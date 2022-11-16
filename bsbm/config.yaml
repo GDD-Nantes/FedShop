@@ -1,0 +1,20 @@
+product:
+  template: "bsbm-product.template"
+  scale_factor: 1
+  params:
+    # type
+    product_n: 100
+    producer_n: 20
+    feature_n: 20
+    prod_type: 20
+    # pgroup
+    # assocation
+  test:
+    - "test_assc_products-producer.sparql"
+
+vendor:
+  template: "bsbm-vendor.template"
+  scale_factor: 1
+  params:
+    product_n: ${product.params.product_n}
+    offer_n: 10

@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+*.nt
+*.nq
+*.tmp
+*.csv
+*_ss.sparql
+.snakemake/

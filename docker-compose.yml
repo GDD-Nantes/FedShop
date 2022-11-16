@@ -1,0 +1,8 @@
+version: "3"
+services:
+  bsbm-virtuoso:
+    image: openlink/virtuoso-opensource-7:7.2.8
+    volumes:
+      - "bsbm/model/vendors:/usr/share/proj"
+    ports:
+      - "8890:8890"

@@ -1,0 +1,40 @@
+#namespace	shop=http://www.shop{%vendor_id}.fr/
+#namespace	ocp=http://www.ocp.com/
+#namespace	bsbm=http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/
+#namespace	rdfs=http://www.w3.org/2000/01/rdf-schema#
+#namespace	rdf=http://www.w3.org/1999/02/22-rdf-syntax-ns#
+#namespace	dc=http://purl.org/dc/elements/1.1/
+
+// ===== ENTITIES & LITERAL PROPERTIES ===== //
+
+
+// ----- Product ----- //
+
+<type> ocp:Product {%product_n}
+</type>
+
+
+// ----- Vendor ----- //
+<type> shop:Vendor 1
+
+<pgroup> 1.0
+#predicate rdfs:label string
+</pgroup>
+
+<pgroup> 1.0
+#predicate rdfs:comment string
+</pgroup>
+
+</type>
+
+// ----- Offer ----- //
+<type> shop:Offer {%offer_n}
+
+<pgroup> 1.0
+#predicate bsbm:price string
+</pgroup>
+</type>
+
+#association shop:Offer bsbm:product ocp:Product 2 1 1.0 ZIPFIAN
+#association shop:Offer bsbm:vendor shop:Vendor 2 1 1.0 ZIPFIAN
+

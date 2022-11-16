@@ -1,0 +1,104 @@
+#namespace	ocp=http://www.ocp.com/
+#namespace	bsbm=http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/
+#namespace	rdfs=http://www.w3.org/2000/01/rdf-schema#
+#namespace	rdf=http://www.w3.org/1999/02/22-rdf-syntax-ns#
+#namespace	dc=http://purl.org/dc/elements/1.1/
+
+// ===== ENTITIES & LITERAL PROPERTIES ===== //
+
+// ----- Producer ----- //
+<type> ocp:Producer {%producer_n}
+
+<pgroup> 1.0
+#predicate rdfs:label string
+</pgroup>
+
+<pgroup> 1.0
+#predicate rdfs:comment string
+</pgroup>
+
+</type>
+
+// ----- Product ----- //
+
+<type> ocp:Product {%product_n}
+
+<pgroup> 1.0
+#predicate rdfs:label string
+</pgroup>
+
+<pgroup> 1.0
+#predicate rdfs:comment string
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:productPropertyTextual1 string
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:productPropertyTextual2 string
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:productPropertyTextual3 string
+</pgroup>
+
+<pgroup> 0.8
+#predicate bsbm:productPropertyTextual4 string
+</pgroup>
+
+<pgroup> 0.8
+#predicate bsbm:productPropertyTextual5 string
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:productPropertyNumeric1 integer
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:productPropertyNumeric2 integer
+</pgroup>
+</type>
+
+<pgroup> 1.0
+#predicate bsbm:productPropertyNumeric3 integer
+</pgroup>
+</type>
+
+<pgroup> 0.8
+#predicate bsbm:productPropertyNumeric4 integer
+</pgroup>
+</type>
+
+// ----- ProductFeature ----- //
+<type> ocp:ProductFeature {%feature_n}
+
+<pgroup> 1.0
+#predicate rdfs:label string
+</pgroup>
+
+<pgroup> 1.0
+#predicate rdfs:comment string
+</pgroup>
+
+</type>
+
+// ----- ProductType ----- //
+<type> ocp:ProductType {%prod_type}
+
+<pgroup> 1.0
+#predicate rdfs:label string
+</pgroup>
+
+<pgroup> 1.0
+#predicate rdfs:comment string
+</pgroup>
+
+</type>
+
+#association ocp:Product rdf:type ocp:ProductType 2 20 1.0 ZIPFIAN
+#association ocp:Product bsbm:productFeature ocp:ProductFeature 2 22[normal] 1.0 ZIPFIAN
+#association ocp:Product bsbm:producer ocp:Producer 2 1 1.0 ZIPFIAN
+#association ocp:Product dc:producer ocp:Producer 2 1 1.0 ZIPFIAN
+
+
