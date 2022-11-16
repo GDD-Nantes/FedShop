@@ -1,8 +1,12 @@
 version: "3"
 services:
   bsbm-virtuoso:
+    container_name: "bsbm-virtuoso"
     image: openlink/virtuoso-opensource-7:7.2.8
+    environment:
+      DBA_PASSWORD: dba
     volumes:
-      - "bsbm/model/vendors:/usr/share/proj"
+      - "./bsbm/model/vendors:/usr/share/proj"
     ports:
+      - "1111:1111"
       - "8890:8890"

@@ -11,7 +11,7 @@ WHERE {
 	?product rdfs:comment ?comment .
 	?product bsbm:producer ?p .
 	?p rdfs:label ?producer .
-    ?product dc:publisher ?p . 
+    #?product dc:publisher ?p . 
 	?product bsbm:productFeature ?f .
 	?f rdfs:label ?productFeature .
 	?product bsbm:productPropertyTextual1 ?propertyTextual1 .
