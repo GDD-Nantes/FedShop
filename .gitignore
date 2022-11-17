@@ -133,4 +133,4 @@ dmypy.json
 *.csv
 *_ss.sparql
 .snakemake/
-virtuoso-status.txt
+virtuoso-ok.txt

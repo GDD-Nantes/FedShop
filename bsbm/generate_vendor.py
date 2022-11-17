@@ -24,4 +24,5 @@ with open(vendor_outFile, "w") as vendorFile:
 
 vendor_scale_factor = config["vendor"]["scale_factor"]
 os.system(f"watdiv -d {vendor_outFile} {vendor_scale_factor} > {model}/{vendor_model}.nt.tmp")
+os.remove(vendor_outFile)
 #os.system(f"python utils/to_quad.py {model}/{vendor_model}.nt.tmp > {model}/{vendor_model}.nq.tmp")

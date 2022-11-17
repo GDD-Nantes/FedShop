@@ -22,4 +22,5 @@ with open(product_outFile, "w") as productFile:
 
 product_scale_factor = config["product"]["scale_factor"]
 os.system(f"watdiv -d {product_outFile} {product_scale_factor} > {os.path.join(model, 'products.nt.tmp')}")
+os.remove(os.path.join(model, "products.txt.tmp"))
 #os.system(f"python utils/to_quad.py {os.path.join(model, 'products.nt.tmp')} > {os.path.join(model, 'products.nq.tmp')}")

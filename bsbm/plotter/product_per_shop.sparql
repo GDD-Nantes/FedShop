@@ -1,0 +1,11 @@
+# Expectation: should get a zipfian distribution
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+SELECT ?shop ?vendor (COUNT(DISTINCT ?product) as ?nbProd)
+WHERE {
+    GRAPH ?shop {
+        ?offer bsbm:product ?product .
+        ?offer bsbm:vendor ?vendor .
+    }
+}
+GROUP BY ?shop ?vendor
+ORDER BY ASC (?shop)
