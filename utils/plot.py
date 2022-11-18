@@ -3,10 +3,17 @@ import os
 from pathlib import Path
 import click
 import subprocess
-from io import BytesIO, StringIO
+from io import StringIO
 import seaborn as sns
 import pandas as pd
 import ast
+from fitter import Fitter, get_common_distributions, get_distributions
+import pylab
+
+from collections import defaultdict
+from itertools import count
+from functools import partial
+
 
 @click.group
 def cli():
@@ -28,18 +35,50 @@ def execute_query(queryfile, endpoint):
 
     return result, records
 
-    
+class PlotFitter(Fitter):
+    def hist(self):
+        _ = pylab.hist(self._data, bins=self.bins, density=False)
+        pylab.grid(True)
+        
+    def summary(self, Nbest=5, lw=2, plot=True, method="sumsquare_error", clf=True, figout=None):
+        """Plots the distribution of the data and Nbest distribution"""
+        if plot:
+            if clf: pylab.clf()
+            self.hist()
+            self.plot_pdf(Nbest=Nbest, lw=lw, method=method)
+            pylab.grid(True)
+            pylab.xlabel("count_value")
+            pylab.ylabel("frequency")
+            if figout is not None:
+                pylab.savefig(figout)
+
+        Nbest = min(Nbest, len(self.distributions))
+        try:
+            names = self.df_errors.sort_values(by=method).index[0:Nbest]
+        except:  # pragma: no cover
+            names = self.df_errors.sort(method).index[0:Nbest]
+        return self.df_errors.loc[names]
 
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.option("--csvout", type=click.Path(file_okay=True, dir_okay=False))
 @click.option("--figout", type=click.Path(file_okay=True, dir_okay=False))
+@click.option("--fitout", type=click.Path(file_okay=True, dir_okay=False))
+@click.option("--fitfig", type=click.Path(file_okay=True, dir_okay=False))
 @click.option("--endpoint", type=str, default="http://localhost:8890/sparql/", help="SPARQL endpoint")
-@click.option("--x", type=click.STRING)
-@click.option("--y", type=click.STRING)
-@click.option("--title", type=click.STRING)
-def plot_entitytype_distribution(queryfile, csvout, figout, endpoint, x, y, title):
+def plot_entitytype_distribution(queryfile, csvout, figout, fitout, fitfig, endpoint):
     result, _ = execute_query(queryfile, endpoint)
+
+    if fitout is not None:
+        data = result[result.columns[1]].values
+        # label_to_number = defaultdict(partial(next, count(1)))
+        # data = [label_to_number[label] for label in data]
+
+        fitter = PlotFitter(data, distributions=get_common_distributions())
+        fitter.fit()
+        fit_result = fitter.summary(Nbest=5, plot=True, method="sumsquare_error", figout=fitfig)
+        fit_result.to_csv(fitout)
+        print(fitter.get_best(method="sumsquare_error"))
     
     if csvout is not None:
         result.to_csv(csvout, index=False)
@@ -47,10 +86,11 @@ def plot_entitytype_distribution(queryfile, csvout, figout, endpoint, x, y, titl
         print(result)
 
     if figout is not None:
+        pylab.clf()
         Path(figout).parent.mkdir(parents=True, exist_ok=True)
         plot = sns.lineplot(result, x=result.columns[0], y=result.columns[1])
+        #plot = sns.displot(result, x=result.columns[0])
         plot.set(
-            title=title,
             xticklabels=[]
         )
         plot.figure.savefig(figout)            

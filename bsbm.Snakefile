@@ -69,8 +69,12 @@ rule run__plot_distribution:
     input: expand("{workdir}/virtuoso-ok.txt", workdir=WORK_DIR)
     output: 
         csv="{model_dir}/distrib/{feature}.csv",
-        fig="{model_dir}/distrib/{feature}.png"
-    shell: "python utils/plot.py plot-entitytype-distribution {WORK_DIR}/plotter/{wildcards.feature}.sparql --csvout {output.csv} --figout {output.fig}"
+        fig="{model_dir}/distrib/{feature}.png",
+        fitout="{model_dir}/distrib/{feature}_fit.csv",
+        fitfig="{model_dir}/distrib/{feature}_fit.png"
+    shell: "python utils/plot.py plot-entitytype-distribution {WORK_DIR}/plotter/{wildcards.feature}.sparql \
+        --csvout {output.csv} --figout {output.fig} \
+        --fitout {output.fitout} --fitfig {output.fitfig}"
 
 rule ingest_virtuoso:
     input: expand("{model_dir}/vendor/shop{vendor_id}.nq", vendor_id=range(N_VENDORS), model_dir=MODEL_DIR)

@@ -138,3 +138,6 @@ virtuoso-ok.txt
 bsbm/model/distrib/
 bsbm/model/product/
 bsbm/model/vendor/
+
+.DS_Store
+db/

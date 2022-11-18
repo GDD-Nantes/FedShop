@@ -12,6 +12,7 @@ services:
     volumes:
       #- "./bsbm/model/vendors:/usr/share/proj"
       - "./bsbm/model/vendor:/usr/local/virtuoso-opensource/share/virtuoso/vad"
+      - ".db:/usr/local/virtuoso-opensource/var/lib/virtuoso/db"
     ports:
       - "1111:1111"
       - "8890:8890"

@@ -11,3 +11,4 @@ pandas==1.4.4
 omegaconf==2.2.3
 coloredlogs==15.0.1
 seaborn==0.12.1
+fitter==1.5.1
