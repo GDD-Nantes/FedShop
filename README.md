@@ -1,6 +1,8 @@
 # RSFB
 Code for Realistic Synthetic Federated Benchmark
 
+Refer to the [Wiki](https://github.com/mhoangvslev/RSFB/wiki) for details.
+
 # Instruction
 
 1. Install dependencies
