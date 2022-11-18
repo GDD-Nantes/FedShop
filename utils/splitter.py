@@ -53,7 +53,7 @@ class SplitSink(Sink):
         if (f"{tofile}.nt" != os.path.basename(currentfile.name)):
             currentfile.close()
             currentfile = open(os.path.join(self.outdir, f"{tofile}.nt"), "a")
-        currentfile.write(f"{s.n3()} {p.n3()} {o.n3()} .\n")
+        currentfile.write(f"{s.n3()}\t{p.n3()}\t{o.n3()}\t.\n")
 
 
 @click.command()

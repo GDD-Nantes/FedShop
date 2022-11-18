@@ -10,3 +10,4 @@ iso639-lang==2.1.0
 pandas==1.4.4
 omegaconf==2.2.3
 coloredlogs==15.0.1
+seaborn==0.12.1

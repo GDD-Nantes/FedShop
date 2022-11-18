@@ -1,10 +1,11 @@
 # Expectation: should get a zipfian distribution
 PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
-SELECT ?product (COUNT(DISTINCT ?shop) as ?nbShop)
+SELECT ?feature (COUNT(DISTINCT ?shop) as ?nbShop)
 WHERE {
     GRAPH ?shop {
-        ?offer bsbm:product ?product
+        ?offer bsbm:product ?product .
+        ?product bsbm:feature ?feature .
     }
 }
-GROUP BY ?product
+GROUP BY ?feature
 ORDER BY DESC (?nbShop)

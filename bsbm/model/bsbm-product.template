@@ -21,7 +21,7 @@
 
 // ----- Product ----- //
 
-<type> ocp:Product {%product_n}
+<type> ocp:Product {%product_id}
 
 <pgroup> 1.0
 #predicate rdfs:label string
@@ -96,9 +96,9 @@
 
 </type>
 
-#association ocp:Product rdf:type ocp:ProductType 2 20 1.0 ZIPFIAN
-#association ocp:Product bsbm:productFeature ocp:ProductFeature 2 22[normal] 1.0 ZIPFIAN
+#association ocp:Product rdf:type ocp:ProductType 2 {%prod_type} 1.0 ZIPFIAN
+#association ocp:Product bsbm:productFeature ocp:ProductFeature 2 {%feature_n} 1.0 ZIPFIAN
 #association ocp:Product bsbm:producer ocp:Producer 2 1 1.0 ZIPFIAN
-#association ocp:Product dc:producer ocp:Producer 2 1 1.0 ZIPFIAN
+//#association ocp:Product dc:producer ocp:Producer 2 1 1.0 ZIPFIAN
 
 

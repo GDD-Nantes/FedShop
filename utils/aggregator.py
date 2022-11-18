@@ -36,7 +36,7 @@ class AggSink(Sink):
         #print(f"{s.n3()} {p.n3()} {o.n3()} .")
 
         with open(self.outfile, "a") as output:
-            output.write(f"{s.n3()} {p.n3()} {o.n3()} {self.domain.n3()}.\n")
+            output.write(f"{s.n3()}\t{p.n3()}\t{o.n3()}\t{self.domain.n3()}.\n")
 
         if isinstance(o, URIRef):
         #if str(o).startswith("http://"):
@@ -52,12 +52,11 @@ class AggSink(Sink):
 @click.argument("infile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("indir", type=click.Path(dir_okay=True, file_okay=False))
 @click.argument("outfile", type=click.Path(dir_okay=False, file_okay=True))
-#@click.argument("domain", type=click.STRING)
-def aggregate(infile, indir, outfile):
-    domain = re.sub(r"<(.*)>", r"\1", open(infile, "r").readline().strip("\n").split()[0])
-    domain = URIRef(domain.rsplit('/', 1)[0])
-    print(domain)
-    sink=AggSink(domain=domain, indir=indir,oufile=outfile, files=[])
+@click.argument("domain", type=click.STRING)
+def aggregate(infile, indir, outfile, domain):
+    # domain = re.sub(r"<(.*)>", r"\1", open(infile, "r").readline().strip("\n").split()[0])
+    # domain = domain.rsplit('/', 1)[0]
+    sink=AggSink(domain=URIRef(domain), indir=indir,oufile=outfile, files=[])
     n=NTParser(sink)
     with open(infile, "rb") as input_file:
         n.skipparse(input_file)

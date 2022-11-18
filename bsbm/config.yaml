@@ -3,10 +3,10 @@ product:
   scale_factor: 1
   params:
     # type
-    product_n: 100
-    producer_n: 20
-    feature_n: 20
-    prod_type: 20
+    product_id: 100
+    producer_n: 4
+    feature_n: 6
+    prod_type: 2
     # pgroup
     # assocation
   test:
@@ -14,6 +14,14 @@ product:
 
 vendor:
   template: "bsbm-vendor.template"
+  scale_factor: 1
+  params:
+    product_n: ${product.params.product_id}
+    offer_n: 10
+    #vendor_n: 10
+
+offer:
+  template: "bsbm-offer.template"
   scale_factor: 1
   params:
     product_n: ${product.params.product_n}
