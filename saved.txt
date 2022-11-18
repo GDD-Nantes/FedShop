@@ -1,5 +1,0 @@
-3
-ocp:Product 100
-shop:Offer 10
-shop:Vendor 1
-0

@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+from pathlib import Path
 
 VIRTUOSO_HOME = ""
 ENDPOINT = "http://localhost:8890/sparql"
@@ -9,7 +10,7 @@ QUERY_DIR = f"{WORK_DIR}/queries"
 MODEL_DIR = f"{WORK_DIR}/model"
 BENCH_DIR = f"{WORK_DIR}/benchmark"
 VARIATION = 3
-VERBOSE = True
+VERBOSE = False
 
 N_VENDORS=100
 N_OFFERS=10
@@ -57,12 +58,27 @@ SCALE_FACTOR=1
 #         'python utils/query.py transform-query {input.query} --endpoint {ENDPOINT} --output {BENCH_DIR} --variation {params.variation}'
 
 rule all:
+    input: 
+        expand(
+            "{model_dir}/distrib/{feature}.csv", 
+            model_dir=MODEL_DIR, 
+            feature=[Path(filename).resolve().stem for filename in os.listdir(os.path.join(WORK_DIR, "plotter"))]
+        )
+
+rule run__plot_distribution:
     input: expand("{workdir}/virtuoso-ok.txt", workdir=WORK_DIR)
+    output: 
+        csv="{model_dir}/distrib/{feature}.csv",
+        fig="{model_dir}/distrib/{feature}.png"
+    shell: "python utils/plot.py plot-entitytype-distribution {WORK_DIR}/plotter/{wildcards.feature}.sparql --csvout {output.csv} --figout {output.fig}"
 
 rule ingest_virtuoso:
-    input: expand("{model_dir}/vendor/shop{vendor_id}.nq", model_dir=MODEL_DIR, vendor_id=range(N_VENDORS))
+    input: expand("{model_dir}/vendor/shop{vendor_id}.nq", vendor_id=range(N_VENDORS), model_dir=MODEL_DIR)
     output: "{WORK_DIR}/virtuoso-ok.txt"
-    shell: 'sh utils/ingest.sh bsbm && echo "" > {WORK_DIR}/virtuoso-ok.txt'
+    run: 
+        os.system(f'sh utils/ingest.sh bsbm && echo "" > {WORK_DIR}/virtuoso-ok.txt')
+        if not VERBOSE:
+            os.system(f"rm {MODEL_DIR}/*.tmp")
 
 rule run__agg_product_vendor:
     input: 

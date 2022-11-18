@@ -63,7 +63,6 @@ def cli():
 @click.option("--pool", type=int, default=1000, help="Seed for random function")
 @click.option("--variation", type=int, default=1, help="Number of variation for each query")
 def transform_query(queryfile, output, endpoint, pool, variation):
-    
     querytext = open(queryfile, mode="r").read()
     result = None
 

@@ -134,3 +134,7 @@ dmypy.json
 *_ss.sparql
 .snakemake/
 virtuoso-ok.txt
+
+bsbm/model/distrib/
+bsbm/model/product/
+bsbm/model/vendor/
