@@ -31,13 +31,25 @@
 <type> shop:Offer {%offer_n}
 
 <pgroup> 1.0
-#predicate bsbm:price integer
+#predicate bsbm:price float
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:validFrom date
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:validTo date
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:deliveryDays integer 1 14 zipfian
 </pgroup>
 
 </type>
 
 // [1] shop:Offer is related to [1] ocp:Product (drawn with a ZIPFIAN) with the probability 1.0 
-#association shop:Offer bsbm:product ocp:Product 2 1 1.0 ZIPFIAN
+#association shop:Offer bsbm:product ocp:Product 2 1
 
 // [1] shop:Offer is related to [1] shop:Vendor (drawn with a ZIPFIAN) with the probability 1.0 
 #association shop:Offer bsbm:vendor shop:Vendor 2 1

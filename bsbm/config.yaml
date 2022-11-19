@@ -8,6 +8,11 @@ product:
     feature_n: 70
     prod_type: 60
     # pgroup
+    productPropertyTextual4_p: 0.7
+    productPropertyTextual5_p: 0.8
+    productPropertyNumeric4_p: 0.7
+    productPropertyNumeric5_p: 0.8
+
     # assocation
   test:
     - "test_assc_products-producer.sparql"
@@ -20,9 +25,15 @@ vendor:
     offer_n: 50
     #vendor_n: 10
 
-# offer:
-#   template: "bsbm-offer.template"
-#   scale_factor: 1
-#   params:
-#     product_n: ${product.params.product_n}
-#     offer_n: 10
+offer:
+  template: "bsbm-review.template"
+  scale_factor: 1
+  params:
+    #type
+    product_n: ${product.params.product_id}
+    person_n: 40
+    #pgroup
+    rating1_p: 0.8
+    rating2_p: 0.7
+    rating3_p: 0.6
+    rating4_p: 0.5

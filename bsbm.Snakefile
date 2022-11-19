@@ -16,54 +16,59 @@ N_VENDORS=100
 N_OFFERS=10
 SCALE_FACTOR=1
 
-# rule all:
-#     input: expand("{benchDir}/results.csv", benchDir=BENCH_DIR)
-
-# rule summary_exectime:
-#     input: 
-#         expand(
-#             "{benchDir}/{query}_v{var}_{ver}.rec.csv", 
-#             benchDir=BENCH_DIR,
-#             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR)],
-#             var=range(VARIATION),
-#             ver=["no_ss", "ss"]
-#         )
-#     output: "{workdir}/results.csv"
-#     run:
-#         print(f"Merging {input} ...")
-#         print(output)
-#         pd.concat(map(pd.read_csv, input)).sort_values("query").to_csv(str(output), index=False)
-
-# rule run__exec_sourceselection_query:
-#     input: "{benchDir}/{query}_v{var}_{ver}.sparql"
-#     output: 
-#         records="{benchDir}/{query}_v{var}_{ver}.rec.csv",
-#         dump="{benchDir}/{query}_v{var}_{ver}.dump.csv"
-#     params:
-#         endpoint=ENDPOINT,
-#         variation=VARIATION
-#     shell: 
-#         'python utils/query.py execute-query {input} --endpoint {params.endpoint} --output {output.dump} --output-format "csv" --records {output.records} --records-format "csv"'
-      
-
-# rule run__build_sourceselection_query: # compute source selection query
-#     input:
-#         status=expand("{workdir}/virtuoso-ok.txt", workdir=WORK_DIR),
-#         query=expand("{queryDir}/{{query}}.sparql", queryDir=QUERY_DIR)
-
-#     output: "{benchDir}/{query}_v{var}_{ver}.sparql"
-#     params:
-#         variation=VARIATION
-#     shell:
-#         'python utils/query.py transform-query {input.query} --endpoint {ENDPOINT} --output {BENCH_DIR} --variation {params.variation}'
-
 rule all:
+    input: expand("{benchDir}/results.csv", benchDir=BENCH_DIR)
+
+rule summary_exectime:
     input: 
         expand(
+            "{benchDir}/{query}_v{var}_{ver}.rec.csv", 
+            benchDir=BENCH_DIR,
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR)],
+            var=range(VARIATION),
+            ver=["no_ss", "ss"]
+        )
+    output: "{workdir}/results.csv"
+    run:
+        print(f"Merging {input} ...")
+        print(output)
+        pd.concat(map(pd.read_csv, input)).sort_values("query").to_csv(str(output), index=False)
+
+rule run__exec_sourceselection_query:
+    input: "{benchDir}/{query}_v{var}_{ver}.sparql"
+    output: 
+        records="{benchDir}/{query}_v{var}_{ver}.rec.csv",
+        dump="{benchDir}/{query}_v{var}_{ver}.dump.csv"
+    params:
+        endpoint=ENDPOINT,
+        variation=VARIATION
+    shell: 
+        'python utils/query.py execute-query {input} --endpoint {params.endpoint} --output {output.dump} --output-format "csv" --records {output.records} --records-format "csv"'
+      
+
+rule run__build_sourceselection_query: # compute source selection query
+    input:
+        status=expand("{workdir}/virtuoso-ok.txt", workdir=WORK_DIR),
+        query=expand("{queryDir}/{{query}}.sparql", queryDir=QUERY_DIR),
+        distrib=expand(
             "{model_dir}/distrib/{feature}.csv", 
             model_dir=MODEL_DIR, 
             feature=[Path(filename).resolve().stem for filename in os.listdir(os.path.join(WORK_DIR, "plotter"))]
         )
+
+    output: "{benchDir}/{query}_v{var}_{ver}.sparql"
+    params:
+        variation=VARIATION
+    shell:
+        'python utils/query.py transform-query {input.query} --endpoint {ENDPOINT} --output {BENCH_DIR} --variation {params.variation}'
+
+# rule all:
+#     input: 
+#         expand(
+#             "{model_dir}/distrib/{feature}.csv", 
+#             model_dir=MODEL_DIR, 
+#             feature=[Path(filename).resolve().stem for filename in os.listdir(os.path.join(WORK_DIR, "plotter"))]
+#         )
 
 rule run__plot_distribution:
     input: expand("{workdir}/virtuoso-ok.txt", workdir=WORK_DIR)

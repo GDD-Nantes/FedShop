@@ -141,3 +141,5 @@ bsbm/model/vendor/
 
 .DS_Store
 db/
+
+saved.txt

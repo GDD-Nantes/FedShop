@@ -35,9 +35,9 @@ def preprocess(query, pool):
     result = re.sub(r"DESCRIBE\s+((\?\w+)\s)*", r"SELECT * ", result)
     result = re.sub("ORDER", "#ORDER", result)
     result = re.sub(r"LIMIT (\d+)", "LIMIT 100", result)
-    result = re.sub(r"FILTER", "#FILTER", result)
-    #result = re.sub(r"(OPTIONAL|UNION|FILTER) (\{|\()", r"#\1 \2", result)
-    #result = re.sub(r"(\t+)\}(\s+)", r"\1#}\2", result)
+    #result = re.sub(r"FILTER", "#FILTER", result)
+    result = re.sub(r"(UNION|FILTER) (\{|\()", r"#\1 \2", result)
+    result = re.sub(r"(\t+)\}(\s+)", r"\1#}\2", result)
 
     if re.search(r"LIMIT", result) is None:
         result += f"\nLIMIT {pool}"
