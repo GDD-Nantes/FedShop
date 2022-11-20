@@ -13,7 +13,7 @@ VARIATION = 3
 VERBOSE = False
 
 N_VENDORS=100
-N_OFFERS=10
+N_REVIEWERS=50
 SCALE_FACTOR=1
 
 rule all:
@@ -82,18 +82,27 @@ rule run__plot_distribution:
         --fitout {output.fitout} --fitfig {output.fitfig}"
 
 rule ingest_virtuoso:
-    input: expand("{model_dir}/vendor/shop{vendor_id}.nq", vendor_id=range(N_VENDORS), model_dir=MODEL_DIR)
+    input: 
+        shop=expand("{model_dir}/vendor/shop{vendor_id}.nq", vendor_id=range(N_VENDORS), model_dir=MODEL_DIR),
+        person=expand("{model_dir}/person/person{person_id}.nq", person_id=range(N_REVIEWERS), model_dir=MODEL_DIR)
     output: "{WORK_DIR}/virtuoso-ok.txt"
     run: 
         os.system(f'sh utils/ingest.sh bsbm && echo "" > {WORK_DIR}/virtuoso-ok.txt')
         if not VERBOSE:
             os.system(f"rm {MODEL_DIR}/*.tmp")
 
+rule run__agg_product_person:
+    input:
+        person="{model_dir}/person{person_id}.nt.tmp",
+        product="{model_dir}/product/"
+    output: "{model_dir}/person/person{person_id}.nq"
+    shell: 'python utils/aggregator.py {input.person} {input.product} {output} http://www.person{wildcards.person_id}.fr'
+
 rule run__agg_product_vendor:
     input: 
         vendor="{model_dir}/vendor{vendor_id}.nt.tmp",
         product="{model_dir}/product/"
-    output: "{model_dir}/vendor/shop{vendor_id}.nq"
+    output: "{model_dir}/vendor/shop{vendor_id}.nq",   
     shell: 'python utils/aggregator.py {input.vendor} {input.product} {output} http://www.shop{wildcards.vendor_id}.fr'
 
 rule run__split_products:
@@ -101,26 +110,27 @@ rule run__split_products:
     output: directory("{model_dir}/product/")
     shell: 'python utils/splitter.py {input} {output}'
 
-# rule run__split_offers:
-#     input: "{model_dir}/offer{offer_id}.nt.tmp"
-#     output: directory("{model_dir}/offer/")
-#     shell: 'python utils/splitter.py {input} {output}'
-
-# rule run__generate_offers:
-#     output: "{model_dir}/offer{offer_id}.nt.tmp"
-#     params:
-#         verbose=VERBOSE
-#     shell: 'python utils/generate.py generate {WORK_DIR}/config.yaml vendor {wildcards.model_dir}/bsbm-vendor.template {output} {wildcards.offer_id} --verbose {params.verbose}'
+rule run__generate_reviewers:
+    input: "watdiv/bin/Release/watdiv"
+    output: "{model_dir}/person{person_id}.nt.tmp"
+    params:
+        verbose=VERBOSE
+    shell: 'python utils/generate.py generate {WORK_DIR}/config.yaml person {wildcards.model_dir}/bsbm-person.template {output} {wildcards.person_id} --verbose {params.verbose}'
 
 rule run__generate_products:
+    input: "watdiv/bin/Release/watdiv"
     output: "{model_dir}/product0.nt.tmp", 
     params:
         verbose=VERBOSE
     shell: 'python utils/generate.py generate {WORK_DIR}/config.yaml product {wildcards.model_dir}/bsbm-product.template {output} 0 --verbose {params.verbose}'
 
 rule run__generate_vendors:
+    input: "watdiv/bin/Release/watdiv"
     output: "{model_dir}/vendor{vendor_id}.nt.tmp"
     params:
         verbose=VERBOSE
     shell: 'python utils/generate.py generate {WORK_DIR}/config.yaml vendor {wildcards.model_dir}/bsbm-vendor.template {output} {wildcards.vendor_id} --verbose {params.verbose}'
 
+rule run__compile_watdiv:
+    output: "watdiv/bin/Release/watdiv"
+    shell: 'cd watdiv && make rebuild && cd ../'

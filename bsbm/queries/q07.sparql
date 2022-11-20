@@ -7,19 +7,21 @@ PREFIX dc: <http://purl.org/dc/elements/1.1/>
 SELECT ?productLabel ?offer ?price ?vendor ?vendorTitle ?review ?revTitle 
  ?reviewer ?revName ?rating1 ?rating2
 WHERE { 
-    %ProductXYZ% rdfs:label ?productLabel .
+    # ?const ?ProductXYZ
+    ?ProductXYZ rdfs:label ?productLabel .
     OPTIONAL {
-        ?offer bsbm:product %ProductXYZ% .
+        ?offer bsbm:product ?ProductXYZ .
 	    ?offer bsbm:price ?price .
 	    ?offer bsbm:vendor ?vendor .
 	    ?vendor rdfs:label ?vendorTitle .
-        ?vendor bsbm:country <http://downlode.org/rdf/iso-3166/countries#DE> .
+        ?vendor bsbm:country "Germany" .
         ?offer dc:publisher ?vendor . 
         ?offer bsbm:validTo ?date .
-        FILTER (?date > %currentDate% )
+        # const ?currentDate $ ?date
+        FILTER (?date > ?currentDate )
     }
     OPTIONAL {
-	    ?review bsbm:reviewFor %ProductXYZ% .
+	    ?review bsbm:reviewFor ?ProductXYZ .
 	    ?review rev:reviewer ?reviewer .
 	    ?reviewer foaf:name ?revName .
 	    ?review dc:title ?revTitle .

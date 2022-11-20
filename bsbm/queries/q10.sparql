@@ -1,0 +1,20 @@
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> 
+PREFIX dc: <http://purl.org/dc/elements/1.1/>
+
+SELECT DISTINCT ?offer ?price
+WHERE {
+    # const ?ProductXYZ
+	?offer bsbm:product ?ProductXYZ .
+	?offer bsbm:vendor ?vendor .
+    ?offer dc:publisher ?vendor .
+	?vendor bsbm:country "USA" .
+	?offer bsbm:deliveryDays ?deliveryDays .
+	FILTER (?deliveryDays <= 3)
+	?offer bsbm:price ?price .
+    ?offer bsbm:validTo ?date .
+    # const ?currentDate $ ?date
+    FILTER (?date > ?currentDate )
+}
+ORDER BY xsd:double(str(?price))
+LIMIT 10

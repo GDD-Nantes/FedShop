@@ -31,7 +31,7 @@
 <type> shop:Offer {%offer_n}
 
 <pgroup> 1.0
-#predicate bsbm:price float
+#predicate bsbm:price float 5 200 normal
 </pgroup>
 
 <pgroup> 1.0

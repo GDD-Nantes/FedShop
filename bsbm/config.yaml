@@ -25,13 +25,13 @@ vendor:
     offer_n: 50
     #vendor_n: 10
 
-offer:
-  template: "bsbm-review.template"
+person:
+  template: "bsbm-person.template"
   scale_factor: 1
   params:
     #type
     product_n: ${product.params.product_id}
-    person_n: 40
+    review_n: 40
     #pgroup
     rating1_p: 0.8
     rating2_p: 0.7
