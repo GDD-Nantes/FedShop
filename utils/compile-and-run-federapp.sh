@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#./utils/compile-and-run-federapp.sh 3600s /Users/mathieugicquel/RSFB/tmp/out.ttl /Users/mathieugicquel/RSFB/tmp/a/query0_v0_0_v0_no_ss.sparql /Users/mathieugicquel/RSFB/tmp/c/query.out  /Users/mathieugicquel/RSFB/tmp/c/query.csv /Users/mathieugicquel/RSFB/tmp/c/query.ss.csv /Users/mathieugicquel/RSFB/tmp/c/query.httpreq.txt /Users/mathieugicquel/RSFB/tmp/b/records.csv
+
 set -x
 
 mkdir -p "$(dirname "$4")" && touch "$4"

@@ -120,24 +120,24 @@ rule run__generate_vendors:
     shell: 'python utils/generate.py generate {WORK_DIR}/config.yaml vendor {wildcards.model_dir}/bsbm-vendor.template {output} {wildcards.vendor_id} --verbose {params.verbose}'
 
 # rule run__generate_fedx_config:
-#    input: "{model_dir}/vendor{vendor_id}.nt.tmp",
-#    output: "{model_dir}/fedx.config",
+#    input: "{model_dir}/vendor",
+#    output: "{benchDir}/fedx.config",
 #    params: endpoint=ENDPOINT,
-#    shell: 'python utils/generate-fedx-config-file.py {input} {output} {params.endpoint}'
+#    shell: 'python utils/generate-fedx-config-file.py {input} {output} --endpoint {params.endpoint}'
 
 # rule run__compile_and_run_federapp_default:
 #    input:
 #        query={benchDir}/{query}_v{var}_{ver}.sparql,
-#        config="{model_dir}/fedx.config"
+#        config="{benchDir}/fedx.config"
 #    params:
 #        run=VARIATION
 #    threads: 1
 #    output:
-#        result="{benchDir}/{query}_v{var}_{ver}.out",
-#        stat="{benchDir}/{query}_v{var}_{ver}.stat",
-#        log="{benchDir}/{query}_v{var}_{ver}.log",
-#        sourceselection="{benchDir}/{query}_v{var}_{ver}.default.ss",
-#        httpreq="{benchDir}/{query}_v{var}_{ver}.http.txt"
+#        result="{benchDir}/{query}_v{var}_{ver}.dft.out",
+#        stat="{benchDir}/{query}_v{var}_{ver}.dft.stat",
+#        log="{benchDir}/{query}_v{var}_{ver}.dft.log",
+#        sourceselection="{benchDir}/{query}_v{var}_{ver}.dft.ss",
+#        httpreq="{benchDir}/{query}_v{var}_{ver}.dft.nhttp"
 #    shell:
 #        "./scripts/compile_and_run_federapp.sh "
 #        + os.getcwd() +"/{input.config} "
@@ -151,8 +151,8 @@ rule run__generate_vendors:
 # rule run__compile_and_run_federapp_forcess:
 #    input:
 #        query="{benchDir}/{query}_v{var}_{ver}.sparql",
-#        config="{model_dir}/fedx.config",
-#        ssopt="{benchDir}/{query}_v{var}_{ver}.default.ss"
+#        config="{benchDir}/fedx.config",
+#        ssopt="{benchDir}/{query}_v{var}_{ver}.rec.csv"
 #    params:
 #        run=VARIATION
 #    threads: 1
@@ -160,8 +160,8 @@ rule run__generate_vendors:
 #        result="{benchDir}/{query}_v{var}_{ver}.fss.out",
 #        stat="{benchDir}/{query}_v{var}_{ver}.fss.stat",
 #        log="{benchDir}/{query}_v{var}_{ver}.fss.log",
-#        sourceselection="{benchDir}/{query}_v{var}_{ver}.force.ss",
-#        httpreq="{benchDir}/{query}_v{var}_{ver}.fss.http.txt"
+#        sourceselection="{benchDir}/{query}_v{var}_{ver}.fss.ss",
+#        httpreq="{benchDir}/{query}_v{var}_{ver}.fss.nhttp"
 #    shell:
 #        "./scripts/compile_and_run_federapp.sh "
 #        + os.getcwd() +"/{input.config} "
