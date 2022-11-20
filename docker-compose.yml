@@ -5,14 +5,14 @@ services:
     #image: openlink/virtuoso-opensource-7:7.2.8
     image: tenforce/virtuoso:virtuoso7.2.5
     environment:
-      SPARQL_UPDATE: false
-      DBA_PASSWORD: dba
+      SPARQL_UPDATE: "false"
+      DBA_PASSWORD: "dba"
       VIRT_SPARQL_MaxQueryCostEstimationTime: 0
       VIRT_SPARQL_ResultSetMaxRows: 0
     volumes:
       #- "./bsbm/model/vendors:/usr/share/proj"
       - "./bsbm/model/vendor:/usr/local/virtuoso-opensource/share/virtuoso/vad"
-      - ".db:/usr/local/virtuoso-opensource/var/lib/virtuoso/db"
+      - "./db:/usr/local/virtuoso-opensource/var/lib/virtuoso/db"
     ports:
       - "1111:1111"
       - "8890:8890"

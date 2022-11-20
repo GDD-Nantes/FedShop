@@ -119,3 +119,56 @@ rule run__generate_vendors:
         verbose=VERBOSE
     shell: 'python utils/generate.py generate {WORK_DIR}/config.yaml vendor {wildcards.model_dir}/bsbm-vendor.template {output} {wildcards.vendor_id} --verbose {params.verbose}'
 
+rule run__generate_fedx_config:
+    input: "{model_dir}/vendor{vendor_id}.nt.tmp",
+    output: "{model_dir}/fedx.config",
+    params: endpoint=ENDPOINT,
+    shell: 'python utils/generate-fedx-config-file.py {input} {output} {params.endpoint}'
+
+rule run__compile_and_run_federapp_default:
+    input:
+        query={benchDir}/{query}_v{var}_{ver}.sparql,
+        config="{model_dir}/fedx.config"
+    params:
+        run=VARIATION
+    threads: 1
+    output:
+        result="{benchDir}/{query}_v{var}_{ver}.out",
+        stat="{benchDir}/{query}_v{var}_{ver}.stat",
+        log="{benchDir}/{query}_v{var}_{ver}.log",
+        sourceselection="{benchDir}/{query}_v{var}_{ver}.default.ss",
+        httpreq="{benchDir}/{query}_v{var}_{ver}.http.txt"
+    shell:
+        "./scripts/compile_and_run_federapp.sh "
+        + os.getcwd() +"/{input.config} "
+        + os.getcwd() +"/{input.query} "
+        + os.getcwd() +"/{output.result}  "
+        + os.getcwd() +"/{output.stat} "
+        + os.getcwd() +"/{output.sourceselection} "
+        + os.getcwd() +"/{output.httpreq} "
+        + " > " + os.getcwd() +"/{output.log}"
+
+rule run__compile_and_run_federapp_forcess:
+    input:
+        query="{benchDir}/{query}_v{var}_{ver}.sparql",
+        config="{model_dir}/fedx.config",
+        ssopt="{benchDir}/{query}_v{var}_{ver}.default.ss"
+    params:
+        run=VARIATION
+    threads: 1
+    output:
+        result="{benchDir}/{query}_v{var}_{ver}.fss.out",
+        stat="{benchDir}/{query}_v{var}_{ver}.fss.stat",
+        log="{benchDir}/{query}_v{var}_{ver}.fss.log",
+        sourceselection="{benchDir}/{query}_v{var}_{ver}.force.ss",
+        httpreq="{benchDir}/{query}_v{var}_{ver}.fss.http.txt"
+    shell:
+        "./scripts/compile_and_run_federapp.sh "
+        + os.getcwd() +"/{input.config} "
+        + os.getcwd() +"/{input.query} "
+        + os.getcwd() +"/{output.result}  "
+        + os.getcwd() +"/{output.stat} "
+        + os.getcwd() +"/{output.sourceselection} "
+        + os.getcwd() +"/{output.httpreq} "
+         + os.getcwd() +"/{input.ssopt} "
+        + " > " + os.getcwd() +"/{output.log}"
