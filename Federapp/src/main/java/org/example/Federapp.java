@@ -60,7 +60,7 @@ public class Federapp {
         String statPath = args[3];
         String sourceSelectionPath = args[4];
         String httpListFilePath = args[5];
-        boolean enableTimeout = true;
+        boolean enableTimeout = false;
 
         if(args.length > 6) {
             String ssPath= args[6];
@@ -107,7 +107,7 @@ public class Federapp {
             try {
                 return Federapp.evaluate(finalConn,rawQuery);
             } catch (Exception e) {
-                log.error(String.valueOf(e));
+                log.error("An error occured inside Future", e);
                 success.set(false);
                 return null;
             }
@@ -119,6 +119,7 @@ public class Federapp {
                 results =  future.get(15,TimeUnit.MINUTES);
             }catch (TimeoutException e) {
                 log.error("Timeout", e);
+                future.cancel(true);
                 success.set(false);
             }
         } else {
@@ -147,7 +148,7 @@ public class Federapp {
             createHttpListFile(httpListFilePath);
         } else {
             statWriter.write(CSV_HEADER);
-            statWriter.write(queryPath + "," +"failed,failed,failed" + "\n");
+            statWriter.write(queryPath + "," +"failed,failed,failed,failed" + "\n");
 
             createSourceSelectionFile(sourceSelectionPath);
             createHttpListFile(httpListFilePath);
@@ -236,8 +237,9 @@ public class Federapp {
                     if(!tpMap.containsKey(j)){
                         tpMap.put(j, new HashSet<>());
                     }
-                    String ss = tp.split("g/")[1].replace("\"","").replace("/","_");
-                    tpMap.get(j).add("sparql_example.org_"+ss);
+                    String ss = tp.replace("http://", "");
+                    // www.shop69.fr -> sparql_www.shop69.fr
+                    tpMap.get(j).add("sparql_" + ss);
                     j++;
                 }
             }
