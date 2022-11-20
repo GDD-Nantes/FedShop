@@ -36,9 +36,9 @@ def execute_query(queryfile, endpoint):
     return result, records
 
 class PlotFitter(Fitter):
-    def hist(self):
-        _ = pylab.hist(self._data, bins=self.bins, density=False)
-        pylab.grid(True)
+    def __init__(self, data, xmin=None, xmax=None, bins=100, distributions=None, timeout=30, density=True):
+        super().__init__(data, xmin, xmax, bins, distributions, timeout, density)
+        self._density = density
         
     def summary(self, Nbest=5, lw=2, plot=True, method="sumsquare_error", clf=True, figout=None):
         """Plots the distribution of the data and Nbest distribution"""
@@ -88,7 +88,7 @@ def plot_entitytype_distribution(queryfile, csvout, figout, fitout, fitfig, endp
     if figout is not None:
         pylab.clf()
         Path(figout).parent.mkdir(parents=True, exist_ok=True)
-        plot = sns.lineplot(result, x=result.columns[0], y=result.columns[1])
+        plot = sns.lineplot(result, x=result.columns[0], y=result.columns[-1], markers=True)
         #plot = sns.displot(result, x=result.columns[0])
         plot.set(
             xticklabels=[]
