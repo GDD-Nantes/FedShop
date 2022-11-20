@@ -31,7 +31,19 @@
 <type> shop:Offer {%offer_n}
 
 <pgroup> 1.0
-#predicate bsbm:price integer
+#predicate bsbm:price float
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:validFrom date
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:validTo date
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:deliveryDays integer 1 14 zipfian
 </pgroup>
 
 </type>

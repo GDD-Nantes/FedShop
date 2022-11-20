@@ -17,6 +17,10 @@
 #predicate rdfs:comment string
 </pgroup>
 
+<pgroup> 1.0
+#predicate bsbm:country country
+</pgroup>
+
 </type>
 
 // ----- Product ----- //
@@ -43,11 +47,11 @@
 #predicate bsbm:productPropertyTextual3 string
 </pgroup>
 
-<pgroup> 0.8
+<pgroup> {%productPropertyTextual4_p}
 #predicate bsbm:productPropertyTextual4 string
 </pgroup>
 
-<pgroup> 0.8
+<pgroup> {%productPropertyTextual5_p}
 #predicate bsbm:productPropertyTextual5 string
 </pgroup>
 
@@ -65,9 +69,14 @@
 </pgroup>
 </type>
 
-<pgroup> 0.8
+<pgroup> {%productPropertyNumeric4_p}
 #predicate bsbm:productPropertyNumeric4 integer
 </pgroup>
+
+<pgroup> {%productPropertyNumeric5_p}
+#predicate bsbm:productPropertyNumeric5 integer
+</pgroup>
+
 </type>
 
 // ----- ProductFeature ----- //
@@ -98,7 +107,6 @@
 
 #association ocp:Product rdf:type ocp:ProductType 2 {%prod_type} 1.0 ZIPFIAN
 #association ocp:Product bsbm:productFeature ocp:ProductFeature 2 {%feature_n} 1.0 ZIPFIAN
-#association ocp:Product bsbm:producer ocp:Producer 2 1 1.0 ZIPFIAN
-//#association ocp:Product dc:producer ocp:Producer 2 1 1.0 ZIPFIAN
+#association ocp:Product bsbm:producer ocp:Producer 2 {%producer_n} 1.0 ZIPFIAN
 
 
