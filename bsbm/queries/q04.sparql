@@ -23,6 +23,7 @@ WHERE {
         # const ?ProductFeature1
         ?product bsbm:productFeature ?ProductFeature1 .
         # const ?ProductFeature3
+        # distrib ?ProductFeature3 $ ?ProductFeature2
         ?product bsbm:productFeature ?ProductFeature3 .
         ?product bsbm:productPropertyTextual1 ?propertyTextual .
         ?product bsbm:productPropertyNumeric2 ?p2 .

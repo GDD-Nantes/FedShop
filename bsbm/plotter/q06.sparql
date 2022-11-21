@@ -3,8 +3,7 @@ PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 
 SELECT 
-    ?ProductFeature1 
-    ?ProductFeature2 
+    ?product 
     (COUNT(DISTINCT ?shop) as ?nbShop)
     (GROUP_CONCAT(DISTINCT ?shop, "|") as ?candidateShop)
 WHERE {
@@ -12,4 +11,4 @@ WHERE {
 	    ?offer bsbm:product ?product .
     }
 }
-GROUP BY ?ProductFeature1 ?ProductFeature2
+GROUP BY ?product

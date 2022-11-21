@@ -15,7 +15,7 @@ WHERE {
 	    ?offer bsbm:vendor ?vendor .
 	    ?vendor rdfs:label ?vendorTitle .
         ?vendor bsbm:country "Germany" .
-        ?offer dc:publisher ?vendor . 
+        #?offer dc:publisher ?vendor . 
         ?offer bsbm:validTo ?date .
         # const ?currentDate $ ?date
         FILTER (?date > ?currentDate )

@@ -15,6 +15,7 @@ VERBOSE = False
 N_VENDORS=100
 N_REVIEWERS=50
 SCALE_FACTOR=1
+SS_PROB_LIMIT=10
 
 # rule all:
 #     input: expand("{benchDir}/results.csv", benchDir=BENCH_DIR)
@@ -50,7 +51,7 @@ rule all:
         expand(
             "{benchDir}/{query}_v{var}_{ver}.sparql",
             benchDir=BENCH_DIR,
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR)],
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if "_" not in f],
             var=range(VARIATION),
             ver=["no_ss", "ss"]
         )
@@ -62,9 +63,10 @@ rule run__build_sourceselection_query: # compute source selection query
         distrib=expand("{modelDir}/distrib/{{query}}.csv", modelDir=MODEL_DIR)
     output: "{benchDir}/{query}_v{var}_{ver}.sparql"
     params:
-        variation=VARIATION
+        variation=VARIATION,
+        pool=SS_PROB_LIMIT
     shell:
-        'python utils/query.py transform-query {input.query} {input.distrib} --endpoint {ENDPOINT} --output {BENCH_DIR} --variation {params.variation}'
+        'python utils/query.py transform-query {input.query} {input.distrib} --endpoint {ENDPOINT} --output {BENCH_DIR} --variation {params.variation} --pool {params.pool}'
 
 # rule all:
 #     input: 
