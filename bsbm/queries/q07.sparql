@@ -7,7 +7,7 @@ PREFIX dc: <http://purl.org/dc/elements/1.1/>
 SELECT ?productLabel ?offer ?price ?vendor ?vendorTitle ?review ?revTitle 
  ?reviewer ?revName ?rating1 ?rating2
 WHERE { 
-    # ?const ?ProductXYZ
+    # const ?ProductXYZ
     ?ProductXYZ rdfs:label ?productLabel .
     OPTIONAL {
         ?offer bsbm:product ?ProductXYZ .

@@ -28,7 +28,7 @@ SCALE_FACTOR=1
 #             var=range(VARIATION),
 #             ver=["no_ss", "ss"]
 #         )
-#     output: "{workdir}/results.csv"
+#     output: "{workDir}/results.csv"
 #     run:
 #         print(f"Merging {input} ...")
 #         print(output)
@@ -44,86 +44,89 @@ SCALE_FACTOR=1
 #         variation=VARIATION
 #     shell: 
 #         'python utils/query.py execute-query {input} --endpoint {params.endpoint} --output {output.dump} --output-format "csv" --records {output.records} --records-format "csv"'
-      
-
-# rule run__build_sourceselection_query: # compute source selection query
-#     input:
-#         status=expand("{workdir}/virtuoso-ok.txt", workdir=WORK_DIR),
-#         query=expand("{queryDir}/{{query}}.sparql", queryDir=QUERY_DIR),
-#         distrib=expand(
-#             "{model_dir}/distrib/{feature}.csv", 
-#             model_dir=MODEL_DIR, 
-#             feature=[Path(filename).resolve().stem for filename in os.listdir(os.path.join(WORK_DIR, "plotter"))]
-#         )
-
-#     output: "{benchDir}/{query}_v{var}_{ver}.sparql"
-#     params:
-#         variation=VARIATION
-#     shell:
-#         'python utils/query.py transform-query {input.query} --endpoint {ENDPOINT} --output {BENCH_DIR} --variation {params.variation}'
 
 rule all:
     input: 
         expand(
-            "{model_dir}/distrib/{feature}.csv", 
-            model_dir=MODEL_DIR, 
-            feature=[Path(filename).resolve().stem for filename in os.listdir(os.path.join(WORK_DIR, "plotter"))]
+            "{benchDir}/{query}_v{var}_{ver}.sparql",
+            benchDir=BENCH_DIR,
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR)],
+            var=range(VARIATION),
+            ver=["no_ss", "ss"]
         )
 
+rule run__build_sourceselection_query: # compute source selection query
+    input:
+        #status=expand("{workDir}/virtuoso-ok.txt", workDir=WORK_DIR),
+        query=expand("{queryDir}/{{query}}.sparql", queryDir=QUERY_DIR),
+        distrib=expand("{modelDir}/distrib/{{query}}.csv", modelDir=MODEL_DIR)
+    output: "{benchDir}/{query}_v{var}_{ver}.sparql"
+    params:
+        variation=VARIATION
+    shell:
+        'python utils/query.py transform-query {input.query} {input.distrib} --endpoint {ENDPOINT} --output {BENCH_DIR} --variation {params.variation}'
+
+# rule all:
+#     input: 
+#         expand(
+#             "{modelDir}/distrib/{query}.csv", 
+#             modelDir=MODEL_DIR,
+#             query=[Path(filename).resolve().stem for filename in os.listdir(QUERY_DIR)]
+#         )
+
 rule run__plot_distribution:
-    input: expand("{workdir}/virtuoso-ok.txt", workdir=WORK_DIR)
+    input: 
+        virtuoso=expand("{workDir}/virtuoso-ok.txt", workDir=WORK_DIR),
+        queryfile=expand("{workDir}/plotter/{{query}}.sparql", workDir=WORK_DIR)
     output: 
-        csv="{model_dir}/distrib/{feature}.csv",
-        fig="{model_dir}/distrib/{feature}.png",
-        #fitout="{model_dir}/distrib/{feature}_fit.csv",
-        #fitfig="{model_dir}/distrib/{feature}_fit.png"
-    shell: "python utils/plot.py plot-entitytype-distribution {WORK_DIR}/plotter/{wildcards.feature}.sparql \
-        --csvout {output.csv} --figout {output.fig} "
+        csv="{modelDir}/distrib/{query}.csv",
+        #fig="{modelDir}/distrib/{query}.png",
+        #fitout="{modelDir}/distrib/{feature}_fit.csv",
+        #fitfig="{modelDir}/distrib/{feature}_fit.png"
+    shell: "python utils/plot.py plot-entitytype-distribution {input.queryfile} --csvout {output.csv}"
+        # --figout {output.fig} 
         #--fitout {output.fitout} --fitfig {output.fitfig}"
 
 rule ingest_virtuoso:
     input: 
-        shop=expand("{model_dir}/vendor/shop{vendor_id}.nq", vendor_id=range(N_VENDORS), model_dir=MODEL_DIR),
-        person=expand("{model_dir}/person/person{person_id}.nq", person_id=range(N_REVIEWERS), model_dir=MODEL_DIR)
+        shop=expand("{modelDir}/exported/shop{vendor_id}.nq", vendor_id=range(N_VENDORS), modelDir=MODEL_DIR),
+        person=expand("{modelDir}/exported/person{person_id}.nq", person_id=range(N_REVIEWERS), modelDir=MODEL_DIR)
     output: "{WORK_DIR}/virtuoso-ok.txt"
-    run: 
-        os.system(f'sh utils/ingest.sh bsbm && echo "" > {WORK_DIR}/virtuoso-ok.txt')
-        if not VERBOSE:
-            os.system(f"rm {MODEL_DIR}/*.tmp")
+    run:  os.system(f'sh utils/ingest.sh bsbm && echo "" > {WORK_DIR}/virtuoso-ok.txt')
 
 rule run__agg_product_person:
     input:
-        person="{model_dir}/person{person_id}.nt.tmp",
-        product="{model_dir}/product/"
-    output: "{model_dir}/person/person{person_id}.nq"
+        person="{modelDir}/tmp/person{person_id}.nt.tmp",
+        product="{modelDir}/tmp/product/"
+    output: "{modelDir}/exported/person{person_id}.nq"
     shell: 'python utils/aggregator.py {input.person} {input.product} {output} http://www.person{wildcards.person_id}.fr'
 
 rule run__agg_product_vendor:
     input: 
-        vendor="{model_dir}/vendor{vendor_id}.nt.tmp",
-        product="{model_dir}/product/"
-    output: "{model_dir}/vendor/shop{vendor_id}.nq",   
+        vendor="{modelDir}/tmp/vendor{vendor_id}.nt.tmp",
+        product="{modelDir}/tmp/product/"
+    output: "{modelDir}/exported/shop{vendor_id}.nq",   
     shell: 'python utils/aggregator.py {input.vendor} {input.product} {output} http://www.shop{wildcards.vendor_id}.fr'
 
 rule run__split_products:
-    input: "{model_dir}/product0.nt.tmp"
-    output: directory("{model_dir}/product/")
+    input: "{modelDir}/tmp/product0.nt.tmp"
+    output: directory("{modelDir}/tmp/product/")
     shell: 'python utils/splitter.py {input} {output}'
 
 rule run__generate_reviewers:
-    output: "{model_dir}/person{person_id}.nt.tmp"
+    output: "{modelDir}/tmp/person{person_id}.nt.tmp"
     params:
         verbose=VERBOSE
-    shell: 'python utils/generate.py generate {WORK_DIR}/config.yaml person {wildcards.model_dir}/bsbm-person.template {output} {wildcards.person_id} --verbose {params.verbose}'
+    shell: 'python utils/generate.py generate {WORK_DIR}/config.yaml person {wildcards.modelDir}/bsbm-person.template {output} {wildcards.person_id} --verbose {params.verbose}'
 
 rule run__generate_products:
-    output: "{model_dir}/product0.nt.tmp", 
+    output: "{modelDir}/tmp/product0.nt.tmp", 
     params:
         verbose=VERBOSE
-    shell: 'python utils/generate.py generate {WORK_DIR}/config.yaml product {wildcards.model_dir}/bsbm-product.template {output} 0 --verbose {params.verbose}'
+    shell: 'python utils/generate.py generate {WORK_DIR}/config.yaml product {wildcards.modelDir}/bsbm-product.template {output} 0 --verbose {params.verbose}'
 
 rule run__generate_vendors:
-    output: "{model_dir}/vendor{vendor_id}.nt.tmp"
+    output: "{modelDir}/tmp/vendor{vendor_id}.nt.tmp"
     params:
         verbose=VERBOSE
-    shell: 'python utils/generate.py generate {WORK_DIR}/config.yaml vendor {wildcards.model_dir}/bsbm-vendor.template {output} {wildcards.vendor_id} --verbose {params.verbose}'
+    shell: 'python utils/generate.py generate {WORK_DIR}/config.yaml vendor {wildcards.modelDir}/bsbm-vendor.template {output} {wildcards.vendor_id} --verbose {params.verbose}'

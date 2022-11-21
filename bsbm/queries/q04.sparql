@@ -10,6 +10,7 @@ WHERE {
         ?product rdf:type ?ProductType .
         # const ?ProductFeature1
         ?product bsbm:productFeature ?ProductFeature1 .
+        # const ?ProductFeature2
         ?product bsbm:productFeature ?ProductFeature2 .
         ?product bsbm:productPropertyTextual1 ?propertyTextual .
         ?product bsbm:productPropertyNumeric1 ?p1 .

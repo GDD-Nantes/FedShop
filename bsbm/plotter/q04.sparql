@@ -1,0 +1,17 @@
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT 
+    ?ProductFeature1 
+    ?ProductFeature2 
+    (COUNT(DISTINCT ?shop) as ?nbShop)
+    (GROUP_CONCAT(DISTINCT ?shop, "|") as ?candidateShop)
+WHERE {
+    GRAPH ?shop {
+        ?product rdf:type ?ProductType .
+        ?product bsbm:productFeature ?ProductFeature1 .
+        ?product bsbm:productFeature ?ProductFeature2 .
+    }
+}
+GROUP BY ?ProductType ?ProductFeature1 ?ProductFeature2

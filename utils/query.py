@@ -58,11 +58,12 @@ def cli():
 
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("distribfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.option("--output", type=click.Path(dir_okay=True, file_okay=False), default=None, help="The folder in which the query result will be stored.")
 @click.option("--endpoint", type=str, default="http://localhost:8890/sparql/", help="URL to a SPARQL endpoint")
 @click.option("--pool", type=int, default=1000, help="Seed for random function")
 @click.option("--variation", type=int, default=1, help="Number of variation for each query")
-def transform_query(queryfile, output, endpoint, pool, variation):
+def transform_query(queryfile, distribfile, output, endpoint, pool, variation):
     querytext = open(queryfile, mode="r").read()
     result = None
 
@@ -79,6 +80,28 @@ def transform_query(queryfile, output, endpoint, pool, variation):
     query_results = pd.read_csv(BytesIO(result))
     #print(query_results)
 
+    # Read distribution information
+    distrib = pd.read_csv(distribfile)
+    distrib.filter(regex="candidate*")
+    infos = dict()
+    infos["const"] = [ col for col in distrib.columns if "nb" not in col and "candidate" not in col ]
+    infos["candidate"] = []
+    infos["nb"] = []
+    for col in distrib.columns:
+        if "candidate" in col:
+            distrib[col] = distrib[col].apply(lambda x: x.str.split("|"))
+            infos["candidate"].append(col)
+
+        elif "nb" in col:
+            infos["nb"].append(col)
+        
+    # If there are more than one source to choose from, choose randomly one
+    nbInfo = np.random.choice(infos["nb"])
+    nbCandidate = np.random.choice(infos["candidate"])
+
+    # Cut into groups in term of availability across source
+    distrib["variation"] = pd.cut(distrib[nbInfo], bins=3, labels=range(variation))
+
     subDict = dict()
     prefixDict = dict()
     prefixDict["http://www.w3.org/2001/XMLSchema#"] = "xsd"
@@ -86,7 +109,9 @@ def transform_query(queryfile, output, endpoint, pool, variation):
     query_name = Path(queryfile).resolve().stem
 
     for var in range(variation):
+        #===============================
         # Parse input file
+        #===============================
         query = open(queryfile, mode="r").read()
         for line in open(queryfile, mode="r").readlines():
             toks = np.array(re.split(r"\s+", line))
@@ -111,6 +136,13 @@ def transform_query(queryfile, output, endpoint, pool, variation):
         
         # Replace all tokens in subDict
         for const, constSrc in subDict.items():
+
+            # If const is in distrib infos
+            if const in infos["const"]:
+                repl_val = distrib[distrib["variation"] == var].sample(1)
+                query = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", query)
+                continue
+
             subSrc = const[1:]
             repl_val = None
             if constSrc is not None:
@@ -151,13 +183,18 @@ def transform_query(queryfile, output, endpoint, pool, variation):
                         query = f"PREFIX {prefixName}: <{prefixSub}>" + "\n" + query
             query = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", query)
 
+        #===============================
         # Write vanilla version
+        #===============================
         out_no_ss_file = os.path.join(output, f"{query_name}_v{var}_no_ss.sparql")
         with open(out_no_ss_file, mode="w") as out:
             out.write(query)
             out.close()
 
+        #===============================
         # Write source selection version
+        #===============================
+
         # Wrap each tp with GRAPH clause
         ntp = 0
         wherePos = np.inf
@@ -173,7 +210,7 @@ def transform_query(queryfile, output, endpoint, pool, variation):
                 continue
         
         graph_proj = ' '.join([ f"?tp{i}" for i in np.arange(1, ntp+1) ])
-        query = re.sub(r"SELECT(\s+DISTINCT)?\s+((\?\w+)\s+|\*)*", rf"SELECT\1 \3 {graph_proj} ", query)
+        query = re.sub(r"SELECT(\s+DISTINCT)?\s+((\?\w+)\s+|\*)*", rf"SELECT\1 {graph_proj} ", query)
 
 
         Path(output).mkdir(parents=True, exist_ok=True)

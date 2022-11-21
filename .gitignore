@@ -143,3 +143,5 @@ bsbm/model/vendor/
 db/
 
 saved.txt
+
+*.zip

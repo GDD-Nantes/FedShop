@@ -62,12 +62,13 @@ class PlotFitter(Fitter):
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.option("--csvout", type=click.Path(file_okay=True, dir_okay=False))
-@click.option("--figout", type=click.Path(file_okay=True, dir_okay=False))
 @click.option("--fitout", type=click.Path(file_okay=True, dir_okay=False))
 @click.option("--fitfig", type=click.Path(file_okay=True, dir_okay=False))
 @click.option("--endpoint", type=str, default="http://localhost:8890/sparql/", help="SPARQL endpoint")
-def plot_entitytype_distribution(queryfile, csvout, figout, fitout, fitfig, endpoint):
+def plot_entitytype_distribution(queryfile, csvout, fitout, fitfig, endpoint):
     result, _ = execute_query(queryfile, endpoint)
+    if result.empty:
+        raise RuntimeError(f"{queryfile} returns no result...")
 
     if fitout is not None:
         data = result[result.columns[1]].values
@@ -83,19 +84,7 @@ def plot_entitytype_distribution(queryfile, csvout, figout, fitout, fitfig, endp
     if csvout is not None:
         result.to_csv(csvout, index=False)
     else:
-        print(result)
-
-    if figout is not None:
-        pylab.clf()
-        Path(figout).parent.mkdir(parents=True, exist_ok=True)
-        plot = sns.lineplot(result, x=result.columns[0], y=result.columns[-1], markers=True)
-        #plot = sns.displot(result, x=result.columns[0])
-        plot.set(
-            xticklabels=[]
-        )
-        plot.figure.savefig(figout)            
-
-
+        print(result)  
   
 if __name__ == "__main__":
     cli()
