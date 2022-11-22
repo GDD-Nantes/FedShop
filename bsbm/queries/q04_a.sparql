@@ -13,7 +13,7 @@ WHERE {
     ?product bsbm:productFeature ?ProductFeature2 .
     ?product bsbm:productPropertyTextual1 ?propertyTextual .
     ?product bsbm:productPropertyNumeric1 ?p1 .
-    # const ?x $ ?p1
+    # const ?x < ?p1
     #FILTER ( ?p1 > ?x )
 }
 LIMIT 1

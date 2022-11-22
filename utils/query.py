@@ -52,12 +52,14 @@ def lang_detect(txt):
     #print(result)
     return result
 
-def exec_query(query, endpoint):
+def exec_query(query, endpoint, error_when_timeout=False):
     sparql_endpoint = SPARQLWrapper(endpoint)
+    if error_when_timeout: sparql_endpoint.addParameter("timeout", "300000") # in ms
     sparql_endpoint.setReturnFormat(CSV)        
     sparql_endpoint.setQuery(query)
-    result = sparql_endpoint.queryAndConvert()
-    return result
+    response = sparql_endpoint.query()
+    result = response.convert()
+    return response, result
 
 @click.group
 def cli():
@@ -84,7 +86,6 @@ def transform_query(queryfile, distribfile, variation, var, noss_output, ss_outp
     infos["nb"] = []
     for col in distrib.columns:
         if "candidate" in col:
-            print(distrib[col] )
             distrib[col] = distrib[col].apply(lambda x: x.split("|"))
             infos["candidate"].append(col)
 
@@ -96,7 +97,7 @@ def transform_query(queryfile, distribfile, variation, var, noss_output, ss_outp
     #nbCandidate = np.random.choice(infos["candidate"])
 
     # Cut into groups in term of availability across source
-    distrib["variation"] = pd.cut(distrib[nbInfo], bins=3, labels=range(variation))
+    distrib["variation"] = pd.cut(distrib[nbInfo], bins=variation, labels=range(variation))
     print(distrib["variation"].value_counts())
 
     subDict = dict()
@@ -177,14 +178,20 @@ def transform_query(queryfile, distribfile, variation, var, noss_output, ss_outp
     print(f"Sub-queries: {subQueries}")
     if len(subQueries) == 0:
         print(query_intermediate)
-        query_results.append(pd.read_csv(BytesIO(exec_query(query_intermediate, endpoint))))
+        _, result = exec_query(query_intermediate, endpoint)
+        header = BytesIO(result).readline().decode().replace('"', '').split(",")
+        query_results.append(pd.read_csv(BytesIO(result), 
+            parse_dates=[col for col in header if "date" in col.lower() ]
+        ))
 
     for subQuery in tqdm(subQueries):
         content = open(subQuery, "r").read()
         for const, repl_val in repl_cache.items():
             content = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", content)
         print(content)
-        qr = pd.read_csv(BytesIO(exec_query(content, endpoint)))
+        _, result = exec_query(content, endpoint)
+        header = BytesIO(result).readline().decode().replace('"', '').split(",")
+        qr = pd.read_csv(BytesIO(result), parse_dates=[col for col in header if "date" in col.lower()])
         if qr.empty: raise RuntimeError(f"{content} returns no result...")
         query_results.append(qr)
 
@@ -238,8 +245,6 @@ def transform_query(queryfile, distribfile, variation, var, noss_output, ss_outp
 
         if str(repl_val).startswith("http") or str(repl_val).startswith("nodeID"): 
             repl_val = URIRef(repl_val).n3()
-        elif re.search(r"\d{4}((\-|\/)\d+){2}", str(repl_val)) is not None:
-            repl_val = Literal(repl_val).n3() + "^^<http://www.w3.org/2001/XMLSchema#dateType>"
         else:
             repl_val = Literal(repl_val).n3()
 
@@ -302,9 +307,14 @@ def execute_query(query, output, output_format, records, records_format, endpoin
     query_text = open(query, mode="r").read()
 
     startTime = time()    
-    result = exec_query(query_text, endpoint)  
+    response, result = exec_query(query_text, endpoint, error_when_timeout=True)  
     endTime = time()
+    execTime = (endTime-startTime)*1e-3
     
+    # When timeout
+    if "x-exec-milliseconds" in response.info():
+        execTime = np.nan
+
     csvOut = pd.read_csv(BytesIO(result))
     if output is None:
         if output_format == "stdout": 
@@ -317,7 +327,7 @@ def execute_query(query, output, output_format, records, records_format, endpoin
 
     recordsOut = {
         "query": query_name,
-        "exec_time": (endTime-startTime)*1e-3
+        "exec_time": execTime
     }
 
     if records is None :

@@ -14,7 +14,7 @@ WHERE {
         ?product bsbm:productFeature ?ProductFeature2 .
         ?product bsbm:productPropertyTextual1 ?propertyTextual .
         ?product bsbm:productPropertyNumeric1 ?p1 .
-        # const ?x $ ?p1
+        # const ?x < ?p1
         FILTER ( ?p1 > ?x )
     } UNION {
         ?product rdfs:label ?label .
@@ -27,7 +27,7 @@ WHERE {
         ?product bsbm:productFeature ?ProductFeature3 .
         ?product bsbm:productPropertyTextual1 ?propertyTextual .
         ?product bsbm:productPropertyNumeric2 ?p2 .
-        # const ?y $ ?p2
+        # const ?y < ?p2
         FILTER ( ?p2 > ?y ) 
     } 
 }

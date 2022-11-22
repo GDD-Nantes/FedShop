@@ -11,10 +11,10 @@ WHERE {
     # const ?ProductFeature1
 	?product bsbm:productFeature ?ProductFeature1 .
 	?product bsbm:productPropertyNumeric1 ?p1 .
-    # const ?x $ ?p1 
+    # const ?x < ?p1 
 	FILTER ( ?p1 > ?x ) 
 	?product bsbm:productPropertyNumeric3 ?p3 .
-	# const ?y $ ?p3
+	# const ?y > ?p3
     FILTER (?p3 < ?y )
     OPTIONAL { 
         # const ?ProductFeature2

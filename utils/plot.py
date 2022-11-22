@@ -1,4 +1,4 @@
-import json
+import glob
 import os
 from pathlib import Path
 import click
@@ -9,11 +9,7 @@ import pandas as pd
 import ast
 from fitter import Fitter, get_common_distributions, get_distributions
 import pylab
-
-from collections import defaultdict
-from itertools import count
-from functools import partial
-
+import numpy as np
 
 @click.group
 def cli():
@@ -85,6 +81,23 @@ def plot_entitytype_distribution(queryfile, csvout, fitout, fitfig, endpoint):
         result.to_csv(csvout, index=False)
     else:
         print(result)  
+
+@cli.command()
+@click.argument("benchdir")
+def plot_ss_performance_per_query(benchdir):
+    all_records = glob.glob(os.path.join(benchdir, "*.rec.csv"))
+    all_dumps = glob.glob(os.path.join(benchdir, "*.dump.csv"))
+
+    for dumpfile in all_dumps:
+        dump = pd.read_csv(dumpfile)
+        print(dumpfile)
+        print(dump)
+        tpwss = dump.apply(lambda x: np.sum(x.nunique()))
+        print(tpwss)
+        break
+    
+    virtuoso_exec_rec = pd.concat((pd.read_csv(f) for f in all_records)).set_index("query")
+    print(virtuoso_exec_rec)
   
 if __name__ == "__main__":
     cli()
