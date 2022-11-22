@@ -4,7 +4,6 @@ from time import time
 from collections import Counter
 import os
 from pathlib import Path
-from rdflib import ConjunctiveGraph
 from tqdm import tqdm
 
 import re
@@ -12,7 +11,7 @@ import numpy as np
 import pandas as pd
 from SPARQLWrapper import SPARQLWrapper, CSV, DESCRIBE
 from io import BytesIO, StringIO
-from rdflib.term import Literal, URIRef, BNode
+from rdflib import Literal, URIRef, XSD
 import click
 
 import nltk
@@ -32,7 +31,7 @@ for lang in ["english"]:
 
 def preprocess(query, pool):
     result = query
-    result = re.sub(r"SELECT(\s+DISTINCT)?\s+((\?\w+)\s+|\*)*", r"SELECT\1 * ", result)
+    result = re.sub(r"(SELECT|CONSTRUCT)(\s+DISTINCT)?\s+((\?\w+)\s+|\*)*", r"SELECT\2 * ", result)
     result = re.sub(r"DESCRIBE\s+((\?\w+)\s)*", r"SELECT * ", result)
     result = re.sub("ORDER", "#ORDER", result)
     result = re.sub(r"LIMIT (\d+)", "LIMIT 100", result)
@@ -67,11 +66,14 @@ def cli():
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("distribfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
-@click.option("--output", type=click.Path(dir_okay=True, file_okay=False), default=None, help="The folder in which the query result will be stored.")
+@click.argument("variation", type=click.INT)
+@click.argument("var", type=click.INT)
+@click.argument("noss_output", type=click.Path(dir_okay=True, file_okay=False))
+@click.argument("ss_output", type=click.Path(dir_okay=True, file_okay=False))
 @click.option("--endpoint", type=str, default="http://localhost:8890/sparql/", help="URL to a SPARQL endpoint")
-@click.option("--pool", type=int, default=1000, help="Seed for random function")
-@click.option("--variation", type=int, default=1, help="Number of variation for each query")
-def transform_query(queryfile, distribfile, output, endpoint, pool, variation):
+@click.option("--pool", type=click.INT, default=1000, help="Seed for random function")
+
+def transform_query(queryfile, distribfile, variation, var, noss_output, ss_output, endpoint, pool):
 
     # Read distribution information
     distrib = pd.read_csv(distribfile)
@@ -82,6 +84,7 @@ def transform_query(queryfile, distribfile, output, endpoint, pool, variation):
     infos["nb"] = []
     for col in distrib.columns:
         if "candidate" in col:
+            print(distrib[col] )
             distrib[col] = distrib[col].apply(lambda x: x.split("|"))
             infos["candidate"].append(col)
 
@@ -103,175 +106,185 @@ def transform_query(queryfile, distribfile, output, endpoint, pool, variation):
 
     query_name = Path(queryfile).resolve().stem
 
-    for var in range(variation):
-        repl_cache = dict()
+    repl_cache = dict()
 
-        #===============================
-        # Parse input file
-        #===============================
-        print(f"Parsing {queryfile} ...")
-        query = open(queryfile, mode="r").read()
-        for line in open(queryfile, mode="r").readlines():
-            toks = np.array(re.split(r"\s+", line))
-            if "#" in toks:
-                if "const" in toks:
-                    comp = re.search(r"(\?\w+)\s+(\W|\w+)\s+(\?\w+)", line)
-                    if comp is not None:
-                        op = comp.group(2)
-                        const = comp.group(1)
-                        constSrc = comp.group(3)
-                        subDict[const] = {"src": constSrc, "op": op}
-                    else:
-                        const = toks[np.argwhere(toks == "const") + 1].item()
-                        subDict[const] = None
-                    continue
-                elif "distrib" in toks:
-                    comp = re.search(r"(\?\w+)\s+(\W|\w+)\s+(\?\w+)", line)
-                    if comp is not None:
-                        op = comp.group(2)
-                        const = comp.group(1)
-                        constSrc = comp.group(3)
-                        distribDict[const] = {"src": constSrc, "op": op}
-                    continue
-
-            elif "PREFIX" in toks:
-                regex = r"PREFIX\s+([\w\-]+):\s*<(.*)>\s*"
-                prefixName = re.search(regex, line).group(1)
-                prefixSub = re.search(regex, line).group(2)
-                prefixDict[prefixSub] = prefixName
-        
-        # Step 1: Inject constant using distribution infos
-        print(f"Inject constant using distribution infos...")
-        distrib_sample = distrib[distrib["variation"] == var].sample(1)
-        distrib_cache = dict()
-        for const in subDict.keys():
-            constHaveRef = const in distribDict.keys()
-            subSrc = distribDict[const]["src"][1:] if constHaveRef else const[1:]
-            if subSrc in infos["const"]:
-
-                if constHaveRef: # Resample if already have ref
-                    search_query = ["variation == @var"] + [ f"{k} == '{v}'" for k, v in distrib_cache.items() ]
-                    search_query = " and ".join(search_query)
-                    print(search_query)
-                    distrib_sample = distrib.query(search_query).sample(1)
-                repl_val = distrib_sample[subSrc].item()
-                distrib_cache[subSrc] = repl_val
-                repl_val = URIRef(repl_val).n3()
-                repl_cache[const] = repl_val
-                query = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", query)
-
-        # Step 2: Inject const using random sampling for the rest
-        print(f"Inject const using random sampling for the rest")
-        query_intermediate = preprocess(query, pool)
-
-        query_results = []
-        
-        # Step 3: Replace const in subqueries and obtain result:
-        subQueries = [ os.path.join(Path(queryfile).parent, fn) for fn in os.listdir(Path(queryfile).parent) if fn.startswith(f"{query_name}_") ]
-        print(subQueries)
-        if len(subQueries) == 0:
-            query_results.append(pd.read_csv(BytesIO(exec_query(query_intermediate, endpoint))))
-
-        for subQuery in tqdm(subQueries):
-            content = open(subQuery, "r").read()
-            for const, repl_val in repl_cache.items():
-                content = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", content)
-            print(content)
-            query_results.append(pd.read_csv(BytesIO(exec_query(content, endpoint))))
-
-        # Step 4: Replace const in the rest of the queries
-        for const, constSrc in subDict.items():
-            subSrc = const[1:]
-
-            if const in repl_cache.keys(): continue
-            
-            def find(subSrc, query_results):
-                
-                # Find amongst the subqueries if the required column is presetn
-                query_result = None
-                for r in query_results:
-                    print(f"Finding {subSrc} amongst {r.columns}")
-                    if subSrc in r.columns:
-                        query_result = r
-                        break
-                return query_result
-                
-            # Replace all tokens in subDict
-            query_result = find(subSrc, query_results)
-            repl_val = None
-            if constSrc is not None:
-                query_result = find(subSrc, query_results)
-                subSrc = constSrc["src"][1:]
-                if ">" in constSrc["op"]:
-                    repl_val = query_result[subSrc].dropna().max()
-                elif "<" in constSrc["op"]:
-                    repl_val = query_result[subSrc].dropna().min()
-                elif constSrc["op"] == "in":
-                    query_result["lang"] = query_result[subSrc].apply(lambda x: lang_detect(x))
-                    for lang in query_result["lang"].unique():
-                        try: stopwords.extend(nltk_stopwords.words(lang))
-                        except: continue
-                    
-                    bow = Counter(tokenizer.tokenize(str(query_result[subSrc].str.cat(sep=" ")).lower()))
-                    bow = Counter({ k: v for k, v in bow.items() if k not in stopwords})
-                    print(bow.most_common(10))
-                    repl_val = np.random.choice(list(map(lambda x: x[0], bow.most_common(10)))).item()
-
+    #===============================
+    # Parse input file
+    #===============================
+    print(f"Parsing {queryfile} ...")
+    query = open(queryfile, mode="r").read()
+    for line in open(queryfile, mode="r").readlines():
+        toks = np.array(re.split(r"\s+", line))
+        if "#" in toks:
+            if "const" in toks:
+                comp = re.search(r"(\?\w+)\s+(\W|\w+)\s+(\?\w+)", line)
+                if comp is not None:
+                    op = comp.group(2)
+                    const = comp.group(1)
+                    constSrc = comp.group(3)
+                    subDict[const] = {"src": constSrc, "op": op}
                 else:
-                    query_result = find(subSrc, query_results)
-                    repl_val = query_result[subSrc].dropna().value_counts().idxmax()
-            else: 
-                repl_val = query_result[subSrc].dropna().value_counts().idxmax()
-            
-            if str(repl_val).startswith("http") or str(repl_val).startswith("nodeID"): 
-                repl_val = URIRef(repl_val).n3()
-            else: 
-                repl_val = Literal(repl_val).n3()
+                    const = toks[np.argwhere(toks == "const") + 1].item()
+                    subDict[const] = None
+                continue
+            elif "distrib" in toks:
+                comp = re.search(r"(\?\w+)\s+(\W|\w+)\s+(\?\w+)", line)
+                if comp is not None:
+                    op = comp.group(2)
+                    const = comp.group(1)
+                    constSrc = comp.group(3)
+                    distribDict[const] = {"src": constSrc, "op": op}
+                continue
 
-            # Shorten string representations with detected and common prefixes
-            for prefixSub, prefixName in prefixDict.items():
-                if prefixSub in repl_val:
-                    repl_val = re.sub(rf"<{prefixSub}(\w+)>", rf"{prefixName}:\1", repl_val)
-                    missing_prefix = f"PREFIX {prefixName}: <{prefixSub}>"
-                    if re.search(re.escape(missing_prefix), query) is None:
-                        query = f"PREFIX {prefixName}: <{prefixSub}>" + "\n" + query
+        elif "PREFIX" in toks:
+            regex = r"PREFIX\s+([\w\-]+):\s*<(.*)>\s*"
+            prefixName = re.search(regex, line).group(1)
+            prefixSub = re.search(regex, line).group(2)
+            prefixDict[prefixSub] = prefixName
+        
+    # Step 1: Inject constant using distribution infos
+    print(f"Inject constant using distribution infos...")    
+    distrib_cache = dict()
+    for const in subDict.keys():
+        constHaveRef = const in distribDict.keys()
+        subSrc = distribDict[const]["src"][1:] if constHaveRef else const[1:]
+        if subSrc in infos["const"]:
+            distrib_sample = None
+            if len(distrib["variation"].unique()) == 1:
+                distrib_sample = distrib.sample(1)
+            else:
+                search_query = [f"variation == {var}"] + [ f"{k} == '{v}'" for k, v in distrib_cache.items() if k != subSrc ]
+                if constHaveRef: # Resample if already have ref
+                    search_query.extend([ f"{k} == '{v}'" for k, v in distrib_cache.items() if k == subSrc ])
+                search_query = " and ".join(search_query)
+                print(search_query)
+                distrib_sample = distrib.query(search_query).sample(1)
+            
+            repl_val = distrib_sample[subSrc].item()
+            distrib_cache[subSrc] = repl_val
+            repl_val = URIRef(repl_val).n3()
+            repl_cache[const] = repl_val
             query = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", query)
 
-        #===============================
-        # Write vanilla version
-        #===============================
-        out_no_ss_file = os.path.join(output, f"{query_name}_v{var}_no_ss.sparql")
-        with open(out_no_ss_file, mode="w") as out:
-            out.write(query)
-            out.close()
+    # Step 2: Inject const using random sampling for the rest
+    print(f"Inject const using random sampling for the rest")
+    query_intermediate = preprocess(query, pool)
 
-        #===============================
-        # Write source selection version
-        #===============================
-
-        # Wrap each tp with GRAPH clause
-        ntp = 0
-        wherePos = np.inf
-        for cur, line in enumerate(StringIO(query).readlines()):
-            if "WHERE" not in line and cur < wherePos: continue
-            else: wherePos = cur
-            try:
-                ntp += 1
-                subline = re.search(r"^(\s|(\w+\s*\{)|\{)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\?\w+|\w+:\w+|<\S+>))(\s|\}|\.)*\s*$", line).group(3)
-                query = re.sub(re.escape(subline), f"GRAPH ?tp{ntp} {{ {subline} }}", query)
-            except:
-                ntp -= 1
-                continue
+    query_results = []
         
-        graph_proj = ' '.join([ f"?tp{i}" for i in np.arange(1, ntp+1) ])
-        query = re.sub(r"SELECT(\s+DISTINCT)?\s+((\?\w+)\s+|\*)*", rf"SELECT\1 {graph_proj} ", query)
+    # Step 3: Replace const in subqueries and obtain result:
+    subQueries = [ os.path.join(Path(queryfile).parent, fn) for fn in os.listdir(Path(queryfile).parent) if fn.startswith(f"{query_name}_") ]
+    print(f"Sub-queries: {subQueries}")
+    if len(subQueries) == 0:
+        print(query_intermediate)
+        query_results.append(pd.read_csv(BytesIO(exec_query(query_intermediate, endpoint))))
 
+    for subQuery in tqdm(subQueries):
+        content = open(subQuery, "r").read()
+        for const, repl_val in repl_cache.items():
+            content = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", content)
+        print(content)
+        qr = pd.read_csv(BytesIO(exec_query(content, endpoint)))
+        if qr.empty: raise RuntimeError(f"{content} returns no result...")
+        query_results.append(qr)
 
-        Path(output).mkdir(parents=True, exist_ok=True)
-        out_ss_file = os.path.join(output, f"{query_name}_v{var}_ss.sparql")
-        with open(out_ss_file, mode="w") as out:
-            out.write(query)
-            out.close()
+    # Step 4: Replace const in the rest of the queries
+    print(f"Replace const in the rest of the queries")
+    for const, constSrc in subDict.items():
+        if const in repl_cache.keys(): continue            
+        
+        def find(subSrc, query_results): 
+            # Find amongst the subqueries if the required column is presetn
+            query_result = None
+            for r in query_results:
+                #print(f"Finding {subSrc} amongst {r.columns}")
+                if subSrc in r.columns:
+                    query_result = r
+                    break
+            if query_result is None:
+                raise RuntimeError(f"{subSrc} could not be found in {query_results}")
+            return query_result
+                
+        # Replace all tokens in subDict
+        repl_val = None
+        if constSrc is not None:
+            subSrc = constSrc["src"][1:]
+            query_result = find(subSrc, query_results)
+
+            if ">" in constSrc["op"]:
+                repl_val = query_result[subSrc].dropna().max().item()
+            elif "<" in constSrc["op"]:
+                repl_val = query_result[subSrc].dropna().min().item()
+            elif constSrc["op"] == "in":
+                query_result["lang"] = query_result[subSrc].apply(lambda x: lang_detect(x))
+                for lang in query_result["lang"].unique():
+                    try: stopwords.extend(nltk_stopwords.words(lang))
+                    except: continue
+                    
+                bow = Counter(tokenizer.tokenize(str(query_result[subSrc].str.cat(sep=" ")).lower()))
+                bow = Counter({ k: v for k, v in bow.items() if k not in stopwords})
+                print(bow.most_common(10))
+                repl_val = np.random.choice(list(map(lambda x: x[0], bow.most_common(10)))).item()
+
+            else:
+                query_result = find(subSrc, query_results)
+                repl_val = query_result[subSrc].dropna().value_counts().idxmax()
+        else: 
+            subSrc = const[1:]
+            query_result = find(subSrc, query_results)
+            repl_val = query_result[subSrc].dropna().value_counts().idxmax()
+        
+        repl_val =  repl_val.item() if np.issubdtype(type(repl_val), np.number) else repl_val
+
+        if str(repl_val).startswith("http") or str(repl_val).startswith("nodeID"): 
+            repl_val = URIRef(repl_val).n3()
+        elif re.search(r"\d{4}((\-|\/)\d+){2}", str(repl_val)) is not None:
+            repl_val = Literal(repl_val).n3() + "^^<http://www.w3.org/2001/XMLSchema#dateType>"
+        else:
+            repl_val = Literal(repl_val).n3()
+
+        # Shorten string representations with detected and common prefixes
+        for prefixSub, prefixName in prefixDict.items():
+            if prefixSub in repl_val:
+                repl_val = re.sub(rf"<{prefixSub}(\w+)>", rf"{prefixName}:\1", repl_val)
+                missing_prefix = f"PREFIX {prefixName}: <{prefixSub}>"
+                if re.search(re.escape(missing_prefix), query) is None:
+                    query = f"PREFIX {prefixName}: <{prefixSub}>" + "\n" + query
+        query = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", query)
+
+    #===============================
+    # Write vanilla version
+    #===============================
+    print(f"Writing noss version...")
+    with open(noss_output, mode="w") as out:
+        out.write(query)
+        out.close()
+
+    #===============================
+    # Write source selection version
+    #===============================
+    print(f"Writing ss version...")
+    ss_cache = dict()
+
+    # Wrap each tp with GRAPH clause
+    ntp = 0
+    wherePos = np.inf
+    for cur, line in enumerate(open(noss_output, "r").readlines()):
+        if "WHERE" not in line and cur < wherePos: continue
+        else: wherePos = cur
+        subline_search = re.search(r"^(\s|(\w+\s*\{)|\{)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\?\w+|\w+:\w+|<\S+>))(\s|\}|\.)*\s*$", line)
+        if subline_search is not None:
+            subline = subline_search.group(3)
+            if subline not in ss_cache.keys():
+                ntp += 1
+                query = re.sub(re.escape(subline), f"GRAPH ?tp{ntp} {{ {subline} }}", query)
+            
+    graph_proj = ' '.join([ f"?tp{i}" for i in np.arange(1, ntp+1) ])
+    query = re.sub(r"SELECT(\s+DISTINCT)?\s+((\?\w+)\s+|\*)*", rf"SELECT\1 {graph_proj} ", query)
+
+    with open(ss_output, mode="w") as out:
+        out.write(query)
+        out.close()
 
 @cli.command()
 @click.argument("query", type=click.Path(exists=True, file_okay=True, dir_okay=False))

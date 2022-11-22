@@ -5,16 +5,7 @@ PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 PREFIX bsbm-export: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/export/>
 PREFIX dc: <http://purl.org/dc/elements/1.1/>
 
-CONSTRUCT { 
-    # const ?OfferXYZ
-    ?OfferXYZ bsbm-export:product ?productURI .
-    ?OfferXYZ bsbm-export:productlabel ?productlabel .
-    ?OfferXYZ bsbm-export:vendor ?vendorname .
-    ?OfferXYZ bsbm-export:vendorhomepage ?vendorhomepage . 
-    ?OfferXYZ bsbm-export:offerURL ?offerURL .
-    ?OfferXYZ bsbm-export:price ?price .
-    ?OfferXYZ bsbm-export:deliveryDays ?deliveryDays .
-    ?OfferXYZ bsbm-export:validuntil ?validTo } 
+SELECT DISTINCT *
 WHERE { 
     ?OfferXYZ bsbm:product ?productURI .
     ?productURI rdfs:label ?productlabel .

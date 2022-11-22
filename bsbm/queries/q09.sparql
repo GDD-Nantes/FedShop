@@ -1,11 +1,7 @@
 PREFIX rev: <http://purl.org/stuff/rev#>
 
-SELECT 
-    ?ReviewXYZ
-    (COUNT (DISTINCT ?person) as ?nbPerson)
-    (GROUP_CONCAT (DISTINCT ?person) as ?candidatePerson)
+DESCRIBE ?x
 WHERE { 
-    GRAPH ?person {
-        ?ReviewXYZ rev:reviewer ?x .
-    }
+    # const ?ReviewXYZ
+    ?ReviewXYZ rev:reviewer ?x 
 }

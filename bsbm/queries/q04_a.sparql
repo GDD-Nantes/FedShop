@@ -16,4 +16,4 @@ WHERE {
     # const ?x $ ?p1
     #FILTER ( ?p1 > ?x )
 }
-LIMIT 5
+LIMIT 1

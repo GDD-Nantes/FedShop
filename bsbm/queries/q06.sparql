@@ -8,5 +8,5 @@ WHERE {
     ?offer bsbm:product ?product .
     #?product rdf:type bsbm:Product .
     # const ?word1 in ?label 
-	FILTER regex(?label, "?word1")
+	FILTER regex(?label, ?word1)
 }

@@ -9,10 +9,9 @@ import glob
 # Goal : Generate a configuration file for RDF4J to set the use of named graph as endpoint thanks to data file
 
 @click.command()
-@click.argument("dir_data_file")
-@click.argument("config_file")
+@click.argument("dir_data_file", type=click.Path(exists=True, dir_okay=True, file_okay=False))
+@click.argument("config_file", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.option("--endpoint", type=str, default="http://localhost:8890/sparql/", help="URL to a SPARQL endpoint")
-
 def generate_fedx_config_file(dir_data_file, config_file, endpoint):
     ssite = set()
     for data_file in glob.glob(f'{dir_data_file}/*.nq'):

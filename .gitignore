@@ -136,9 +136,10 @@ dmypy.json
 virtuoso-ok.txt
 
 bsbm/model/distrib/
-bsbm/model/product/
-bsbm/model/vendor/
+bsbm/model/tmp/
+bsbm/benchmark/
 
+.m2
 .DS_Store
 db/
 

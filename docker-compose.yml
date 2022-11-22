@@ -10,12 +10,13 @@ services:
       VIRT_SPARQL_MaxQueryCostEstimationTime: 0
       VIRT_SPARQL_ResultSetMaxRows: 0
       VIRT_SPARQL_MaxQueryExecutionTime: 0
+      #VIRT_SPARQL_MaxQueryExecutionTime: 900
       VIRT_Parameters_NumberOfBuffers: 1360000
       VIRT_Parameters_MaxDirtyBuffers: 1000000
     volumes:
       #- "./bsbm/model/vendors:/usr/share/proj"
       - "./bsbm/model/exported:/usr/local/virtuoso-opensource/share/virtuoso/vad"
-      - "./db:/usr/local/virtuoso-opensource/var/lib/virtuoso/db"
+      #- "./db:/usr/local/virtuoso-opensource/var/lib/virtuoso/db"
     ports:
       - "1111:1111"
       - "8890:8890"
