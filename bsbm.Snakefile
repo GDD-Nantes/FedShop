@@ -49,7 +49,7 @@ rule run__compile_and_run_federapp_default:
 rule run__compile_and_run_federapp_forcess:
    input:
        query="{benchDir}/{query}_v{var}_ss.sparql",
-       config=expand("{workDir}/fedx.ttl", workDir=WORK_DIR),
+       config="{benchDir}/fedx.ttl",
        ssopt="{benchDir}/{query}_v{var}_ss.rec.csv"
    params:
        run=VARIATION,
@@ -71,8 +71,8 @@ rule run__generate_fedx_config:
     input: 
         exported=expand("{modelDir}/exported", modelDir=MODEL_DIR),
         dump=expand(
-            "{{benchDir}}/{query}_v{var}_{ver}.dump.csv",
-            #benchDir=BENCH_DIR,
+            "{benchDir}/{query}_v{var}_{ver}.dump.csv",
+            benchDir=BENCH_DIR,
             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if "_" not in f],
             var=range(VARIATION),
             ver=VERSIONS

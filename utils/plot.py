@@ -1,6 +1,7 @@
 import glob
 import os
 from pathlib import Path
+import re
 import click
 import subprocess
 from io import StringIO
@@ -10,6 +11,7 @@ import ast
 from fitter import Fitter, get_common_distributions, get_distributions
 import pylab
 import numpy as np
+import matplotlib.pyplot as plt
 
 @click.group
 def cli():
@@ -83,20 +85,54 @@ def plot_entitytype_distribution(queryfile, csvout, fitout, fitfig, endpoint):
         print(result)  
 
 @cli.command()
-@click.argument("benchdir")
+@click.argument("benchdir", type=click.Path(exists=True, dir_okay=True, file_okay=False))
 def plot_ss_performance_per_query(benchdir):
-    all_records = glob.glob(os.path.join(benchdir, "*.rec.csv"))
-    all_dumps = glob.glob(os.path.join(benchdir, "*.dump.csv"))
+    all_records = glob.glob(os.path.join(benchdir, "*_ss.rec.csv"))
+    all_dumps = glob.glob(os.path.join(benchdir, "*_ss.dump.csv"))
 
+    dump_list = []
     for dumpfile in all_dumps:
         dump = pd.read_csv(dumpfile)
-        print(dumpfile)
-        print(dump)
-        tpwss = dump.apply(lambda x: np.sum(x.nunique()))
-        print(tpwss)
-        break
+        info_search = re.search(r"(q\d+)_v(\d+)_((no)?ss)", dumpfile)
+        dump_list.append(pd.DataFrame({
+            "query": f"{info_search.group(1)}_v{info_search.group(2)}_{info_search.group(3)}",
+            "query_group": info_search.group(1),
+            "freq_group": info_search.group(2),
+            "distinct_ss": dump.apply(lambda x: x.nunique()).sum(),
+            "ss": dump.apply(lambda x: len(x)).sum()
+        }, index=[0]))
+    virtuoso_ss_rec = pd.concat(dump_list).set_index("query").sort_index()
+    virtuoso_ss_rec.to_csv(os.path.join(benchdir, "virtuoso_ss_rec.csv"))
+    print(virtuoso_ss_rec)
+
+    sns.barplot(data=virtuoso_ss_rec, x="query_group", y="ss", hue="freq_group") \
+        .set(
+            title="Number of source selections for queries in Virtuoso",
+            yscale="log"
+        )
+    plt.savefig(os.path.join(benchdir, "virtuoso_total_ss_rec.png"))
+    plt.clf()
+
+    sns.barplot(data=virtuoso_ss_rec, x="query_group", y="distinct_ss", hue="freq_group") \
+        .set(
+            title="Number of distinct source selections for queries in Virtuoso",
+            yscale="log"
+        )
+    plt.savefig(os.path.join(benchdir, "virtuoso_distinct_ss_rec.png"))
+    plt.clf()
     
-    virtuoso_exec_rec = pd.concat((pd.read_csv(f) for f in all_records)).set_index("query")
+    virtuoso_exec_rec = pd.concat((pd.read_csv(f) for f in all_records)).set_index("query").sort_index()
+    virtuoso_exec_rec["query_group"] = virtuoso_exec_rec.index.str.replace(r"(q\d+)_v(\d+)_(no)?ss", r"\1", regex=True)
+    virtuoso_exec_rec["freq_group"] = virtuoso_exec_rec.index.str.replace(r"(q\d+)_v(\d+)_(no)?ss", r"\2", regex=True)
+    virtuoso_exec_rec.to_csv(os.path.join(benchdir, "virtuoso_exec_rec.csv"))
+
+    sns.barplot(data=virtuoso_exec_rec, x="query_group", y="exec_time", hue="freq_group") \
+        .set(
+            title="Execution time for queries in Virtuoso",
+            yscale="log"
+        )
+    plt.savefig(os.path.join(benchdir, "virtuoso_ss_exec.png"))
+    plt.clf()
     print(virtuoso_exec_rec)
   
 if __name__ == "__main__":

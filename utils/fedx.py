@@ -19,22 +19,26 @@ def cli():
 @click.argument("app", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("query", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("result", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("stat", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("sourceselection", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("httpreq", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("ssopt", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("output", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.argument("result", type=click.Path(exists=False, file_okay=True, dir_okay=True))
+@click.argument("stat", type=click.Path(exists=False, file_okay=True, dir_okay=True))
+@click.argument("sourceselection", type=click.Path(exists=False, file_okay=True, dir_okay=True))
+@click.argument("httpreq", type=click.Path(exists=False, file_okay=True, dir_okay=True))
+@click.argument("output", type=click.Path(exists=False, file_okay=True, dir_okay=True))
+@click.option("--ssopt", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.option("--timeout", type=click.INT, default=300)
-def run_benchmark(app, config, query, result, stat, sourceselection, httpreq, ssopt, output, timeout):
+def run_benchmark(app, config, query, result, stat, sourceselection, httpreq, output, ssopt, timeout):
     jar = os.path.join(app, "Federapp-1.0-SNAPSHOT.jar")
     lib = os.path.join(app, "lib/*")
-    args = f"{config} {query} {result} {stat} {sourceselection} {httpreq} {ssopt}"
+    args = f"{config} {query} {result} {stat} {sourceselection} {httpreq} {ssopt}".strip()
     timeoutArgs = f'timeout --signal=SIGKILL "{timeout}"' if timeout != 0 else ""
-    fedx_proc = subprocess.run(f'{timeoutArgs} java -classpath "{jar}:{lib}" org.example.Federapp {args}')
+    fedx_proc = subprocess.run(
+        f'{timeoutArgs} java -classpath "{jar}:{lib}" org.example.Federapp {args}'.strip(),
+        capture_output=True,
+        shell=True
+    )
     if fedx_proc.returncode == 0:
         with open(output, "w") as fout:
-            fout.write(fedx_proc.stdout)
+            fout.write(fedx_proc.stdout.decode())
             fout.close()
     else:
         with open(output, "w") as fout:

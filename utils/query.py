@@ -179,7 +179,8 @@ def transform_query(queryfile, distribfile, variation, var, noss_output, ss_outp
     if len(subQueries) == 0:
         print(query_intermediate)
         _, result = exec_query(query_intermediate, endpoint)
-        header = BytesIO(result).readline().decode().replace('"', '').split(",")
+        header = BytesIO(result).readline()
+        header = pd.read_csv(BytesIO(header)).columns
         query_results.append(pd.read_csv(BytesIO(result), 
             parse_dates=[col for col in header if "date" in col.lower() ]
         ))
@@ -190,7 +191,8 @@ def transform_query(queryfile, distribfile, variation, var, noss_output, ss_outp
             content = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", content)
         print(content)
         _, result = exec_query(content, endpoint)
-        header = BytesIO(result).readline().decode().replace('"', '').split(",")
+        header = BytesIO(result).readline()
+        header = pd.read_csv(BytesIO(header)).columns        
         qr = pd.read_csv(BytesIO(result), parse_dates=[col for col in header if "date" in col.lower()])
         if qr.empty: raise RuntimeError(f"{content} returns no result...")
         query_results.append(qr)
@@ -219,9 +221,9 @@ def transform_query(queryfile, distribfile, variation, var, noss_output, ss_outp
             query_result = find(subSrc, query_results)
 
             if ">" in constSrc["op"]:
-                repl_val = query_result[subSrc].dropna().max().item()
+                repl_val = query_result[subSrc].dropna().max()
             elif "<" in constSrc["op"]:
-                repl_val = query_result[subSrc].dropna().min().item()
+                repl_val = query_result[subSrc].dropna().min()
             elif constSrc["op"] == "in":
                 query_result["lang"] = query_result[subSrc].apply(lambda x: lang_detect(x))
                 for lang in query_result["lang"].unique():
@@ -240,9 +242,10 @@ def transform_query(queryfile, distribfile, variation, var, noss_output, ss_outp
             subSrc = const[1:]
             query_result = find(subSrc, query_results)
             repl_val = query_result[subSrc].dropna().value_counts().idxmax()
-        
-        repl_val =  repl_val.item() if np.issubdtype(type(repl_val), np.number) else repl_val
 
+        try: repl_val = repl_val.item()
+        except: pass
+        
         if str(repl_val).startswith("http") or str(repl_val).startswith("nodeID"): 
             repl_val = URIRef(repl_val).n3()
         else:
@@ -309,7 +312,7 @@ def execute_query(query, output, output_format, records, records_format, endpoin
     startTime = time()    
     response, result = exec_query(query_text, endpoint, error_when_timeout=True)  
     endTime = time()
-    execTime = (endTime-startTime)*1e-3
+    execTime = (endTime-startTime)*1e3
     
     # When timeout
     if "x-exec-milliseconds" in response.info():
