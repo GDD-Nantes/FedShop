@@ -34,7 +34,7 @@ def generate(config, section, template, output, id, verbose):
 
     scale_factor = config["vendor"]["scale_factor"]
     
-    watdiv_proc = subprocess.run(f"watdiv -d {outFile} {scale_factor}", capture_output=True, shell=True)
+    watdiv_proc = subprocess.run(f"{config['watdiv']['exec']} -d {outFile} {scale_factor}", capture_output=True, shell=True)
     
     if watdiv_proc.returncode != 0:
         raise RuntimeError(watdiv_proc.stderr.decode())

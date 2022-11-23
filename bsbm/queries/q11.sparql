@@ -1,0 +1,7 @@
+SELECT ?property ?hasValue ?isValueOf
+WHERE {
+    # const ?OfferXYZ
+    { ?OfferXYZ ?property ?hasValue }
+    UNION
+    { ?isValueOf ?property ?OfferXYZ }
+}

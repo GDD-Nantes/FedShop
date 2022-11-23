@@ -1,0 +1,72 @@
+#namespace	review=http://www.review{%person_id}.fr/
+#namespace	ocp=http://www.ocp.com/
+#namespace	bsbm=http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/
+#namespace	rdfs=http://www.w3.org/2000/01/rdf-schema#
+#namespace	rdf=http://www.w3.org/1999/02/22-rdf-syntax-ns#
+#namespace	dc=http://purl.org/dc/elements/1.1/
+#namespace  rev=http://purl.org/stuff/rev#
+#namespace  foaf=http://xmlns.com/foaf/0.1/
+
+// ===== ENTITIES & LITERAL PROPERTIES ===== //
+
+// ----- Product ----- //
+
+<type> ocp:Product {%product_n}
+</type>
+
+// ----- Person ----- //
+
+<type> review:Person 1
+
+<pgroup> 1.0
+#predicate foaf:name name
+</pgroup>
+
+<pgroup> 1.0
+#predicate foaf:mbox_sha1sum integer
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:country COUNTRY 1 8 normal
+</pgroup>
+
+</type>
+
+// ----- Review ----- //
+<type> review:Review {%review_n}
+
+<pgroup> 1.0
+#predicate bsbm:reviewDate date
+</pgroup>
+
+<pgroup> 1.0
+#predicate dc:title string
+</pgroup>
+
+<pgroup> 1.0
+#predicate rev:text string
+</pgroup>
+
+<pgroup> {%rating1_p}
+#predicate bsbm:rating1 integer 1 5 normal
+</pgroup>
+
+<pgroup> {%rating2_p}
+#predicate bsbm:rating2 integer 1 5 normal
+</pgroup>
+
+<pgroup> {%rating3_p}
+#predicate bsbm:rating3 integer 1 5 normal
+</pgroup>
+
+<pgroup> {%rating4_p}
+#predicate bsbm:rating4 integer 1 5 normal
+</pgroup>
+
+</type>
+
+// [1] review:Review is related to [1] ocp:Product (drawn with a ZIPFIAN) with the probability 1.0 
+#association review:Review bsbm:reviewFor ocp:Product 1 1
+
+// [Many] review:Review are related to [Many] review:Person (drawn with a ZIPFIAN) with the probability 1.0 
+#association review:Review rev:reviewer review:Person 2 1

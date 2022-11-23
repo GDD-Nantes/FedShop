@@ -1,4 +1,4 @@
-from logging import Logger
+import logging
 from typing import Union
 from rdflib.plugins.parsers.ntriples import W3CNTriplesParser as NTripleParser, DummySink as Sink, ParseError
 from rdflib.util import from_n3
@@ -32,8 +32,7 @@ class NTParser(NTripleParser):
             try:
                 self.parseline()
             except ParseError:
-                Logger.warning(
-                    f"parse error: dropping {self.line}. Reason {sys.exc_info()[0]}")
+                logging.warning(f"parse error: dropping {self.line}. Reason {sys.exc_info()[0]}")
                 continue
         return self.sink
 
