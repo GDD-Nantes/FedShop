@@ -288,7 +288,8 @@ def transform_query(queryfile, distribfile, variation, var, noss_output, ss_outp
                 query = re.sub(re.escape(subline), f"GRAPH ?tp{ntp} {{ {subline} }}", query)
             
     graph_proj = ' '.join([ f"?tp{i}" for i in np.arange(1, ntp+1) ])
-    query = re.sub(r"SELECT(\s+DISTINCT)?\s+((\?\w+)\s+|\*)*", rf"SELECT\1 {graph_proj} ", query)
+    query = re.sub(r"SELECT(\s+DISTINCT)?\s+((\?\w+)\s+|\*)*", rf"SELECT {graph_proj} ", query)
+    # Deferring the task of eliminate duplicate downstream if needed.
 
     with open(ss_output, mode="w") as out:
         out.write(query)

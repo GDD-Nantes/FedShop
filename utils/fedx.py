@@ -24,31 +24,32 @@ def cli():
 @click.argument("sourceselection", type=click.Path(exists=False, file_okay=True, dir_okay=True))
 @click.argument("httpreq", type=click.Path(exists=False, file_okay=True, dir_okay=True))
 @click.argument("output", type=click.Path(exists=False, file_okay=True, dir_okay=True))
-@click.option("--ssopt", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.option("--ssopt", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
 @click.option("--timeout", type=click.INT, default=300)
 def run_benchmark(app, config, query, result, stat, sourceselection, httpreq, output, ssopt, timeout):
     jar = os.path.join(app, "Federapp-1.0-SNAPSHOT.jar")
     lib = os.path.join(app, "lib/*")
-    args = f"{config} {query} {result} {stat} {sourceselection} {httpreq} {ssopt}".strip()
+    args = [config, query, result, stat, sourceselection, httpreq, ssopt]
+    #args = [ os.path.abspath(fn) for fn in args ]
+    args = " ".join(args)
     timeoutArgs = f'timeout --signal=SIGKILL "{timeout}"' if timeout != 0 else ""
-    fedx_proc = subprocess.run(
-        f'{timeoutArgs} java -classpath "{jar}:{lib}" org.example.Federapp {args}'.strip(),
-        capture_output=True,
-        shell=True
-    )
-    if fedx_proc.returncode == 0:
+    cmd = f'{timeoutArgs} java -classpath "{jar}:{lib}" org.example.Federapp {args}'.strip() 
+    print(cmd)
+    
+    success = False
+    result = None
+    try: 
+        fedx_proc = subprocess.run(cmd, capture_output=True, shell=True, timeout=timeout)
+        result = fedx_proc.stdout.decode() if fedx_proc.returncode == 0 else fedx_proc.stderr.decode()
+        print(f"{query} benchmarked sucessfully")
         with open(output, "w") as fout:
-            fout.write(fedx_proc.stdout.decode())
+            fout.write(result)
             fout.close()
-    else:
+    except subprocess.TimeoutExpired: 
+        print(f"{query} timed out!")
         with open(output, "w") as fout:
-            pd.DataFrame({
-                "query": query,
-                "exec_time": np.nan,
-                "total_distinct_ss": np.nan,
-                "nb_http_request": np.nan,
-                "total_ss": np.nan
-            }).to_csv(index=False)
+            fout.write("Timeout expired!")
+            fout.close()
 
 @cli.command()
 @click.argument("dir_data_file", type=click.Path(exists=True, dir_okay=True, file_okay=False))
