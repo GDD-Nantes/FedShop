@@ -9,81 +9,88 @@ WORK_DIR = "bsbm"
 QUERY_DIR = f"{WORK_DIR}/queries"
 MODEL_DIR = f"{WORK_DIR}/model"
 BENCH_DIR = f"{WORK_DIR}/benchmark"
+FEDERAPP_DIR = "Federapp/target"
 VARIATION = 3
 VERBOSE = False
 
-N_VENDORS=100
-N_REVIEWERS=50
+N_VENDORS=30
+N_REVIEWERS=20
 SCALE_FACTOR=1
 SS_PROB_LIMIT=1
-VERSIONS=["ss"] # noss
-
-# rule all:
-#     input: 
-#         expand(
-#             "{benchDir}/{query}_v{var}_{ver}.dft.out",
-#             benchDir=BENCH_DIR,
-#             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if "_" not in f],
-#             var=range(VARIATION),
-#             ver=VERSIONS
-#         )
-
-# rule run__compile_and_run_federapp_default:
-#    input:
-#        query="{benchDir}/{query}_v{var}_{ver}.sparql",
-#        config="{benchDir}/fedx.ttl"
-#    params:
-#        run=VARIATION
-#    threads: 1
-#    output:
-#        result="{benchDir}/{query}_v{var}_{ver}.dft.out",
-#        stat="{benchDir}/{query}_v{var}_{ver}.dft.stat",
-#        log="{benchDir}/{query}_v{var}_{ver}.dft.log",
-#        sourceselection="{benchDir}/{query}_v{var}_{ver}.dft.ss",
-#        httpreq="{benchDir}/{query}_v{var}_{ver}.dft.nhttp"
-#    shell:
-#        "sh utils/compile_and_run_federapp.sh {input.config} {input.query} {output.result} {output.stat} {output.sourceselection} {output.httpreq} > {output.log}"
-
-# rule run__compile_and_run_federapp_forcess:
-#    input:
-#        query="{benchDir}/{query}_v{var}_{ver}.sparql",
-#        config=expand("{workDir}/fedx.ttl", workDir=WORK_DIR),
-#        ssopt="{benchDir}/{query}_v{var}_{ver}.rec.csv"
-#    params:
-#        run=VARIATION
-#    threads: 1
-#    output:
-#        result="{benchDir}/{query}_v{var}_{ver}.fss.out",
-#        stat="{benchDir}/{query}_v{var}_{ver}.fss.stat",
-#        log="{benchDir}/{query}_v{var}_{ver}.fss.log",
-#        sourceselection="{benchDir}/{query}_v{var}_{ver}.fss.ss",
-#        httpreq="{benchDir}/{query}_v{var}_{ver}.fss.nhttp"
-#    shell:
-#        "sh utils/compile_and_run_federapp.sh {input.config} {input.query} {output.result} {output.stat} {output.sourceselection} {output.httpreq} {input.ssopt} > {output.log}"
-
-# rule run__generate_fedx_config:
-#     input: 
-#         exported=expand("{modelDir}/exported", modelDir=MODEL_DIR),
-#         dump=expand(
-#             "{benchDir}/{query}_v{var}_{ver}.dump.csv",
-#             benchDir=BENCH_DIR,
-#             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if "_" not in f],
-#             var=range(VARIATION),
-#             ver=VERSIONS
-#         )
-#     output: "{benchDir}/fedx.ttl",
-#     params: endpoint=ENDPOINT,
-#     shell: 'python utils/generate-fedx-config-file.py {input.exported} {output} --endpoint {params.endpoint}'
+VERSIONS=["noss", "ss"] # noss
 
 rule all:
     input: 
         expand(
-            "{benchDir}/{query}_v{var}_{ver}.rec.csv",
+            "{benchDir}/{query}_v{var}_{mode}.log",
+            benchDir=BENCH_DIR,
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if "_" not in f],
+            var=range(VARIATION),
+            mode=["dft", "fss"]
+        )
+
+rule run__compile_and_run_federapp_default:
+   input:
+        query="{benchDir}/{query}_v{var}_noss.sparql",
+        config="{benchDir}/fedx.ttl"
+   params:
+        run=VARIATION,
+        federapp=FEDERAPP_DIR,
+        result="{benchDir}/{query}_v{var}_dft.out",
+        stat="{benchDir}/{query}_v{var}_dft.stat",
+        sourceselection="{benchDir}/{query}_v{var}_dft.ss",
+        httpreq="{benchDir}/{query}_v{var}_dft.nhttp"
+   threads: 1
+   output:
+        log="{benchDir}/{query}_v{var}_dft.log"
+   shell:
+       "python utils/fedx.py run-benchmark {params.federapp} {input.config} {input.query} {params.result} {params.stat} {params.sourceselection} {params.httpreq} {output.log}"
+
+rule run__compile_and_run_federapp_forcess:
+   input:
+        query="{benchDir}/{query}_v{var}_noss.sparql",
+        config="{benchDir}/fedx.ttl",
+        ssopt="{benchDir}/{query}_v{var}_ss.dump.csv"
+   params:
+        run=VARIATION,
+        federapp=FEDERAPP_DIR,
+        result="{benchDir}/{query}_v{var}_fss.out",
+        stat="{benchDir}/{query}_v{var}_fss.stat",
+        sourceselection="{benchDir}/{query}_v{var}_fss.ss",
+        httpreq="{benchDir}/{query}_v{var}_fss.nhttp"
+   threads: 1
+   output:
+        log="{benchDir}/{query}_v{var}_fss.log"
+   shell:
+       "python utils/fedx.py run-benchmark --ssopt {input.ssopt} {params.federapp} {input.config} {input.query} {params.result} {params.stat} {params.sourceselection} {params.httpreq} {output.log}"
+
+# rule all:
+#     input: expand("{benchDir}/fedx.ttl", benchDir=BENCH_DIR)
+
+rule run__generate_fedx_config:
+    input: 
+        exported=expand("{modelDir}/exported", modelDir=MODEL_DIR),
+        dump=expand(
+            "{benchDir}/{query}_v{var}_{ver}.dump.csv",
             benchDir=BENCH_DIR,
             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if "_" not in f],
             var=range(VARIATION),
             ver=VERSIONS
         )
+    output: "{benchDir}/fedx.ttl",
+    params: endpoint=ENDPOINT,
+    shell: 
+        "python utils/fedx.py generate-fedx-config-file {input.exported} {output} --endpoint {params.endpoint}"
+
+# rule all:
+#     input: 
+#         expand(
+#             "{benchDir}/{query}_v{var}_{ver}.rec.csv",
+#             benchDir=BENCH_DIR,
+#             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if "_" not in f],
+#             var=range(VARIATION),
+#             ver=VERSIONS
+#         )
 
 rule run__exec_sourceselection_query:
     input: "{benchDir}/{query}_v{var}_{ver}.sparql"

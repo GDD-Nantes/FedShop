@@ -6,10 +6,10 @@ product:
   scale_factor: 1
   params:
     # type
-    product_id: 100
-    producer_n: 200
-    feature_n: 70
-    prod_type: 60
+    product_id: 1000
+    producer_n: 12
+    feature_n: 8
+    prod_type: 10
     # pgroup
     productPropertyTextual4_p: 0.7
     productPropertyTextual5_p: 0.8
@@ -25,7 +25,7 @@ vendor:
   scale_factor: 1
   params:
     product_n: ${product.params.product_id}
-    offer_n: 50
+    offer_n: 15
     #vendor_n: 10
 
 person:
@@ -34,7 +34,7 @@ person:
   params:
     #type
     product_n: ${product.params.product_id}
-    review_n: 40
+    review_n: 14
     #pgroup
     rating1_p: 0.8
     rating2_p: 0.7

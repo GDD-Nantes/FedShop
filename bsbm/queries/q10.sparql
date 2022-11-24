@@ -8,7 +8,7 @@ WHERE {
 	?offer bsbm:product ?ProductXYZ .
 	?offer bsbm:vendor ?vendor .
     #?offer dc:publisher ?vendor .
-	?vendor bsbm:country "Germany" .
+	?vendor bsbm:country "US" .
 	?offer bsbm:deliveryDays ?deliveryDays .
 	FILTER (?deliveryDays <= 3)
 	?offer bsbm:price ?price .

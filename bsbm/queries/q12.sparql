@@ -20,8 +20,8 @@ WHERE {
     ?productURI rdfs:label ?productlabel .
     ?OfferXYZ bsbm:vendor ?vendorURI .
     ?vendorURI rdfs:label ?vendorname .
-    #?vendorURI foaf:homepage ?vendorhomepage .
-    #?OfferXYZ bsbm:offerWebpage ?offerURL .
+    ?vendorURI foaf:homepage ?vendorhomepage .
+    ?OfferXYZ bsbm:offerWebpage ?offerURL .
     ?OfferXYZ bsbm:price ?price .
     ?OfferXYZ bsbm:deliveryDays ?deliveryDays .
     ?OfferXYZ bsbm:validTo ?validTo 

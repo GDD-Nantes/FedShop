@@ -9,7 +9,7 @@ WHERE {
 	?review bsbm:reviewFor ?ProductXYZ .
 	?review dc:title ?title .
 	?review rev:text ?text .
-	FILTER langMatches( lang(?text), "EN" ) 
+	FILTER langMatches( lang(?text), "en" ) 
 	?review bsbm:reviewDate ?reviewDate .
 	?review rev:reviewer ?reviewer .
 	?reviewer foaf:name ?reviewerName .

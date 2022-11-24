@@ -23,6 +23,12 @@ fi
 # or copy /path/to/bin/watdiv to local
 chmod a+x /path/to/bin/watdiv && cp /path/to/bin/watdiv /usr/local/bin/
 ```
+- Compile Federapp
+
+```bash
+cd Federapp/
+mvn install dependency:copy-dependencies package
+```
 
 2. Run experiments
 
