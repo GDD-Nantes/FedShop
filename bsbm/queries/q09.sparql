@@ -1,6 +1,6 @@
 PREFIX rev: <http://purl.org/stuff/rev#>
 
-DESCRIBE ?x
+SELECT ?x
 WHERE { 
     # const ?ReviewXYZ
     ?ReviewXYZ rev:reviewer ?x 

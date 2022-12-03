@@ -1,27 +1,32 @@
 PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
 SELECT ?product ?label
 WHERE {
-    ?product rdfs:label ?label .
+    ?localProduct owl:sameAs ?product .
+    ?localProduct rdfs:label ?label .
     # const ?ProductType
-    ?product a ?ProductType .
+    ?localProduct a ?localProductType .
+    ?localProductType owl:sameAs ?ProductType .
 
     # const ?ProductFeature1
-	?product bsbm:productFeature ?ProductFeature1 .
-	?product bsbm:productPropertyNumeric1 ?p1 .
+	?localProduct bsbm:productFeature ?localProductFeature1 .
+    ?localProductFeature1 owl:sameAs ?ProductFeature1 .
+	?localProduct bsbm:productPropertyNumeric1 ?p1 .
     # const ?x < ?p1 
-	FILTER ( ?p1 > ?x ) 
-	?product bsbm:productPropertyNumeric3 ?p3 .
+	# FILTER ( ?p1 > ?x ) 
+	?localProduct bsbm:productPropertyNumeric3 ?p3 .
 	# const ?y > ?p3
-    FILTER (?p3 < ?y )
+    # FILTER (?p3 < ?y )
     OPTIONAL { 
         # const ?ProductFeature2
-        ?product bsbm:productFeature ?ProductFeature2 .
-        ?product rdfs:label ?testVar 
+        ?localProduct bsbm:productFeature ?localProductFeature2 .
+        ?localProductFeature2 owl:sameAs ?ProductFeature2 .
+        ?localProduct rdfs:label ?testVar 
     }
-    FILTER (!bound(?testVar)) 
+    # FILTER (!bound(?testVar)) 
 }
 ORDER BY ?label
 LIMIT 10

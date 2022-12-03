@@ -1,20 +1,31 @@
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
-SELECT DISTINCT ?product ?productLabel
+SELECT DISTINCT ?product ?localProductLabel
 WHERE { 
-	?product rdfs:label ?productLabel .
-    # const ?ProductXYZ
-    FILTER (?ProductXYZ != ?product)
-	?ProductXYZ bsbm:productFeature ?prodFeature .
-	?product bsbm:productFeature ?prodFeature .
-	?ProductXYZ bsbm:productPropertyNumeric1 ?origProperty1 .
-	?product bsbm:productPropertyNumeric1 ?simProperty1 .
-	FILTER (?simProperty1 < (?origProperty1 + 120) && ?simProperty1 > (?origProperty1 - 120))
-	?ProductXYZ bsbm:productPropertyNumeric2 ?origProperty2 .
-	?product bsbm:productPropertyNumeric2 ?simProperty2 .
-	FILTER (?simProperty2 < (?origProperty2 + 170) && ?simProperty2 > (?origProperty2 - 170))
+	?localProduct rdfs:label ?localProductLabel .
+	
+	?localProduct bsbm:productFeature ?localProdFeature .
+	?localProduct bsbm:productPropertyNumeric1 ?simProperty1 .
+	?localProduct bsbm:productPropertyNumeric2 ?simProperty2 .	
+
+	?localProduct owl:sameAs ?product .
+	?localProdFeature owl:sameAs ?prodFeature .
+
+	?localProductXYZ bsbm:productFeature ?localProdFeatureXYZ . # forced to rename
+	?localProductXYZ bsbm:productPropertyNumeric1 ?origProperty1 .
+	?localProductXYZ bsbm:productPropertyNumeric2 ?origProperty2 .
+
+	# const ?ProductXYZ
+	?localProductXYZ owl:sameAs ?ProductXYZ .
+	?localProdFeatureXYZ owl:sameAs ?prodFeature . # same prodFeature
+
+	FILTER (?ProductXYZ != ?product)
+	# Values are pre-determined because we knew the boundaries from the normal distribution
+	# FILTER (?simProperty1 < (?origProperty1 + 120) && ?simProperty1 > (?origProperty1 - 120))
+	# FILTER (?simProperty2 < (?origProperty2 + 170) && ?simProperty2 > (?origProperty2 - 170))
 }
-ORDER BY ?productLabel
+ORDER BY ?localProductLabel
 LIMIT 5
