@@ -147,3 +147,5 @@ db/
 saved.txt
 
 *.zip
+
+*virtuoso-*.txt

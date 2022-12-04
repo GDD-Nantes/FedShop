@@ -150,16 +150,18 @@ def compute_metrics(workload, fedcount, outfile):
         """
         pass
 
-    metrics_df = pd.DataFrame(columns=["query", "instance", "tp_specific_relevant_sources_selectivity", "relevant_sources_selectivity"])
+    metrics_df = pd.DataFrame(columns=["query", "instance", "batch", "tp_specific_relevant_sources_selectivity", "relevant_sources_selectivity"])
     for provenance_file in workload:
         ss_df = pd.read_csv(provenance_file)
-        name_search = re.search(r".*/benchmark/(q\d+)/(\d+)/provenance.csv", provenance_file)
+        name_search = re.search(r".*/benchmark/(q\d+)/(\d+)/batch_(\d+)/provenance.csv", provenance_file)
         query = name_search.group(1)
-        instance = name_search.group(2)
+        instance = int(name_search.group(2))
+        batch = int(name_search.group(3))
 
         new_row = {
             "query": query,
             "instance": instance,
+            "batch": batch,
             "tp_specific_relevant_sources_selectivity": get_tp_specific_relevant_sources(ss_df, fedcount),
             "relevant_sources_selectivity": get_relevant_sources_selectivity(ss_df, fedcount)
             #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(ss_df),
