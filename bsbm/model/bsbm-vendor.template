@@ -1,4 +1,4 @@
-#namespace	shop=http://www.shop{%vendor_id}.fr/
+#namespace	vendor=http://www.vendor{%vendor_id}.fr/
 #namespace	ocp=http://www.ocp.com/
 #namespace	bsbm=http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/
 #namespace	rdfs=http://www.w3.org/2000/01/rdf-schema#
@@ -16,7 +16,7 @@
 
 
 // ----- Vendor ----- //
-<type> shop:Vendor 1
+<type> vendor:Vendor 1
 
 <pgroup> 1.0
 #predicate rdfs:label string
@@ -37,7 +37,7 @@
 </type>
 
 // ----- Offer ----- //
-<type> shop:Offer {%offer_n}
+<type> vendor:Offer {%offer_n}
 
 <pgroup> 1.0
 #predicate bsbm:price float 5 200 normal
@@ -61,9 +61,9 @@
 
 </type>
 
-// [1] shop:Offer is related to [1] ocp:Product (drawn with a ZIPFIAN) with the probability 1.0 
-#association shop:Offer bsbm:product ocp:Product 2 1
+// [1] vendor:Offer is related to [1] ocp:Product (drawn with a ZIPFIAN) with the probability 1.0 
+#association vendor:Offer bsbm:product ocp:Product 2 1 1.0 ZIPFIAN
 
-// [1] shop:Offer is related to [1] shop:Vendor (drawn with a ZIPFIAN) with the probability 1.0 
-#association shop:Offer bsbm:vendor shop:Vendor 2 1
+// [1] vendor:Offer is related to [1] vendor:Vendor (drawn with a ZIPFIAN) with the probability 1.0 
+#association vendor:Offer bsbm:vendor vendor:Vendor 2 1 1.0 ZIPFIAN
 

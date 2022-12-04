@@ -56,25 +56,25 @@
 </pgroup>
 
 <pgroup> 1.0
-#predicate bsbm:productPropertyNumeric1 integer
+#predicate bsbm:productPropertyNumeric1 integer 1 1000 normal
 </pgroup>
 
 <pgroup> 1.0
-#predicate bsbm:productPropertyNumeric2 integer
+#predicate bsbm:productPropertyNumeric2 integer 1 1000 normal
 </pgroup>
 </type>
 
 <pgroup> 1.0
-#predicate bsbm:productPropertyNumeric3 integer
+#predicate bsbm:productPropertyNumeric3 integer 1 1000 normal
 </pgroup>
 </type>
 
 <pgroup> {%productPropertyNumeric4_p}
-#predicate bsbm:productPropertyNumeric4 integer
+#predicate bsbm:productPropertyNumeric4 integer 1 1000 normal
 </pgroup>
 
 <pgroup> {%productPropertyNumeric5_p}
-#predicate bsbm:productPropertyNumeric5 integer
+#predicate bsbm:productPropertyNumeric5 integer 1 1000 normal
 </pgroup>
 
 </type>
@@ -107,6 +107,6 @@
 
 #association ocp:Product rdf:type ocp:ProductType 2 {%prod_type} 1.0 ZIPFIAN
 #association ocp:Product bsbm:productFeature ocp:ProductFeature 2 {%feature_n} 1.0 ZIPFIAN
-#association ocp:Product bsbm:producer ocp:Producer 2 {%producer_n} 1.0 ZIPFIAN
+#association ocp:Product bsbm:producer ocp:Producer 2 1 1.0 ZIPFIAN
 
 

@@ -14,28 +14,17 @@ pip install -r requirements.txt
 ```
 
 - Install [WatDiv](https://github.com/mhoangvslev/watdiv)
-```bash
-# Either index /path/to/bin/watdiv in $PATH
-if [ -f /path/to/bin/watdiv ]; then
-    export PATH = $PATH:/path/to/bin
-fi
 
-# or copy /path/to/bin/watdiv to local
-chmod a+x /path/to/bin/watdiv && cp /path/to/bin/watdiv /usr/local/bin/
-```
-- Compile Federapp
-
-```bash
-cd Federapp/
-mvn install dependency:copy-dependencies package
-```
 
 2. Run experiments
 
 - Tweaks parameters in `bsbm/config.yaml`
-- Tweaks parameters at the beginning of `bsbm.Snakefile` for variate `N_VENDORS` and `SCALE_FACTOR`
-- Start virtuoso server. You can use our docker-compose for quicker setup: `docker-compose up bsbm-virtuoso`
+- Tweaks parameters at the beginning of `bsbm/benchmark.sh`
 
 ```bash
-sh bsbm/clean.sh && snakemake --snakefile bsbm.Snakefile --cores 1 --latency-wait 1
+# Run
+sh bsbm/benchmark.sh
+
+# Clean and rerun
+sh bsbm/clean.sh && sh bsbm/benchmark.sh
 ```

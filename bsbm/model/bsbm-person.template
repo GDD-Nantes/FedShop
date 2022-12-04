@@ -1,4 +1,4 @@
-#namespace	review=http://www.review{%person_id}.fr/
+#namespace	review=http://www.person{%person_id}.fr/
 #namespace	ocp=http://www.ocp.com/
 #namespace	bsbm=http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/
 #namespace	rdfs=http://www.w3.org/2000/01/rdf-schema#
@@ -66,7 +66,7 @@
 </type>
 
 // [1] review:Review is related to [1] ocp:Product (drawn with a ZIPFIAN) with the probability 1.0 
-#association review:Review bsbm:reviewFor ocp:Product 1 1
+#association review:Review bsbm:reviewFor ocp:Product 2 1 1.0 ZIPFIAN
 
 // [Many] review:Review are related to [Many] review:Person (drawn with a ZIPFIAN) with the probability 1.0 
-#association review:Review rev:reviewer review:Person 2 1
+#association review:Review rev:reviewer review:Person 2 1 1.0 ZIPFIAN

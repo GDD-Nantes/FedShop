@@ -36,7 +36,20 @@ class AggSink(Sink):
         #print(f"{s.n3()} {p.n3()} {o.n3()} .")
 
         with open(self.outfile, "a") as output:
-            output.write(f"{s.n3()}\t{p.n3()}\t{o.n3()}\t{self.domain.n3()}.\n")
+            subject_name = s.toPython().rsplit("/", 1)[-1] 
+            subject_renamed = URIRef(f"{self.domain.toPython()}/{subject_name}")
+
+            object_renamed = o
+            if isinstance(o, URIRef):
+                object_name = o.toPython().rsplit("/", 1)[-1] 
+                object_renamed = URIRef(f"{self.domain.toPython()}/{object_name}")
+
+                # Foutre le sameAs
+                sameAs = URIRef('http://www.w3.org/2002/07/owl#sameAs')
+                output.write(f"{subject_renamed.n3()}\t{sameAs.n3()}\t{s.n3()}\t{self.domain.n3()}.\n")
+                output.write(f"{object_renamed.n3()}\t{sameAs.n3()}\t{o.n3()}\t{self.domain.n3()}.\n")
+
+            output.write(f"{subject_renamed.n3()}\t{p.n3()}\t{object_renamed.n3()}\t{self.domain.n3()}.\n")
 
         if isinstance(o, URIRef):
         #if str(o).startswith("http://"):

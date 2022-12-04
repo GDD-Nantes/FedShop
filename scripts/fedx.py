@@ -1,5 +1,7 @@
 # Import part
+import json
 import os
+import re
 import click
 import glob
 import subprocess
@@ -36,11 +38,10 @@ def run_benchmark(app, config, query, result, stat, sourceselection, httpreq, ou
     cmd = f'{timeoutArgs} java -classpath "{jar}:{lib}" org.example.Federapp {args}'.strip() 
     print(cmd)
     
-    success = False
     result = None
     try: 
         fedx_proc = subprocess.run(cmd, capture_output=True, shell=True, timeout=timeout)
-        result = fedx_proc.stdout.decode() if fedx_proc.returncode == 0 else fedx_proc.stderr.decode()
+        result = "OK" if fedx_proc.returncode == 0 else "ERROR"
         print(f"{query} benchmarked sucessfully")
         with open(output, "w") as fout:
             fout.write(result)
@@ -48,16 +49,37 @@ def run_benchmark(app, config, query, result, stat, sourceselection, httpreq, ou
     except subprocess.TimeoutExpired: 
         print(f"{query} timed out!")
         with open(output, "w") as fout:
-            fout.write("Timeout expired!")
+            fout.write("TIMEOUT")
             fout.close()
 
 @cli.command()
-@click.argument("dir_data_file", type=click.Path(exists=True, dir_okay=True, file_okay=False))
+@click.argument("ss", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("comp", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+def generate_ss_table(ss, comp):
+    def parse_triple(result: str):
+        subject, predicate, object = result.split("\t")[1:]
+        subject = re.sub(r"Var \(name=(\w+)\)", r"\1", subject)
+        predicate = re.sub(r"Var \(name=(.*), value=(.+), anonymous\)", r"\2", predicate)
+        object = re.sub(r"Var \(name=(\w+)\)", r"\1", object)
+        return " ".join([subject, predicate, object])
+    
+    composition = {v:k for k, v in json.load(open(comp, "r")).items() }
+    fedx_ss = pd.read_csv(ss)
+    fed_ss_stat = dict()
+    for triple, ss in fedx_ss.itertuples(index=False):
+        fed_ss_stat[composition[parse_triple(triple)]] = re.search(r"StatementSource \(id=sparql_(www\.\w+\.\w+), type=REMOTE\)", ss).groups()
+    
+    result = pd.DataFrame(data=fed_ss_stat)
+    print(result)
+
+@cli.command()
+@click.argument("dir_data_file", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
 @click.argument("config_file", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.option("--endpoint", type=str, default="http://localhost:8890/sparql/", help="URL to a SPARQL endpoint")
 def generate_fedx_config_file(dir_data_file, config_file, endpoint):
     ssite = set()
-    for data_file in glob.glob(f'{dir_data_file}/*.nq'):
+    #for data_file in glob.glob(f'{dir_data_file}/*.nq'):
+    for data_file in dir_data_file:
         with open(data_file) as file:
             t_file = file.readlines()
             for line in t_file:
