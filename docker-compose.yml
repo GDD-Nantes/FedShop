@@ -1,16 +1,5 @@
 version: "3"
 services:
-  bsbm-rdf4j:
-    container_name: "bsbm-rdf4j"
-    image: eclipse/rdf4j-workbench:4.2.1
-    # environment:
-    #   - "JAVA_OPTS=-Xms1g -Xmx4g"
-    volumes:
-      - "./rdf4j/data:/var/rdf4j"
-      - "./rdf4j/log:/usr/local/tomcat/logs"
-    ports:
-      - 8080:8080
-
   bsbm-virtuoso:
     container_name: "bsbm-virtuoso"
     #image: openlink/virtuoso-opensource-7:7.2.8
@@ -25,12 +14,13 @@ services:
       VIRT_Parameters_NumberOfBuffers: 1360000
       VIRT_Parameters_MaxDirtyBuffers: 1000000
     volumes:
-      #- "./bsbm/model/vendors:/usr/share/proj"
       - "./bsbm/model/exported:/usr/local/virtuoso-opensource/share/virtuoso/vad"
-      #- "./db:/usr/local/virtuoso-opensource/var/lib/virtuoso/db"
     ports:
       - "1111:1111"
       - "8890:8890"
   watdiv:
     container_name: "watdiv"
     image: minhhoangdang/watdiv:latest
+    volumes:
+      - "./bsbm:/opt/watdiv/bsbm"
+    entrypoint: "python3 -m http.server"

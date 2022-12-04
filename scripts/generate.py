@@ -43,6 +43,5 @@ def generate(config, section, template, output, id, verbose):
         watdivWriter.write(watdiv_proc.stdout.decode())
         watdivWriter.close()        
         if not verbose: os.remove(outFile)        
-    
 if __name__ == "__main__":
     cli()

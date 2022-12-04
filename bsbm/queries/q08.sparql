@@ -2,14 +2,16 @@ PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 PREFIX dc: <http://purl.org/dc/elements/1.1/>
 PREFIX rev: <http://purl.org/stuff/rev#>
 PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
 SELECT ?title ?text ?reviewDate ?reviewer ?reviewerName ?rating1 ?rating2 ?rating3 ?rating4 
 WHERE { 
     # const ?ProductXYZ
-	?review bsbm:reviewFor ?ProductXYZ .
+	?review bsbm:reviewFor ?localProductXYZ .
+	?localProductXYZ owl:sameAs ?ProductXYZ .
 	?review dc:title ?title .
 	?review rev:text ?text .
-	FILTER langMatches( lang(?text), "en" ) 
+	#FILTER langMatches( lang(?text), "en" ) 
 	?review bsbm:reviewDate ?reviewDate .
 	?review rev:reviewer ?reviewer .
 	?reviewer foaf:name ?reviewerName .

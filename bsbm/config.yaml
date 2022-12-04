@@ -1,6 +1,6 @@
 watdiv: 
-  # exec: "docker-compose run --rm watdiv watdiv"
-  exec: "watdiv"
+  exec: "docker exec watdiv watdiv"
+  #exec: "watdiv"
 product:
   template: "bsbm-product.template"
   scale_factor: 1

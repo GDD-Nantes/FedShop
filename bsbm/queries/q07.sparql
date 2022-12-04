@@ -3,25 +3,30 @@ PREFIX rev: <http://purl.org/stuff/rev#>
 PREFIX foaf: <http://xmlns.com/foaf/0.1/>
 PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 PREFIX dc: <http://purl.org/dc/elements/1.1/>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
-SELECT ?productLabel ?offer ?price ?vendor ?vendorTitle ?review ?revTitle 
- ?reviewer ?revName ?rating1 ?rating2
+SELECT ?productLabel ?offer ?price ?vendor ?vendorTitle ?review ?revTitle ?reviewer ?revName ?rating1 ?rating2
 WHERE { 
+    ?localProduct owl:sameAs ?ProductXYZ .
+    ?localProduct rdfs:label ?productLabel .
+
     # const ?ProductXYZ
-    ?ProductXYZ rdfs:label ?productLabel .
     OPTIONAL {
-        ?offer bsbm:product ?ProductXYZ .
+        ?offer bsbm:product ?offerProduct .
+	    ?offerProduct  owl:sameAs ?ProductXYZ .  
 	    ?offer bsbm:price ?price .
-	    ?offer bsbm:vendor ?vendor .
-	    ?vendor rdfs:label ?vendorTitle .
-        ?vendor bsbm:country ?country .
-        #?offer dc:publisher ?vendor . 
+		?offer bsbm:vendor ?vendor .
+	 	?vendor rdfs:label ?vendorTitle .
+        ?vendor bsbm:country ?country . # it was a constant
+        #?offer dc:publisher ?vendor .
         ?offer bsbm:validTo ?date .
-        # const ?currentDate < ?date
-        FILTER (?date > ?currentDate )
+
+        # const ?currentDate $ ?date 
+        # FILTER (?date > ?currentDate )
     }
     OPTIONAL {
-	    ?review bsbm:reviewFor ?ProductXYZ .
+	    ?review bsbm:reviewFor ?reviewProduct .
+        ?reviewProduct owl:sameAs ?ProductXYZ .
 	    ?review rev:reviewer ?reviewer .
 	    ?reviewer foaf:name ?revName .
 	    ?review dc:title ?revTitle .
