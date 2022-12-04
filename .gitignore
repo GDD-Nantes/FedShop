@@ -143,9 +143,7 @@ virtuoso-ok.txt
 .m2
 .DS_Store
 db/
-
 saved.txt
-
 *.zip
-
-*virtuoso-*.txt
+*-ok.txt
+*-up.txt

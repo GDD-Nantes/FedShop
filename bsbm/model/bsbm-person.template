@@ -27,7 +27,7 @@
 </pgroup>
 
 <pgroup> 1.0
-#predicate bsbm:country COUNTRY 1 8 normal
+#predicate bsbm:country country
 </pgroup>
 
 </type>
@@ -48,19 +48,19 @@
 </pgroup>
 
 <pgroup> {%rating1_p}
-#predicate bsbm:rating1 integer 1 5 normal
+#predicate bsbm:rating1 integer 1 10 normal
 </pgroup>
 
 <pgroup> {%rating2_p}
-#predicate bsbm:rating2 integer 1 5 normal
+#predicate bsbm:rating2 integer 1 10 normal
 </pgroup>
 
 <pgroup> {%rating3_p}
-#predicate bsbm:rating3 integer 1 5 normal
+#predicate bsbm:rating3 integer 1 10 normal
 </pgroup>
 
 <pgroup> {%rating4_p}
-#predicate bsbm:rating4 integer 1 5 normal
+#predicate bsbm:rating4 integer 1 10 normal
 </pgroup>
 
 </type>

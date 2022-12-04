@@ -112,7 +112,7 @@ def compute_metrics(workload, fedcount, outfile):
     """
 
     def get_relevant_sources_selectivity(df: pd.DataFrame, fedcount):
-        return df.apply(lambda x: x.dropna().nunique()).sum()/fedcount
+        return np.unique(df.dropna().values.ravel()).size /fedcount
 
     def get_tp_specific_relevant_sources(df: pd.DataFrame, fedcount) -> float:
         """Union set of all contacted federation member over total number of federation members there is.

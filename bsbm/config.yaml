@@ -8,7 +8,7 @@ product:
     # type
     product_id: 1000
     producer_n: 12
-    feature_n: 8
+    feature_n: 20
     prod_type: 10
     # pgroup
     productPropertyTextual4_p: 0.7
@@ -36,7 +36,7 @@ person:
     product_n: ${product.params.product_id}
     review_n: 14
     #pgroup
-    rating1_p: 0.8
+    rating1_p: 0.7
     rating2_p: 0.7
-    rating3_p: 0.6
-    rating4_p: 0.5
+    rating3_p: 0.7
+    rating4_p: 0.7

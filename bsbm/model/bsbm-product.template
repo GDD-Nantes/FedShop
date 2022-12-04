@@ -56,25 +56,25 @@
 </pgroup>
 
 <pgroup> 1.0
-#predicate bsbm:productPropertyNumeric1 integer 1 1000 normal
+#predicate bsbm:productPropertyNumeric1 integer 1 2000 normal
 </pgroup>
 
 <pgroup> 1.0
-#predicate bsbm:productPropertyNumeric2 integer 1 1000 normal
+#predicate bsbm:productPropertyNumeric2 integer 1 2000 normal
 </pgroup>
 </type>
 
 <pgroup> 1.0
-#predicate bsbm:productPropertyNumeric3 integer 1 1000 normal
+#predicate bsbm:productPropertyNumeric3 integer 1 2000 normal
 </pgroup>
 </type>
 
 <pgroup> {%productPropertyNumeric4_p}
-#predicate bsbm:productPropertyNumeric4 integer 1 1000 normal
+#predicate bsbm:productPropertyNumeric4 integer 1 2000 normal
 </pgroup>
 
 <pgroup> {%productPropertyNumeric5_p}
-#predicate bsbm:productPropertyNumeric5 integer 1 1000 normal
+#predicate bsbm:productPropertyNumeric5 integer 1 2000 normal
 </pgroup>
 
 </type>

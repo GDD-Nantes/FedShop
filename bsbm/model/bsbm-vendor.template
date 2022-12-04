@@ -40,7 +40,7 @@
 <type> vendor:Offer {%offer_n}
 
 <pgroup> 1.0
-#predicate bsbm:price float 5 200 normal
+#predicate bsbm:price float 5 10000 normal
 </pgroup>
 
 <pgroup> 1.0
@@ -52,7 +52,7 @@
 </pgroup>
 
 <pgroup> 1.0
-#predicate bsbm:deliveryDays integer 1 14 zipfian
+#predicate bsbm:deliveryDays integer 1 21 zipfian
 </pgroup>
 
 <pgroup> 1.0
