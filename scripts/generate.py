@@ -10,14 +10,14 @@ def cli():
     pass
 
 @cli.command
-@click.argument("config", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("section", type=click.STRING)
 @click.argument("template", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("output", type=click.Path(file_okay=True, dir_okay=False))
 @click.argument("id", type=click.INT)
 @click.option("--verbose", type=click.BOOL, default=False)
-def generate(config, section, template, output, id, verbose):
-    config = yaml.load(config)
+def generate(configfile, section, template, output, id, verbose):
+    config = yaml.load(configfile)["generation"]
     template = open(template, "r").read()
     # Replace all params in template
     for param, value in config[section]["params"].items():

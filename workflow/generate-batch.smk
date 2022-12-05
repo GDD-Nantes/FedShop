@@ -28,7 +28,7 @@ SCALE_FACTOR=int(os.environ["RSFB__SCALE_FACTOR"])
 
 QUERY_DIR = f"{WORK_DIR}/queries"
 MODEL_DIR = f"{WORK_DIR}/model"
-BENCH_DIR = f"{WORK_DIR}/benchmark"
+BENCH_DIR = f"{WORK_DIR}/benchmark/generation"
 
 #=================
 # USEFUL FUNCTIONS
@@ -116,8 +116,8 @@ rule ingest_virtuoso_next_batches:
     priority: 4
     threads: 1
     input: 
-        vendor=expand("{modelDir}/workflow/ingest_vendor_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
-        person=expand("{modelDir}/workflow/ingest_person_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
+        vendor=expand("{modelDir}/virtuoso/ingest_vendor_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
+        person=expand("{modelDir}/virtuoso/ingest_person_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
         virtuoso_status=expand("{workDir}/virtuoso-up.txt", workDir=WORK_DIR)
     output: expand("{workDir}/virtuoso-batch{{batch_id}}-ok.txt", workDir=WORK_DIR)
     shell: 'sh {input.vendor} bsbm && sh {input.person} && echo "OK" > {output}'
@@ -132,7 +132,7 @@ rule make_virtuoso_ingest_command_for_vendor:
     priority: 5
     threads: 1
     input: expand("{modelDir}/exported/vendor{vendor_id}.nq", vendor_id=range(TOTAL_VENDOR), modelDir=MODEL_DIR)
-    output: "{modelDir}/workflow/ingest_vendor_batch{batch_id}.sh"
+    output: "{modelDir}/virtuoso/ingest_vendor_batch{batch_id}.sh"
     params:
         n_items=TOTAL_VENDOR
     run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), params.n_items)
@@ -141,7 +141,7 @@ rule make_virtuoso_ingest_command_for_person:
     priority: 5
     threads: 1
     input: expand("{modelDir}/exported/person{person_id}.nq", person_id=range(TOTAL_REVIEWER), modelDir=MODEL_DIR)
-    output: "{modelDir}/workflow/ingest_person_batch{batch_id}.sh"
+    output: "{modelDir}/virtuoso/ingest_person_batch{batch_id}.sh"
     params:
         n_items=TOTAL_REVIEWER
     run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), params.n_items)

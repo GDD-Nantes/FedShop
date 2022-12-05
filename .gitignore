@@ -135,7 +135,7 @@ dmypy.json
 .snakemake/
 virtuoso-ok.txt
 
-**/model/workflow/
+**/model/virtuoso/
 **/model/tmp/
 **/benchmark/
 **/model/exported/
@@ -147,3 +147,5 @@ saved.txt
 *.zip
 *-ok.txt
 *-up.txt
+*.dot
+*.png
