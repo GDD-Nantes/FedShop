@@ -18,11 +18,14 @@ export RSFB__N_VENDOR=3
 export RSFB__N_REVIEWER=1
 export RSFB__SCALE_FACTOR=1
 
-N_CORES="1" # any number or "all"
+export RSFB__FEDX_DIR="Federapp/target"
+
+N_CORES=1 # any number or "all"
+N_ENGINES=1
 
 # FIXED
-GENERATION_SNAKEFILE="workflow/generate-batch.Snakefile"
-EVALUATION_SNAKEFILE="workflow/evaluate.Snakefile"
+GENERATION_SNAKEFILE="workflow/generate-batch.smk"
+EVALUATION_SNAKEFILE="workflow/evaluate.smk"
 
 SNAKEMAKE_OPTS="-p --cores ${N_CORES}"
 
@@ -30,7 +33,10 @@ WORKFLOW_DIR="${RSFB__WORK_DIR}/rulegraph"
 mkdir -p ${WORKFLOW_DIR}
 
 MODE="$1" # One of ["generate", "evaluate"]
-DEBUG="$2" # One of ["debug"]
+OP="$2" # One of ["debug", "clean"]
+
+RULEGRAPH_FILE="${WORKFLOW_DIR}/rulegraph_${MODE}_batch${batch}"
+CLEAN_SCRIPT="${WORKFLOW_DIR}/clean.sh"
 
 # FUNCTIONS
 help(){
@@ -47,25 +53,47 @@ if [ $# -lt 1 ]; then
 fi
 
 # If in generate MODE
-if [ "${MODE}"="generate" ]; then
+if [ "${MODE}" = "generate" ]; then
     for batch in $( seq 1 $RSFB__N_BATCH)
     do
-        if [ "$2" = "debug" ]; then
+        if [ "${OP}" = "debug" ]; then
             echo "Producing rulegraph..."
-            (snakemake ${SNAKEMAKE_OPTS} --snakefile ${GENERATION_SNAKEFILE} --rulegraph > "${WORKFLOW_DIR}/rulegraph_batch${batch}.dot") || exit 1
+            (snakemake ${SNAKEMAKE_OPTS} --snakefile ${GENERATION_SNAKEFILE} --rulegraph > "${RULEGRAPH_FILE}.dot") || exit 1
             (
-                #gsed -Ei "s#(digraph snakemake_dag \{)#\1 rankdir=\"LR\"#g" "${WORKFLOW_DIR}/rulegraph_batch${batch}.dot" &&
-                dot -Tpng "${WORKFLOW_DIR}/rulegraph_batch${batch}.dot" > "${WORKFLOW_DIR}/rulegraph_batch${batch}.png" 
+                #gsed -Ei "s#(digraph snakemake_dag \{)#\1 rankdir=\"LR\"#g" "${RULEGRAPH_FILE}.dot" &&
+                dot -Tpng "${RULEGRAPH_FILE}.dot" > "${RULEGRAPH_FILE}.png" 
             ) || exit 1
         else
-            echo "Producing metrics for batch ${batch} out of ${RSFB__N_BATCH}..."
+            if [ "${OP}" = "clean" ]; then
+                sh ${CLEAN_SCRIPT} deep
+            fi
+
+            echo "Producing metrics for batch ${batch}/${RSFB__N_BATCH}..."
             snakemake ${SNAKEMAKE_OPTS} --snakefile ${GENERATION_SNAKEFILE} --debug-dag --batch merge_metrics="${batch}/${RSFB__N_BATCH}" || exit 1
             snakemake ${SNAKEMAKE_OPTS} --snakefile ${GENERATION_SNAKEFILE} --batch merge_metrics="${batch}/${RSFB__N_BATCH}" || exit 1
         fi
     done
 # if in evaluate MODE
-elif [ "${MODE}"="generate" ]; then
+elif [ "${MODE}" = "evaluate" ]; then
+    for batch in $( seq 1 ${N_ENGINES})
+    do
+        if [ "${OP}" = "debug" ]; then
+            echo "Producing rulegraph..."
+            (snakemake ${SNAKEMAKE_OPTS} --snakefile ${EVALUATION_SNAKEFILE} --rulegraph > "${RULEGRAPH_FILE}.dot") || exit 1
+            (
+                #gsed -Ei "s#(digraph snakemake_dag \{)#\1 rankdir=\"LR\"#g" "${RULEGRAPH_FILE}.dot" &&
+                dot -Tpng "${RULEGRAPH_FILE}.dot" > "${RULEGRAPH_FILE}.png" 
+            ) || exit 1
+        else
+            if [ "${OP}" = "clean" ]; then
+                sh ${CLEAN_SCRIPT} deep
+            fi
 
+            echo "Measuring execution time for batch ${batch}/${N_ENGINES}..."
+            snakemake ${SNAKEMAKE_OPTS} --snakefile ${EVALUATION_SNAKEFILE} --debug-dag --batch merge_metrics="${batch}/${N_ENGINES}" || exit 1
+            snakemake ${SNAKEMAKE_OPTS} --snakefile ${EVALUATION_SNAKEFILE} --batch merge_metrics="${batch}/${N_ENGINES}" || exit 1
+        fi
+    done
 else
     syntax_error
 fi

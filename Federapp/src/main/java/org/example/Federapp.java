@@ -33,7 +33,7 @@ public class Federapp {
     public static final String MAP_SS = "MAP_SS";
 
 
-    public static final String CSV_HEADER = "query,exec_time,total_distinct_ss,nb_http_request,total_ss\n";
+    public static final String CSV_HEADER = "query,exec_time,nb_http_request\n";
 
     private static List<BindingSet> evaluate(RepositoryConnection conn, String rawQuery) throws Exception {
         TupleQuery tq = conn.prepareTupleQuery(rawQuery);
@@ -138,17 +138,17 @@ public class Federapp {
             statWriter.write(
                     queryPath + ","
                             + durationTime + ","
-                            + sumDistinctSourceSelection() + ","
+                            //+ sumDistinctSourceSelection() + ","
                             + httpqueries + ","
-                            + sumSourceSelection() +
-                            "\n");
+                            //+ sumSourceSelection()
+                            + "\n");
 
 
             createSourceSelectionFile(sourceSelectionPath);
             createHttpListFile(httpListFilePath);
         } else {
             statWriter.write(CSV_HEADER);
-            statWriter.write(queryPath + "," +"failed,failed,failed,failed" + "\n");
+            statWriter.write(queryPath + "," +"nan,nan" + "\n");
 
             createSourceSelectionFile(sourceSelectionPath);
             createHttpListFile(httpListFilePath);

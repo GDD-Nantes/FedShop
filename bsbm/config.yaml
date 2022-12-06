@@ -25,7 +25,7 @@ generation:
     template: "bsbm-vendor.template"
     scale_factor: 1
     params:
-      product_n: ${product.params.product_id}
+      product_n: ${generation.product.params.product_id}
       offer_n: 15
       #vendor_n: 10
 
@@ -34,7 +34,7 @@ generation:
     scale_factor: 1
     params:
       #type
-      product_n: ${product.params.product_id}
+      product_n: ${generation.product.params.product_id}
       review_n: 14
       #pgroup
       rating1_p: 0.7
@@ -43,5 +43,5 @@ generation:
       rating4_p: 0.7
 evaluation:
   engines:
-    - virtuoso
+    # - virtuoso
     - fedx

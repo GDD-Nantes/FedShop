@@ -7,6 +7,7 @@ import glob
 import subprocess
 import pandas as pd
 import numpy as np
+from pathlib import Path
 
 # Example of use : 
 # python3 utils/generate-fedx-config-file.py bsbm/model/vendor test/out.ttl
@@ -18,39 +19,55 @@ def cli():
     pass
 
 @cli.command()
-@click.argument("app", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("query", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("result", type=click.Path(exists=False, file_okay=True, dir_okay=True))
-@click.argument("stat", type=click.Path(exists=False, file_okay=True, dir_okay=True))
-@click.argument("sourceselection", type=click.Path(exists=False, file_okay=True, dir_okay=True))
-@click.argument("httpreq", type=click.Path(exists=False, file_okay=True, dir_okay=True))
-@click.argument("output", type=click.Path(exists=False, file_okay=True, dir_okay=True))
-@click.option("--ssopt", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
+@click.argument("stats", type=click.Path(exists=False, file_okay=True, dir_okay=True))
+@click.option("--ideal-ss", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
 @click.option("--timeout", type=click.INT, default=300)
-def run_benchmark(app, config, query, result, stat, sourceselection, httpreq, output, ssopt, timeout):
+def run_benchmark(config, query, result, stats, ideal_ss, timeout):
+    app = "Federapp/target"
     jar = os.path.join(app, "Federapp-1.0-SNAPSHOT.jar")
     lib = os.path.join(app, "lib/*")
-    args = [config, query, result, stat]
-    #args = [ os.path.abspath(fn) for fn in args ]
+
+    r_root = Path(result).parent
+
+    #stat = f"{r_root}/stats.csv"
+    sourceselection = f"{r_root}/provenance.csv"
+    httpreq = f"{r_root}/httpreq.csv"
+
+    args = [config, query, result, stats, sourceselection, httpreq, ideal_ss]
     args = " ".join(args)
     timeoutArgs = f'timeout --signal=SIGKILL "{timeout}"' if timeout != 0 else ""
     cmd = f'{timeoutArgs} java -classpath "{jar}:{lib}" org.example.Federapp {args}'.strip() 
-    print(cmd)
     
-    result = None
+    def write_empty_stats():
+        with open(stats, "w+") as fout:
+            fout.write("query,exec_time,nb_http_request\n")
+            fout.write(",".join([query, "nan", "nan"])+"\n")
+            fout.close()
+    
+    def write_empty_result(msg):
+        with open(result, "w+") as fout:
+            fout.write(msg)
+            fout.close()
+    
     try: 
         fedx_proc = subprocess.run(cmd, capture_output=True, shell=True, timeout=timeout)
-        result = "OK" if fedx_proc.returncode == 0 else "ERROR"
-        print(f"{query} benchmarked sucessfully")
-        with open(output, "w") as fout:
-            fout.write(result)
-            fout.close()
+        if fedx_proc.returncode == 0:
+            if os.path.exists(stats) and os.stat(stats).st_size > 0 and os.path.exists(result) and os.stat(result).st_size > 0:
+                print(f"{query} benchmarked sucessfully")
+            else:
+                write_empty_stats()
+                write_empty_result(fedx_proc.stderr.decode())
+        else:
+            print(f"{query} reported error")
+            raise RuntimeError(fedx_proc.stderr.decode())
+           
+
     except subprocess.TimeoutExpired: 
         print(f"{query} timed out!")
-        with open(output, "w") as fout:
-            fout.write("TIMEOUT")
-            fout.close()
+        write_empty_stats("timeout")
 
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
@@ -76,7 +93,7 @@ def generate_config_file(datafiles, outfile, endpoint):
 
 """
         )
-        for s in ssite:
+        for s in sorted(ssite,):
             ffile.write(
 f"""
 <{s}> a sd:Service ;
