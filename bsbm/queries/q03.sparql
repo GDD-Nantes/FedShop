@@ -16,17 +16,18 @@ WHERE {
     ?localProductFeature1 owl:sameAs ?ProductFeature1 .
 	?localProduct bsbm:productPropertyNumeric1 ?p1 .
     # const ?x < ?p1 
-	# FILTER ( ?p1 > ?x ) 
+	FILTER ( ?p1 > ?x ) 
 	?localProduct bsbm:productPropertyNumeric3 ?p3 .
 	# const ?y > ?p3
-    # FILTER (?p3 < ?y )
+    FILTER (?p3 < ?y )
+    
     OPTIONAL { 
         # const ?ProductFeature2
         ?localProduct bsbm:productFeature ?localProductFeature2 .
         ?localProductFeature2 owl:sameAs ?ProductFeature2 .
         ?localProduct rdfs:label ?testVar 
     }
-    # FILTER (!bound(?testVar)) 
+    FILTER (!bound(?testVar)) 
 }
 ORDER BY ?label
 LIMIT 10

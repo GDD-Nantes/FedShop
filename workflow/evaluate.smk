@@ -83,7 +83,7 @@ rule measure_default_exec_time:
         configfile="{benchDir}/{engine}/config/{batch_id}/fed.config",
         prerequisite=prerequisite_for_engine
     output: 
-        results="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/default/results.csv",
+        results="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/default/results",
         exec_time="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/default/exec_time.csv",
     shell:
         "python scripts/engines/{wildcards.engine}.py run-benchmark {input.configfile} {input.query} {output.results} {output.exec_time}"
@@ -96,7 +96,7 @@ rule measure_ideal_source_selection_exec_time:
         configfile="{benchDir}/{engine}/config/{batch_id}/fed.config",
         prerequisite=prerequisite_for_engine
     output: 
-        results="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/ideal/results.csv",
+        results="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/ideal/results",
         exec_time="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/ideal/exec_time.csv",
     shell: 
         "python scripts/engines/{wildcards.engine}.py run-benchmark {input.configfile} {input.query} {output.results} {output.exec_time} --ideal-ss {input.ideal_ss}"

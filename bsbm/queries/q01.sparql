@@ -22,7 +22,7 @@ WHERE {
     ?product bsbm:productPropertyNumeric1 ?value1 . 
     
     # const ?constValue1 $ ?value1
-	# FILTER (?value1 > ?constValue1) 
+	FILTER (?value1 > ?constValue1) 
 }
 ORDER BY ?label
 LIMIT 10

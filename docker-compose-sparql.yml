@@ -18,11 +18,7 @@ services:
     ports:
       - "1111:1111"
       - "8890:8890"
-  watdiv:
-    container_name: "watdiv"
-    image: minhhoangdang/watdiv:bsbm
-    ports:
-      - "8000:8000"
-    volumes:
-      - "./bsbm:/opt/watdiv/bsbm"
-    entrypoint: "python3 -m http.server"
+
+networks:
+  default:
+    name: "bsbm-virtuoso-network"

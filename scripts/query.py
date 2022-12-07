@@ -127,11 +127,8 @@ def build_value_selection_query(queryfile, outfile):
 
     query = open(queryfile).read()
     query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {' '.join(consts)} WHERE", query)
-    query = re.sub(r"(#)?(LIMIT|FILTER|OFFSET|ORDER)", r"#\2", query)
+    query = re.sub(r"(#)*(LIMIT|FILTER|OFFSET|ORDER)", r"##\2", query)
 
-    # query += "\nORDER BY RAND()"
-    # query += f"\nLIMIT {n_variations}"
-        
     with open(outfile, "w+") as out:
         out.write(query)
         out.close()
@@ -147,7 +144,7 @@ def inject_constant(queryfile, value_selection, instance_id):
         replace the placeholders with their corresponding columns.
 
     TODO:
-        [] Force injecting distinct variable
+        [x] Force injecting distinct variable
 
     Args:
         queryfile (_type_): _description_
@@ -188,14 +185,15 @@ def inject_constant(queryfile, value_selection, instance_id):
         # Replace for FILTER clauses
         if constSrc is not None:
 
-            # if ">" in constSrc["op"]:
-            #     repl_val = value_selection_values[subSrc].dropna().max()
-            # elif "<" in constSrc["op"]:
-            #     repl_val = value_selection_values[subSrc].dropna().min()
+            if ">" in constSrc["op"]:
+                repl_val = value_selection_values[subSrc].dropna().max()
+            elif "<" in constSrc["op"]:
+                repl_val = value_selection_values[subSrc].dropna().min()
             
-            # Special treatment for REGEX 
-            if constSrc["op"] == "in":
-                langs = value_selection_values[subSrc].apply(lambda x: lang_detect(x))
+            # Special treatment for REGEX
+            #   Extract randomly 1 from 10 most common words in the result list
+            elif constSrc["op"] == "in":
+                langs = value_selection_values[subSrc].dropna().apply(lambda x: lang_detect(x))
                 for lang in set(langs):
                     try: stopwords.extend(nltk_stopwords.words(lang))
                     except: continue
@@ -206,10 +204,10 @@ def inject_constant(queryfile, value_selection, instance_id):
                 repl_val = np.random.choice(list(map(lambda x: x[0], bow.most_common(10))))
             
         # Convert Pandas numpy object to Python object
-        try: 
-            repl_val = repl_val.item()
+        try: repl_val = repl_val.item()
         except: pass
 
+        # Stringify time object and cache
         injection_cache[subSrc] = repl_val.strftime("%Y-%m-%d") if isinstance(repl_val, pd._libs.tslibs.timestamps.Timestamp) else repl_val 
 
         if str(repl_val).startswith("http") or str(repl_val).startswith("nodeID"): 
@@ -235,9 +233,8 @@ def inject_constant(queryfile, value_selection, instance_id):
 @click.argument("value-selection", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("instance-id", type=click.INT)
-@click.option("--endpoint", type=str, default="http://localhost:8890/sparql/", help="URL to a SPARQL endpoint")
 @click.pass_context
-def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile, instance_id, endpoint):
+def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile, instance_id):
     """From a query template, instanciate the {instance_id}-th instance.
 
     1. - Until all placeholders are replaced:
@@ -279,10 +276,11 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
         # Execute the partially injected query to find the rest of constants
         else:
             next_value_selection = f"{Path(value_selection).parent}/value_selection.csv"
-            #ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
             query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection)
 
         query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {select} WHERE", query)
+        query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(\2)),", query)
+        query = re.sub(r"(#){2}(LIMIT|FILTER|OFFSET|ORDER)", r"\2", query)
 
         with open(next_queryfile, "w+") as f:
             f.write(query)
@@ -349,11 +347,11 @@ def build_provenance_query(queryfile, outfile):
                 wherePos = cur
     
     graph_proj = ' '.join([ f"?tp{i}" for i in np.arange(1, ntp+1) ])
-    queryBody = re.sub(r"(LIMIT|ORDER BY|OFFSET)", r"# \1", queryBody)
     # Deferring the task of eliminate duplicate downstream if needed.
     with open(outfile, mode="w+") as out:
         query = queryHeader + queryBody
         query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {graph_proj} WHERE", query)
+        query = re.sub(r"(#)*(LIMIT|FILTER|OFFSET|ORDER)", r"##\2", query)
         out.write(query)
         out.close()
     

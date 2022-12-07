@@ -95,6 +95,7 @@ public class Federapp {
             conn = repo.getConnection();
         }catch (RepositoryException e) {
             log.error("Error", e);
+            statWriter.close();
             throw e;
         }
 

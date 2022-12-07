@@ -33,8 +33,8 @@ def run_benchmark(config, query, result, stats, ideal_ss, timeout):
     r_root = Path(result).parent
 
     #stat = f"{r_root}/stats.csv"
-    sourceselection = f"{r_root}/provenance.csv"
-    httpreq = f"{r_root}/httpreq.csv"
+    sourceselection = f"{r_root}/provenance"
+    httpreq = f"{r_root}/httpreq"
 
     args = [config, query, result, stats, sourceselection, httpreq, ideal_ss]
     args = " ".join(args)
@@ -59,7 +59,7 @@ def run_benchmark(config, query, result, stats, ideal_ss, timeout):
                 print(f"{query} benchmarked sucessfully")
             else:
                 write_empty_stats()
-                write_empty_result(fedx_proc.stderr.decode())
+                write_empty_result(fedx_proc.stdout.decode())
         else:
             print(f"{query} reported error")
             raise RuntimeError(fedx_proc.stderr.decode())

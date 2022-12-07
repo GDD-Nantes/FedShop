@@ -1,0 +1,14 @@
+version: "3"
+services:
+  watdiv:
+    container_name: "watdiv"
+    image: minhhoangdang/watdiv:bsbm
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./bsbm:/opt/watdiv/bsbm"
+    entrypoint: "python3 -m http.server"
+
+networks:
+  default:
+    name: "watdiv-network"

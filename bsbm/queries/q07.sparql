@@ -22,7 +22,7 @@ WHERE {
         ?offer bsbm:validTo ?date .
 
         # const ?currentDate $ ?date 
-        # FILTER (?date > ?currentDate )
+        FILTER (?date > ?currentDate )
     }
     OPTIONAL {
 	    ?review bsbm:reviewFor ?reviewProduct .

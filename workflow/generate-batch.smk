@@ -4,11 +4,15 @@ from pathlib import Path
 import glob
 import time
 import requests
+import subprocess
 
 SPARQL_ENDPOINT = os.environ["RSFB__SPARQL_ENDPOINT"]
 GENERATOR_ENDPOINt = os.environ["RSFB__GENERATOR_ENDPOINT"]
 
+SPARQL_COMPOSE_FILE = os.environ["RSFB__SPARQL_COMPOSE_FILE"]
 SPARQL_CONTAINER_NAME = os.environ["RSFB__SPARQL_CONTAINER_NAME"]
+
+GENERATOR_COMPOSE_FILE = os.environ["RSFB__GENERATOR_COMPOSE_FILE"]
 GENERATOR_CONTAINER_NAME = os.environ["RSFB__GENERATOR_CONTAINER_NAME"]
 
 WORK_DIR = os.environ["RSFB__WORK_DIR"]
@@ -47,12 +51,12 @@ def wait_for_container(endpoint, outfile, wait=1):
         f.close()
 
 def restart_virtuoso(status_file):
-    os.system(f"docker-compose up -d --force-recreate {SPARQL_CONTAINER_NAME}")
+    os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} up -d {SPARQL_CONTAINER_NAME}")
     wait_for_container(SPARQL_ENDPOINT, status_file, wait=1)
     return status_file
 
 def start_generator(status_file):
-    os.system(f"docker-compose up -d --force-recreate {GENERATOR_CONTAINER_NAME}")
+    os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} up -d {GENERATOR_CONTAINER_NAME}")
     wait_for_container(GENERATOR_ENDPOINt, status_file, wait=1)
     return status_file
 
@@ -120,7 +124,12 @@ rule ingest_virtuoso_next_batches:
         person=expand("{modelDir}/virtuoso/ingest_person_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
         virtuoso_status=expand("{workDir}/virtuoso-up.txt", workDir=WORK_DIR)
     output: expand("{workDir}/virtuoso-batch{{batch_id}}-ok.txt", workDir=WORK_DIR)
-    shell: 'sh {input.vendor} bsbm && sh {input.person} && echo "OK" > {output}'
+    run: 
+        proc = subprocess.run(f"docker exec {SPARQL_CONTAINER_NAME} ls /usr/local/virtuoso-opensource/share/virtuoso/vad | wc -l", shell=True, capture_output=True)
+        nFiles = int(proc.stdout.decode())
+        expected_nFiles = len(glob.glob(f"{MODEL_DIR}/exported/*.nq"))
+        if nFiles != expected_nFiles: raise RuntimeError(f"Expecting {expected_nFiles} *.nq files in virtuoso container, got {nFiles}!") 
+        os.system(f'sh {input.vendor} bsbm && sh {input.person} && echo "OK" > {output}')
 
 rule restart_virtuoso:
     priority: 5
@@ -198,6 +207,7 @@ rule build_value_selection_query:
 
 rule agg_product_person:
     priority: 11
+    retries: 2
     input:
         person="{modelDir}/tmp/person{person_id}.nt.tmp",
         product="{modelDir}/tmp/product/"
@@ -206,6 +216,7 @@ rule agg_product_person:
 
 rule agg_product_vendor:
     priority: 11
+    retries: 2
     input: 
         vendor="{modelDir}/tmp/vendor{vendor_id}.nt.tmp",
         product="{modelDir}/tmp/product/"
