@@ -16,6 +16,12 @@ pip install -r requirements.txt
 
 - Install [WatDiv](https://github.com/mhoangvslev/watdiv) (optional)
 
+- Compile Federapp (modified FedX)
+
+```bash
+cd Federapp/
+mvn clean && mvn install dependency:copy-dependencies package
+```
 
 2. Run experiments
 
@@ -24,11 +30,13 @@ pip install -r requirements.txt
 
 ```bash
 # Run
-sh bsbm/benchmark.sh
+sh bsbm/benchmark.sh <task>
 
-# Clean and rerun
-sh bsbm/clean.sh deep && sh bsbm/benchmark.sh
+# Clean and run
+sh bsbm/benchmark.sh <task> clean
 
 # In case one of the batch did not complete
-sh bsbm/clean.sh && sh bsbm/benchmark.sh
+sh bsbm/clean.sh && sh bsbm/benchmark.sh <task>
+
+<task>: generate|evaluate
 ```

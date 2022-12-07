@@ -85,7 +85,7 @@ elif [ "${MODE}" = "evaluate" ]; then
     
     if [ "${OP}" = "clean" ]; then
         echo "Cleaning..."
-        docker-compose -f ${RSFB__SPARQL_COMPOSE_FILE} down &&
+        #docker-compose -f ${RSFB__SPARQL_COMPOSE_FILE} down &&
         rm -rf "${RSFB__WORK_DIR}/benchmark/evaluation"
     fi
 
@@ -95,7 +95,7 @@ elif [ "${MODE}" = "evaluate" ]; then
             echo "Producing rulegraph..."
             (snakemake ${SNAKEMAKE_OPTS} --snakefile ${EVALUATION_SNAKEFILE} --rulegraph > "${RULEGRAPH_FILE}.dot") || exit 1
             (
-                #gsed -Ei "s#(digraph snakemake_dag \{)#\1 rankdir=\"LR\"#g" "${RULEGRAPH_FILE}.dot" &&
+                gsed -Ei "s#(digraph snakemake_dag \{)#\1 rankdir=\"LR\"#g" "${RULEGRAPH_FILE}.dot" &&
                 dot -Tpng "${RULEGRAPH_FILE}.dot" > "${RULEGRAPH_FILE}.png" 
             ) || exit 1
         else

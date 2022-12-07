@@ -56,7 +56,7 @@ public class SourceSelection {
     protected final QueryInfo queryInfo;
 
     public SourceSelection(List<Endpoint> endpoints, SourceSelectionCache cache, QueryInfo queryInfo) {
-        Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION_KEY,this);
+        Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION_KEY, this);
         this.endpoints = endpoints;
         this.cache = cache;
         this.queryInfo = queryInfo;
@@ -67,9 +67,8 @@ public class SourceSelection {
      */
     protected Map<StatementPattern, List<StatementSource>> stmtToSources = new ConcurrentHashMap<>();
 
-
     public void doSourceSelection(List<StatementPattern> stmts) {
-        if(!Federapp.CONTAINER.containsKey(Federapp.MAP_SS)) {
+        if (!Federapp.CONTAINER.containsKey(Federapp.MAP_SS)) {
             log.info("[SOURCE_SELECTION] Default");
             doSourceSelectionDefault(stmts);
         } else {
@@ -77,13 +76,17 @@ public class SourceSelection {
             doSourceSelectionForce(stmts);
         }
     }
+
     /**
-     * Perform source selection for the provided statements using cache or remote ASK queries.
+     * Perform source selection for the provided statements using cache or remote
+     * ASK queries.
      *
-     * Remote ASK queries are evaluated in parallel using the concurrency infrastructure of FedX. Note, that this method
+     * Remote ASK queries are evaluated in parallel using the concurrency
+     * infrastructure of FedX. Note, that this method
      * is blocking until every source is resolved.
      *
-     * The statement patterns are replaced by appropriate annotations in this optimization.
+     * The statement patterns are replaced by appropriate annotations in this
+     * optimization.
      *
      * @param stmts
      */
@@ -93,7 +96,8 @@ public class SourceSelection {
         // for each statement determine the relevant sources
         for (StatementPattern stmt : stmts) {
 
-            // jump over the statement (e.g. if the same pattern is used in two union branches)
+            // jump over the statement (e.g. if the same pattern is used in two union
+            // branches)
             if (stmtToSources.containsKey(stmt)) {
                 continue;
             }
@@ -151,10 +155,9 @@ public class SourceSelection {
             }
         }
 
-        Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION2_KEY,this.stmtToSources);
-        //this.stmtToSources = new ConcurrentHashMap<>();
+        Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION2_KEY, this.stmtToSources);
+        // this.stmtToSources = new ConcurrentHashMap<>();
     }
-
 
     public void doSourceSelectionForce(List<StatementPattern> stmts) {
         List<CheckTaskPair> remoteCheckTasks = new ArrayList<>();
@@ -162,7 +165,8 @@ public class SourceSelection {
         // for each statement determine the relevant sources
         int stmtId = 0;
         for (StatementPattern stmt : stmts) {
-            // jump over the statement (e.g. if the same pattern is used in two union branches)
+            // jump over the statement (e.g. if the same pattern is used in two union
+            // branches)
             if (stmtToSources.containsKey(stmt)) {
                 continue;
             }
@@ -171,11 +175,13 @@ public class SourceSelection {
 
             SubQuery q = new SubQuery(stmt, queryInfo.getDataset());
 
-            Set<String> endpoints = ((Set<String>)((Map<String,Object>)Federapp.CONTAINER.get(Federapp.MAP_SS)).get(stmtId));
-            if(endpoints == null) endpoints = new HashSet<>();
+            Set<String> endpoints = ((Set<String>) ((Map<String, Object>) Federapp.CONTAINER.get(Federapp.MAP_SS))
+                    .get(stmtId));
+            if (endpoints == null)
+                endpoints = new HashSet<>();
 
             for (String endpoint : endpoints) {
-                StatementSource s = new StatementSource(endpoint,StatementSourceType.REMOTE);
+                StatementSource s = new StatementSource(endpoint, StatementSourceType.REMOTE);
                 log.info(s.toString());
                 stmtToSources.get(stmt).add(s);
             }
@@ -183,10 +189,8 @@ public class SourceSelection {
             stmtId += 1;
         }
 
-
-
-        // ------------------------------------------------------------------------------ //
-
+        // ------------------------------------------------------------------------------
+        // //
 
         // if remote checks are necessary, execute them using the concurrency
         // infrastructure and block until everything is resolved
@@ -221,9 +225,10 @@ public class SourceSelection {
             }
         }
         log.info(stmtToSources.toString());
-        Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION2_KEY,stmtToSources);
-        //this.stmtToSources = new ConcurrentHashMap<>();
+        Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION2_KEY, stmtToSources);
+        // this.stmtToSources = new ConcurrentHashMap<>();
     }
+
     /**
      * Retrieve a set of relevant sources for this query.
      *
@@ -238,7 +243,7 @@ public class SourceSelection {
             }
         }
         log.debug("getRelevantSources = " + endpoints.toString());
-        Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION2_KEY,this.stmtToSources);
+        Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION2_KEY, this.stmtToSources);
         return endpoints;
     }
 
@@ -259,8 +264,10 @@ public class SourceSelection {
     protected static class SourceSelectionExecutorWithLatch implements ParallelExecutor<BindingSet> {
 
         /**
-         * Execute the given list of tasks in parallel, and block the thread until all tasks are completed.
-         * Synchronization is achieved by means of a latch. Results are added to the map of the source selection
+         * Execute the given list of tasks in parallel, and block the thread until all
+         * tasks are completed.
+         * Synchronization is achieved by means of a latch. Results are added to the map
+         * of the source selection
          * instance. Errors are reported as {@link OptimizationException} instances.
          *
          * @param tasks
@@ -282,7 +289,8 @@ public class SourceSelection {
         }
 
         /**
-         * Execute the given list of tasks in parallel, and block the thread until all tasks are completed.
+         * Execute the given list of tasks in parallel, and block the thread until all
+         * tasks are completed.
          * Synchronization is achieved by means of a latch
          *
          * @param tasks
@@ -389,7 +397,7 @@ public class SourceSelection {
         protected final QueryInfo queryInfo;
 
         public ParallelCheckTask(Endpoint endpoint, StatementPattern stmt, QueryInfo queryInfo,
-                                 SourceSelectionExecutorWithLatch control) {
+                SourceSelectionExecutorWithLatch control) {
             this.endpoint = endpoint;
             this.stmt = stmt;
             this.queryInfo = queryInfo;

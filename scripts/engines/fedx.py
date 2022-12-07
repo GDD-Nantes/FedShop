@@ -55,24 +55,21 @@ def run_benchmark(config, query, result, stats, ideal_ss, timeout):
     try: 
         fedx_proc = subprocess.run(cmd, capture_output=True, shell=True, timeout=timeout)
         if fedx_proc.returncode == 0:
-            if os.path.exists(stats) and os.stat(stats).st_size > 0 and os.path.exists(result) and os.stat(result).st_size > 0:
-                print(f"{query} benchmarked sucessfully")
-            else:
-                write_empty_stats()
-                write_empty_result(fedx_proc.stdout.decode())
+            print(f"{query} benchmarked sucessfully")  
         else:
             print(f"{query} reported error")
-            raise RuntimeError(fedx_proc.stderr.decode())
+            write_empty_stats()
+            write_empty_result(fedx_proc.stdout.decode())
            
-
     except subprocess.TimeoutExpired: 
         print(f"{query} timed out!")
-        write_empty_stats("timeout")
+        write_empty_stats()
+        write_empty_result("timeout")
 
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
-@click.option("--endpoint", type=str, default="http://localhost:8890/sparql/", help="URL to a SPARQL endpoint")
+@click.option("--endpoint", type=str, default="http://localhost:8890/sparql", help="URL to a SPARQL endpoint")
 def generate_config_file(datafiles, outfile, endpoint):
     ssite = set()
     #for data_file in glob.glob(f'{dir_data_file}/*.nq'):
@@ -80,9 +77,8 @@ def generate_config_file(datafiles, outfile, endpoint):
         with open(data_file) as file:
             t_file = file.readlines()
             for line in t_file:
-                site = line.split()[-1]
-                site = site.replace("<", "")
-                site = site.replace(">.", "")
+                site = line.rsplit()[-1]
+                site = re.search(r"<(.*)>", site).group(1)
                 ssite.add(site)
     
     with open(f'{outfile}', 'a') as ffile:
@@ -93,7 +89,7 @@ def generate_config_file(datafiles, outfile, endpoint):
 
 """
         )
-        for s in sorted(ssite,):
+        for s in sorted(ssite):
             ffile.write(
 f"""
 <{s}> a sd:Service ;

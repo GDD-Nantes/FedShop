@@ -91,7 +91,7 @@ def __parse_query(queryfile):
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.option("--sample", type=click.INT)
-@click.option("--endpoint", type=str, default="http://localhost:8890/sparql/", help="URL to a SPARQL endpoint")
+@click.option("--endpoint", type=str, default="http://localhost:8890/sparql", help="URL to a SPARQL endpoint")
 def execute_query(queryfile, outfile, sample, endpoint):
     query_text = open(queryfile, mode="r").read()
     _, result = exec_query(query_text, endpoint, error_when_timeout=True)  
@@ -279,7 +279,7 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
             query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection)
 
         query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {select} WHERE", query)
-        query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(\2)),", query)
+        query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(\2),", query)
         query = re.sub(r"(#){2}(LIMIT|FILTER|OFFSET|ORDER)", r"\2", query)
 
         with open(next_queryfile, "w+") as f:

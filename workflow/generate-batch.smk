@@ -7,7 +7,7 @@ import requests
 import subprocess
 
 SPARQL_ENDPOINT = os.environ["RSFB__SPARQL_ENDPOINT"]
-GENERATOR_ENDPOINt = os.environ["RSFB__GENERATOR_ENDPOINT"]
+GENERATOR_ENDPOINT = os.environ["RSFB__GENERATOR_ENDPOINT"]
 
 SPARQL_COMPOSE_FILE = os.environ["RSFB__SPARQL_COMPOSE_FILE"]
 SPARQL_CONTAINER_NAME = os.environ["RSFB__SPARQL_CONTAINER_NAME"]
@@ -40,10 +40,13 @@ BENCH_DIR = f"{WORK_DIR}/benchmark/generation"
 
 def wait_for_container(endpoint, outfile, wait=1):
     endpoint_ok = False
+    attempt=1
+    print(f"Waiting for {endpoint}...")
     while(not endpoint_ok):
+        print(f"Attempt {attempt} ...")
         try: endpoint_ok = ( requests.get(endpoint).status_code == 200 )
         except: pass
-        print(f"Waiting for {endpoint}...")
+        attempt += 1
         time.sleep(wait)
 
     with open(f"{outfile}", "w+") as f:
@@ -57,7 +60,7 @@ def restart_virtuoso(status_file):
 
 def start_generator(status_file):
     os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} up -d {GENERATOR_CONTAINER_NAME}")
-    wait_for_container(GENERATOR_ENDPOINt, status_file, wait=1)
+    wait_for_container(GENERATOR_ENDPOINT, status_file, wait=1)
     return status_file
 
 def generate_virtuoso_scripts(nqfiles, shfiles, batch_id, n_items):
@@ -109,7 +112,7 @@ rule exec_provenance_query:
     threads: 1
     input: 
         provenance_query="{benchDir}/{query}/{instance_id}/provenance.sparql",
-        loaded_virtuoso=expand("{workDir}/virtuoso-batch{{batch_id}}-ok.txt", workDir=WORK_DIR)
+        loaded_virtuoso="{benchDir}/virtuoso-batch{batch_id}-ok.txt"
     output: "{benchDir}/{query}/{instance_id}/batch_{batch_id}/provenance.csv"
     params:
         endpoint=SPARQL_ENDPOINT
@@ -122,8 +125,8 @@ rule ingest_virtuoso_next_batches:
     input: 
         vendor=expand("{modelDir}/virtuoso/ingest_vendor_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
         person=expand("{modelDir}/virtuoso/ingest_person_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
-        virtuoso_status=expand("{workDir}/virtuoso-up.txt", workDir=WORK_DIR)
-    output: expand("{workDir}/virtuoso-batch{{batch_id}}-ok.txt", workDir=WORK_DIR)
+        virtuoso_status="{benchDir}/virtuoso-up.txt"
+    output: "{benchDir}/virtuoso-batch{batch_id}-ok.txt"
     run: 
         proc = subprocess.run(f"docker exec {SPARQL_CONTAINER_NAME} ls /usr/local/virtuoso-opensource/share/virtuoso/vad | wc -l", shell=True, capture_output=True)
         nFiles = int(proc.stdout.decode())
@@ -134,7 +137,7 @@ rule ingest_virtuoso_next_batches:
 rule restart_virtuoso:
     priority: 5
     threads: 1
-    output: "{workDir}/virtuoso-up.txt"
+    output: "{benchDir}/virtuoso-up.txt"
     run: restart_virtuoso(output)
 
 rule make_virtuoso_ingest_command_for_vendor:
@@ -199,7 +202,7 @@ rule build_value_selection_query:
     priority: 10
     input: 
         queryfile=expand("{queryDir}/{{query}}.sparql", queryDir=QUERY_DIR),
-        virtuoso_status=expand("{workDir}/virtuoso-batch0-ok.txt", workDir=WORK_DIR)
+        virtuoso_status="{benchDir}/virtuoso-batch0-ok.txt"
     output: "{benchDir}/{query}/value_selection.sparql"
     params:
         n_variations=N_VARIATIONS
@@ -232,7 +235,7 @@ rule split_products:
 
 rule generate_reviewers:
     priority: 13
-    input: expand("{workDir}/generator-ok.txt", workDir=WORK_DIR)
+    input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/person{person_id}.nt.tmp"
     params:
         verbose=VERBOSE
@@ -240,7 +243,7 @@ rule generate_reviewers:
 
 rule generate_vendors:
     priority: 13
-    input: expand("{workDir}/generator-ok.txt", workDir=WORK_DIR)
+    input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/vendor{vendor_id}.nt.tmp"
     params:
         verbose=VERBOSE
@@ -248,7 +251,7 @@ rule generate_vendors:
 
 rule generate_products:
     priority: 14
-    input: expand("{workDir}/generator-ok.txt", workDir=WORK_DIR)
+    input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/product0.nt.tmp", 
     params:
         verbose=VERBOSE,
@@ -256,5 +259,5 @@ rule generate_products:
     shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml product {wildcards.modelDir}/bsbm-product.template {output} {params.product_id} --verbose {params.verbose}'
 
 rule start_generator_container:
-    output: "{workDir}/generator-ok.txt"
+    output: "{benchDir}/generator-ok.txt"
     run: start_generator(f"{output}")
