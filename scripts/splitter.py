@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Union
 from rdflib.plugins.parsers.ntriples import W3CNTriplesParser as NTripleParser, DummySink as Sink, ParseError
 from rdflib.util import from_n3
@@ -45,7 +46,7 @@ class SplitSink(Sink):
         self.outdir = outdir
 
     def triple(self, s: Node, p: Node, o: Node):
-        tofile = s.toPython().rsplit('/', 1)[-1]
+        tofile = re.split(r"#|/", s.toPython())[-1]
         #domain = URIRef(s.toPython().rsplit('/', 1)[0])
         if self.currentfile is None:
             currentfile = open(os.path.join(self.outdir, f"{tofile}.nt"), "a")

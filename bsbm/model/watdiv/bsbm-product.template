@@ -17,9 +17,9 @@
 #predicate rdfs:comment string
 </pgroup>
 
-<pgroup> 1.0
-#predicate bsbm:country country
-</pgroup>
+//<pgroup> 1.0
+//#predicate bsbm:country country
+//</pgroup>
 
 </type>
 

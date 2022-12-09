@@ -12,17 +12,18 @@ def cli():
 @cli.command
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("section", type=click.STRING)
-@click.argument("template", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("output", type=click.Path(file_okay=True, dir_okay=False))
-@click.argument("id", type=click.INT)
+@click.option("--id", type=click.INT, default=0)
 @click.option("--verbose", type=click.BOOL, default=False)
-def generate(configfile, section, template, output, id, verbose):
+def generate(configfile, section, output, id, verbose):
     config = yaml.load(configfile)["generation"]
-    template = open(template, "r").read()
+    template = open(config[section]["template"], "r").read()
     # Replace all params in template
-    for param, value in config[section]["params"].items():
-        if param == f"{section}_n": continue
-        template = re.sub(re.escape(f"{{%{param}}}"), str(value), template)
+    params: dict = config[section]["params"]
+    if params is not None:
+        for param, value in params.items():
+            if param == f"{section}_n": continue
+            template = re.sub(re.escape(f"{{%{param}}}"), str(value), template)
 
     # Generate n vendor
     outFile = os.path.join(Path(output).parent, f"{section}{id}.txt.tmp")

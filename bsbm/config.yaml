@@ -1,9 +1,9 @@
 generation:
   watdiv: 
-    exec: "docker exec watdiv watdiv"
-    #exec: "watdiv"
+    #exec: "docker exec watdiv watdiv"
+    exec: "watdiv"
   product:
-    template: "bsbm-product.template"
+    template: "bsbm/model/watdiv/bsbm-product.template"
     scale_factor: 1
     params:
       # type
@@ -22,7 +22,7 @@ generation:
       - "test_assc_products-producer.sparql"
 
   vendor:
-    template: "bsbm-vendor.template"
+    template: "bsbm/model/watdiv/bsbm-vendor.template"
     scale_factor: 1
     params:
       product_n: ${generation.product.params.product_id}
@@ -30,7 +30,7 @@ generation:
       #vendor_n: 10
 
   person:
-    template: "bsbm-person.template"
+    template: "bsbm/model/watdiv/bsbm-person.template"
     scale_factor: 1
     params:
       #type
@@ -41,6 +41,11 @@ generation:
       rating2_p: 0.7
       rating3_p: 0.7
       rating4_p: 0.7
+
+  country:
+    template: "bsbm/model/watdiv/bsbm-country.template"
+    params:
+
 evaluation:
   engines:
     # - virtuoso

@@ -25,6 +25,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Federapp {
     private static final Logger log = LoggerFactory.getLogger(Federapp.class);
@@ -194,13 +196,22 @@ public class Federapp {
 
         // resultPath: .../{engine}/{query}/{instance_id}/batch_{batch_id}/default/results
         // research in reverse order
-        List<String> basicInfos = Arrays.asList(resultPath.split("/"));
-        Collections.reverse(basicInfos);
-        String engine = basicInfos.get(5);
-        String query = basicInfos.get(4);
-        String instance = basicInfos.get(3);
-        String batch = basicInfos.get(2);
-        String mode = basicInfos.get(1);
+
+        Pattern pattern = Pattern.compile(".*/(\\w+)/(q\\d+)/(\\d+)/batch_(\\d+)/(\\w+)/results");
+        Matcher basicInfos = pattern.matcher(resultPath);
+        String engine = basicInfos.group(1);
+        String query = basicInfos.group(2);
+        String instance = basicInfos.group(3);
+        String batch = basicInfos.group(4);
+        String mode = basicInfos.group(5);
+
+        // List<String> basicInfos = Arrays.asList(resultPath.split("/"));
+        // Collections.reverse(basicInfos);
+        // String engine = basicInfos.get(5);
+        // String query = basicInfos.get(4);
+        // String instance = basicInfos.get(3);
+        // String batch = basicInfos.get(2);
+        // String mode = basicInfos.get(1);
         String distinct_ss = "" + sumDistinctSourceSelection();
         String total_ss = "" + sumSourceSelection();
 

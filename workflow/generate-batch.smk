@@ -33,6 +33,7 @@ SCALE_FACTOR=int(os.environ["RSFB__SCALE_FACTOR"])
 QUERY_DIR = f"{WORK_DIR}/queries"
 MODEL_DIR = f"{WORK_DIR}/model"
 BENCH_DIR = f"{WORK_DIR}/benchmark/generation"
+TEMPLATE_DIR = f"{MODEL_DIR}/watdiv"
 
 #=================
 # USEFUL FUNCTIONS
@@ -54,12 +55,12 @@ def wait_for_container(endpoint, outfile, wait=1):
         f.close()
 
 def restart_virtuoso(status_file):
-    os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} up -d {SPARQL_CONTAINER_NAME}")
+    shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} up -d {SPARQL_CONTAINER_NAME}")
     wait_for_container(SPARQL_ENDPOINT, status_file, wait=1)
     return status_file
 
 def start_generator(status_file):
-    os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} up -d {GENERATOR_CONTAINER_NAME}")
+    shell(f"docker-compose -f {GENERATOR_COMPOSE_FILE} up -d {GENERATOR_CONTAINER_NAME}")
     wait_for_container(GENERATOR_ENDPOINT, status_file, wait=1)
     return status_file
 
@@ -132,7 +133,7 @@ rule ingest_virtuoso_next_batches:
         nFiles = int(proc.stdout.decode())
         expected_nFiles = len(glob.glob(f"{MODEL_DIR}/exported/*.nq"))
         if nFiles != expected_nFiles: raise RuntimeError(f"Expecting {expected_nFiles} *.nq files in virtuoso container, got {nFiles}!") 
-        os.system(f'sh {input.vendor} bsbm && sh {input.person} && echo "OK" > {output}')
+        shell(f'sh {input.vendor} bsbm && sh {input.person} && echo "OK" > {output}')
 
 rule restart_virtuoso:
     priority: 5
@@ -213,7 +214,7 @@ rule agg_product_person:
     retries: 2
     input:
         person="{modelDir}/tmp/person{person_id}.nt.tmp",
-        product="{modelDir}/tmp/product/"
+        product="{modelDir}/tmp/product/",
     output: "{modelDir}/exported/person{person_id}.nq"
     shell: 'python scripts/aggregator.py {input.person} {input.product} {output} http://www.person{wildcards.person_id}.fr'
 
@@ -239,7 +240,7 @@ rule generate_reviewers:
     output: "{modelDir}/tmp/person{person_id}.nt.tmp"
     params:
         verbose=VERBOSE
-    shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml person {wildcards.modelDir}/bsbm-person.template {output} {wildcards.person_id} --verbose {params.verbose}'
+    shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml person {output} --id {wildcards.person_id} --verbose {params.verbose}'
 
 rule generate_vendors:
     priority: 13
@@ -247,16 +248,15 @@ rule generate_vendors:
     output: "{modelDir}/tmp/vendor{vendor_id}.nt.tmp"
     params:
         verbose=VERBOSE
-    shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml vendor {wildcards.modelDir}/bsbm-vendor.template {output} {wildcards.vendor_id} --verbose {params.verbose}'
+    shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml vendor {output} --id {wildcards.vendor_id} --verbose {params.verbose}'
 
 rule generate_products:
     priority: 14
     input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/product0.nt.tmp", 
     params:
-        verbose=VERBOSE,
-        product_id=0
-    shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml product {wildcards.modelDir}/bsbm-product.template {output} {params.product_id} --verbose {params.verbose}'
+        verbose=VERBOSE
+    shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml product {output} --verbose {params.verbose}'
 
 rule start_generator_container:
     output: "{benchDir}/generator-ok.txt"

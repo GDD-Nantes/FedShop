@@ -36,12 +36,12 @@ class AggSink(Sink):
         #print(f"{s.n3()} {p.n3()} {o.n3()} .")
 
         with open(self.outfile, "a") as output:
-            subject_name = s.toPython().rsplit("/", 1)[-1] 
+            subject_name = re.split(r"#|/", s.toPython())[-1]
             subject_renamed = URIRef(f"{self.domain.toPython()}/{subject_name}")
 
             object_renamed = o
             if isinstance(o, URIRef):
-                object_name = o.toPython().rsplit("/", 1)[-1] 
+                object_name = re.split(r"#|/", o.toPython())[-1]
                 object_renamed = URIRef(f"{self.domain.toPython()}/{object_name}")
 
                 # Foutre le sameAs
@@ -53,7 +53,7 @@ class AggSink(Sink):
 
         if isinstance(o, URIRef):
         #if str(o).startswith("http://"):
-            objectfile = os.path.join(self.indir, f"{o.toPython().rsplit('/', 1)[-1]}.nt")
+            objectfile = os.path.join(self.indir, f"{re.split(r'#|/', o.toPython())[-1]}.nt")
             if (os.path.exists(objectfile) and (objectfile not in self.files)):
                 self.files.append(objectfile)
                 logger.info(f"Reading file: {objectfile}")
@@ -67,8 +67,6 @@ class AggSink(Sink):
 @click.argument("outfile", type=click.Path(dir_okay=False, file_okay=True))
 @click.argument("domain", type=click.STRING)
 def aggregate(infile, indir, outfile, domain):
-    # domain = re.sub(r"<(.*)>", r"\1", open(infile, "r").readline().strip("\n").split()[0])
-    # domain = domain.rsplit('/', 1)[0]
     sink=AggSink(domain=URIRef(domain), indir=indir,oufile=outfile, files=[])
     n=NTParser(sink)
     with open(infile, "rb") as input_file:
