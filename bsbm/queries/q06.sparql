@@ -5,10 +5,9 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
 SELECT ?product ?label
 WHERE {
-	?localProduct rdfs:label ?label .
-    ?offer bsbm:product ?localProduct .
-    ?localProduct owl:sameAs ?product .
-    #?product rdf:type bsbm:Product .
+    ?localProduct rdfs:label ?label .
+    ?localProduct rdf:type ?localProductClass .
+    ?localProductClass owl:sameAs bsbm:Product .
     # const ?word1 in ?label 
 	FILTER regex(?label, ?word1)
 }

@@ -1,8 +1,9 @@
 version: "3"
 services:
-  watdiv:
-    container_name: "watdiv"
+  bsbm-watdiv:
+    container_name: "bsbm-watdiv"
     image: minhhoangdang/watdiv:bsbm
+    #user: "1000:1000"
     ports:
       - "8000:8000"
     volumes:

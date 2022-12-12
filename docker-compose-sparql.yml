@@ -4,6 +4,7 @@ services:
     container_name: "bsbm-virtuoso"
     #image: openlink/virtuoso-opensource-7:7.2.8
     image: tenforce/virtuoso:virtuoso7.2.5
+    #user: "1000:1000"
     environment:
       SPARQL_UPDATE: "false"
       DBA_PASSWORD: "dba"

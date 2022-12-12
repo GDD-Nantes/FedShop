@@ -44,7 +44,7 @@ class AggSink(Sink):
                 object_name = re.split(r"#|/", o.toPython())[-1]
                 object_renamed = URIRef(f"{self.domain.toPython()}/{object_name}")
 
-                # Foutre le sameAs
+                # Put the sameAs
                 sameAs = URIRef('http://www.w3.org/2002/07/owl#sameAs')
                 output.write(f"{subject_renamed.n3()}\t{sameAs.n3()}\t{s.n3()}\t{self.domain.n3()}.\n")
                 output.write(f"{object_renamed.n3()}\t{sameAs.n3()}\t{o.n3()}\t{self.domain.n3()}.\n")

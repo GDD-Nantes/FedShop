@@ -11,6 +11,7 @@ WHERE {
 	?offer bsbm:vendor ?vendor .
     #?offer dc:publisher ?vendor .
 	?vendor bsbm:country ?country .
+	?country owl:sameAs <http://downlode.org/rdf/iso-3166/countries#US> .
 	?offer bsbm:deliveryDays ?deliveryDays .
 	FILTER (?deliveryDays <= 3)
 	?offer bsbm:price ?price .

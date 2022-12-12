@@ -1,4 +1,3 @@
-#namespace	ocp=http://www.ocp.com/
 #namespace	bsbm=http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/
 #namespace	rdfs=http://www.w3.org/2000/01/rdf-schema#
 #namespace	rdf=http://www.w3.org/1999/02/22-rdf-syntax-ns#
@@ -7,7 +6,7 @@
 // ===== ENTITIES & LITERAL PROPERTIES ===== //
 
 // ----- Producer ----- //
-<type> ocp:Producer {%producer_n}
+<type> bsbm:Producer {%producer_n}
 
 <pgroup> 1.0
 #predicate rdfs:label string
@@ -17,15 +16,15 @@
 #predicate rdfs:comment string
 </pgroup>
 
-//<pgroup> 1.0
-//#predicate bsbm:country country
-//</pgroup>
+<pgroup> 1.0
+#predicate bsbm:country country
+</pgroup>
 
 </type>
 
 // ----- Product ----- //
 
-<type> ocp:Product {%product_id}
+<type> bsbm:Product {%product_n}
 
 <pgroup> 1.0
 #predicate rdfs:label string
@@ -80,7 +79,7 @@
 </type>
 
 // ----- ProductFeature ----- //
-<type> ocp:ProductFeature {%feature_n}
+<type> bsbm:ProductFeature {%feature_n}
 
 <pgroup> 1.0
 #predicate rdfs:label string
@@ -93,7 +92,7 @@
 </type>
 
 // ----- ProductType ----- //
-<type> ocp:ProductType {%prod_type}
+<type> bsbm:ProductType {%prod_type}
 
 <pgroup> 1.0
 #predicate rdfs:label string
@@ -105,8 +104,8 @@
 
 </type>
 
-#association ocp:Product rdf:type ocp:ProductType 2 {%prod_type} 1.0 ZIPFIAN
-#association ocp:Product bsbm:productFeature ocp:ProductFeature 2 {%feature_n} 1.0 ZIPFIAN
-#association ocp:Product bsbm:producer ocp:Producer 2 1 1.0 ZIPFIAN
+#association bsbm:Product rdf:type bsbm:ProductType 2 {%prod_type} NORMAL NORMAL
+#association bsbm:Product bsbm:productFeature bsbm:ProductFeature 2 {%feature_n} NORMAL NORMAL
+#association bsbm:Product bsbm:producer bsbm:Producer 2 1 NORMAL NORMAL
 
 

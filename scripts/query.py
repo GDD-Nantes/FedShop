@@ -100,6 +100,7 @@ def execute_query(queryfile, outfile, sample, endpoint):
     csvOut = pd.read_csv(BytesIO(result), parse_dates=[h for h in header if "date" in h])
 
     if csvOut.empty:
+        print(query_text)
         raise RuntimeError(f"{queryfile} returns no result...")
 
     if sample is None:
@@ -172,12 +173,14 @@ def inject_constant(queryfile, value_selection, instance_id):
 
         # When not using workload value_selection_query, i.e, filling partially injected queries
         if "workload_" not in value_selection:
-            dedup_query = " and ".join([ 
-                f"`{subSrc}` != {repr(value)}" \
-                    for const, value in injection_cache.items() \
-                    if const != subSrc and value_selection_values[const].dtype == value_selection_values[subSrc].dtype 
-            ] + [ f"{subSrc}.notna()" ])
-            value_selection_values = value_selection_values.query(dedup_query).sample(1)
+            # dedup_query = " and ".join([ 
+            #     f"`{subSrc}` != {repr(value)}" \
+            #         for const, value in injection_cache.items() \
+            #         if const != subSrc #and value_selection_values[const].dtype == value_selection_values[subSrc].dtype 
+            # ] + [ f"`{subSrc}`.notna()" ])
+            # value_selection_values = value_selection_values.query(dedup_query).sample(1)
+            print(value_selection_values)
+            value_selection_values = value_selection_values.dropna().sample(1)
 
         repl_val = value_selection_values[subSrc].item() if instance_id is None else value_selection_values.loc[instance_id, subSrc]
         if pd.isnull(repl_val): continue
@@ -233,8 +236,9 @@ def inject_constant(queryfile, value_selection, instance_id):
 @click.argument("value-selection", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("instance-id", type=click.INT)
+@click.option("--endpoint", type=str, default="http://localhost:8890/sparql", help="URL to a SPARQL endpoint")
 @click.pass_context
-def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile, instance_id):
+def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile, instance_id, endpoint):
     """From a query template, instanciate the {instance_id}-th instance.
 
     1. - Until all placeholders are replaced:
@@ -275,7 +279,9 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
         
         # Execute the partially injected query to find the rest of constants
         else:
-            next_value_selection = f"{Path(value_selection).parent}/value_selection.csv"
+            next_value_selection = f"{qroot}/{qname}.csv"
+            ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
+            #next_value_selection = f"{Path(value_selection).parent}/value_selection.csv"
             query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection)
 
         query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {select} WHERE", query)

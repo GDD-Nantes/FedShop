@@ -1,5 +1,3 @@
-#namespace	review=http://www.person{%person_id}.fr/
-#namespace	ocp=http://www.ocp.com/
 #namespace	bsbm=http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/
 #namespace	rdfs=http://www.w3.org/2000/01/rdf-schema#
 #namespace	rdf=http://www.w3.org/1999/02/22-rdf-syntax-ns#
@@ -9,53 +7,14 @@
 
 // ===== ENTITIES & LITERAL PROPERTIES ===== //
 
-//
-
-#namespace	country=http://downlode.org/rdf/iso-3166/countries#
-
-// ===== ENTITIES & LITERAL PROPERTIES ===== //
-
-// ----- Countries ----- //
-
-<type> country:US 1
-</type>
-
-<type> country:UK 1
-</type>
-
-<type> country:JP 1
-</type>
-
-<type> country:CN 1
-</type>
-
-<type> country:DE 1
-</type>
-
-<type> country:FR 1
-</type>
-
-<type> country:ES 1
-</type>
-
-<type> country:RU 1
-</type>
-
-<type> country:KR 1
-</type>
-
-<type> country:AT 1
-</type>
-
-
 // ----- Product ----- //
 
-<type> ocp:Product {%product_n}
+<type> bsbm:Product {%product_n}
 </type>
 
 // ----- Person ----- //
 
-<type> review:Person 1
+<type> bsbm:Person 1
 
 <pgroup> 1.0
 #predicate foaf:name name
@@ -65,10 +24,14 @@
 #predicate foaf:mbox_sha1sum integer
 </pgroup>
 
+<pgroup> 1.0
+#predicate bsbm:country country
+</pgroup>
+
 </type>
 
 // ----- Review ----- //
-<type> review:Review {%review_n}
+<type> bsbm:Review {%review_n}
 
 <pgroup> 1.0
 #predicate bsbm:reviewDate date
@@ -100,21 +63,9 @@
 
 </type>
 
-// Every person is linked to one country 
-#association review:Person bsbm:country country:US 2 1 0.4
-#association review:Person bsbm:country country:UK 2 1 0.1
-#association review:Person bsbm:country country:JP 2 1 0.1
-#association review:Person bsbm:country country:CN 2 1 0.1
-#association review:Person bsbm:country country:DE 2 1 0.05
-#association review:Person bsbm:country country:FR 2 1 0.05
-#association review:Person bsbm:country country:ES 2 1 0.05
-#association review:Person bsbm:country country:RU 2 1 0.05
-#association review:Person bsbm:country country:KR 2 1 0.05
-#association review:Person bsbm:country country:AT 2 1 0.05
 
+// Every bsbm:Review is related to [1] bsbm:Product (drawn with a ZIPFIAN) with the probability 1.0 
+#association bsbm:Review bsbm:reviewFor bsbm:Product 2 1 NORMAL NORMAL
 
-// Every review:Review is related to [1] ocp:Product (drawn with a ZIPFIAN) with the probability 1.0 
-#association review:Review bsbm:reviewFor ocp:Product 2 1 1.0 ZIPFIAN
-
-// Every review:Review are related to [Many] review:Person (drawn with a ZIPFIAN) with the probability 1.0 
-#association review:Review rev:reviewer review:Person 2 1 1.0 ZIPFIAN
+// Every bsbm:Review are related to [Many] bsbm:Person (drawn with a ZIPFIAN) with the probability 1.0 
+#association bsbm:Review rev:reviewer bsbm:Person 2 1 NORMAL NORMAL

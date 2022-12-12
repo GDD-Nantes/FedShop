@@ -6,29 +6,33 @@ import time
 import requests
 import subprocess
 
-SPARQL_ENDPOINT = os.environ["RSFB__SPARQL_ENDPOINT"]
-GENERATOR_ENDPOINT = os.environ["RSFB__GENERATOR_ENDPOINT"]
+import sys
+smk_directory = os.path.abspath(workflow.basedir)
+sys.path.append(os.path.join(Path(smk_directory).parent, "scripts"))
 
-SPARQL_COMPOSE_FILE = os.environ["RSFB__SPARQL_COMPOSE_FILE"]
-SPARQL_CONTAINER_NAME = os.environ["RSFB__SPARQL_CONTAINER_NAME"]
+from config import load_config
 
-GENERATOR_COMPOSE_FILE = os.environ["RSFB__GENERATOR_COMPOSE_FILE"]
-GENERATOR_CONTAINER_NAME = os.environ["RSFB__GENERATOR_CONTAINER_NAME"]
+WORK_DIR = "bsbm"
+CONFIG = load_config(f"{WORK_DIR}/config.yaml")["generation"]
 
-WORK_DIR = os.environ["RSFB__WORK_DIR"]
-N_VARIATIONS = int(os.environ["RSFB__N_VARIATIONS"])
-VERBOSE = bool(os.environ["RSFB__VERBOSE"])
-N_BATCH=int(os.environ["RSFB__N_BATCH"])
+SPARQL_ENDPOINT = CONFIG["sparql"]["endpoint"]
+GENERATOR_ENDPOINT = CONFIG["generator"]["endpoint"]
+
+SPARQL_COMPOSE_FILE = CONFIG["sparql"]["compose-file"]
+SPARQL_CONTAINER_NAME = CONFIG["sparql"]["container-name"]
+
+GENERATOR_COMPOSE_FILE = CONFIG["generator"]["compose-file"]
+GENERATOR_CONTAINER_NAME = CONFIG["generator"]["container-name"]
+
+N_QUERY_INSTANCES = CONFIG["n_query_instances"]
+VERBOSE = CONFIG["verbose"]
+N_BATCH = CONFIG["n_batch"]
 
 # Config per batch
-N_VENDOR=int(os.environ["RSFB__N_VENDOR"])
-N_REVIEWER=int(os.environ["RSFB__N_REVIEWER"])
+N_VENDOR=CONFIG["schema"]["vendor"]["params"]["vendor_n"]
+N_REVIEWER=CONFIG["schema"]["person"]["params"]["person_n"]
 
-TOTAL_VENDOR = N_VENDOR * N_BATCH
-TOTAL_REVIEWER = N_REVIEWER * N_BATCH 
-
-FEDERATION_COUNT=TOTAL_VENDOR+TOTAL_REVIEWER
-SCALE_FACTOR=int(os.environ["RSFB__SCALE_FACTOR"])
+FEDERATION_COUNT=N_VENDOR+N_REVIEWER
 
 QUERY_DIR = f"{WORK_DIR}/queries"
 MODEL_DIR = f"{WORK_DIR}/model"
@@ -60,8 +64,15 @@ def restart_virtuoso(status_file):
     return status_file
 
 def start_generator(status_file):
-    shell(f"docker-compose -f {GENERATOR_COMPOSE_FILE} up -d {GENERATOR_CONTAINER_NAME}")
-    wait_for_container(GENERATOR_ENDPOINT, status_file, wait=1)
+    exec_cmd = CONFIG["generator"]["exec"]
+    if "docker exec" in exec_cmd:
+        shell(f"docker-compose -f {GENERATOR_COMPOSE_FILE} up -d {GENERATOR_CONTAINER_NAME}")
+        wait_for_container(GENERATOR_ENDPOINT, status_file, wait=1)
+    elif os.system(f"command -v {exec_cmd}") == 0:
+        with open(status_file, "w+") as f:
+            f.write(exec_cmd + "\n")
+            f.close()
+
     return status_file
 
 def generate_virtuoso_scripts(nqfiles, shfiles, batch_id, n_items):
@@ -101,7 +112,7 @@ rule compute_metrics:
         expand(
             "{{benchDir}}/{query}/{instance_id}/batch_{{batch_id}}/provenance.csv",
             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if "_" not in f],
-            instance_id=range(N_VARIATIONS)
+            instance_id=range(N_QUERY_INSTANCES)
         )
     output: "{benchDir}/metrics_batch{batch_id}.csv"
     params:
@@ -144,20 +155,16 @@ rule restart_virtuoso:
 rule make_virtuoso_ingest_command_for_vendor:
     priority: 5
     threads: 1
-    input: expand("{modelDir}/exported/vendor{vendor_id}.nq", vendor_id=range(TOTAL_VENDOR), modelDir=MODEL_DIR)
+    input: expand("{modelDir}/exported/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR)
     output: "{modelDir}/virtuoso/ingest_vendor_batch{batch_id}.sh"
-    params:
-        n_items=TOTAL_VENDOR
-    run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), params.n_items)
+    run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), N_VENDOR)
 
 rule make_virtuoso_ingest_command_for_person:
     priority: 5
     threads: 1
-    input: expand("{modelDir}/exported/person{person_id}.nq", person_id=range(TOTAL_REVIEWER), modelDir=MODEL_DIR)
+    input: expand("{modelDir}/exported/person{person_id}.nq", person_id=range(N_REVIEWER), modelDir=MODEL_DIR)
     output: "{modelDir}/virtuoso/ingest_person_batch{batch_id}.sh"
-    params:
-        n_items=TOTAL_REVIEWER
-    run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), params.n_items)
+    run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), N_REVIEWER)
 
 rule build_provenance_query: 
     """
@@ -185,10 +192,8 @@ rule create_workload_value_selection:
     priority: 8
     input: "{benchDir}/{query}/value_selection.csv"
     output: "{benchDir}/{query}/workload_value_selection.csv"
-    params:
-        n_variations=N_VARIATIONS
     run:
-        pd.read_csv(f"{input}").sample(params.n_variations).to_csv(f"{output}", index=False)
+        pd.read_csv(f"{input}").sample(N_QUERY_INSTANCES).to_csv(f"{output}", index=False)
 
 rule exec_value_selection_query:
     priority: 9
@@ -205,8 +210,6 @@ rule build_value_selection_query:
         queryfile=expand("{queryDir}/{{query}}.sparql", queryDir=QUERY_DIR),
         virtuoso_status="{benchDir}/virtuoso-batch0-ok.txt"
     output: "{benchDir}/{query}/value_selection.sparql"
-    params:
-        n_variations=N_VARIATIONS
     shell: "python scripts/query.py build-value-selection-query {input.queryfile} {output}"
 
 rule agg_product_person:
@@ -230,6 +233,7 @@ rule agg_product_vendor:
 rule split_products:
     priority: 12
     threads: 1
+    retries: 2
     input: "{modelDir}/tmp/product0.nt.tmp"
     output: directory("{modelDir}/tmp/product/")
     shell: 'python scripts/splitter.py {input} {output}'
@@ -238,25 +242,19 @@ rule generate_reviewers:
     priority: 13
     input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/person{person_id}.nt.tmp"
-    params:
-        verbose=VERBOSE
-    shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml person {output} --id {wildcards.person_id} --verbose {params.verbose}'
+    shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml person {output} --id {wildcards.person_id}'
 
 rule generate_vendors:
     priority: 13
     input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/vendor{vendor_id}.nt.tmp"
-    params:
-        verbose=VERBOSE
-    shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml vendor {output} --id {wildcards.vendor_id} --verbose {params.verbose}'
+    shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml vendor {output} --id {wildcards.vendor_id}'
 
 rule generate_products:
     priority: 14
     input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/product0.nt.tmp", 
-    params:
-        verbose=VERBOSE
-    shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml product {output} --verbose {params.verbose}'
+    shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml product {output}'
 
 rule start_generator_container:
     output: "{benchDir}/generator-ok.txt"

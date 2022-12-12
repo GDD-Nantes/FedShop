@@ -1,52 +1,59 @@
 generation:
-  watdiv: 
+  n_batch: 3
+  n_query_instances: 10
+  verbose: true
+  generator: 
     #exec: "docker exec watdiv watdiv"
     exec: "watdiv"
-  product:
-    template: "bsbm/model/watdiv/bsbm-product.template"
-    scale_factor: 1
-    params:
-      # type
-      product_id: 1000
-      producer_n: 12
-      feature_n: 20
-      prod_type: 10
-      # pgroup
-      productPropertyTextual4_p: 0.7
-      productPropertyTextual5_p: 0.8
-      productPropertyNumeric4_p: 0.7
-      productPropertyNumeric5_p: 0.8
+    endpoint: "http://localhost:8000"
+    compose-file: "docker-compose-generator.yml"
+    container-name: "bsbm-watdiv"
+  sparql:
+    endpoint: "http://localhost:8890/sparql"
+    compose-file: "docker-compose-sparql.yml"
+    container-name: "bsbm-virtuoso"
+  schema:
+    # Configuration for ONE batch
+    product:
+      # Products are generated once, independant from vendor and person
+      template: "bsbm/model/watdiv/bsbm-product.template"
+      scale_factor: 1
+      params:
+        # type
+        product_n: "${multiply: 100, ${generation.schema.product.scale_factor}, ${generation.n_batch}}"
+        producer_n: "${normal_dist: 3, 1, 50}"
+        feature_n: 20
+        prod_type: "${product_type_per_product: ${generation.schema.product.params.product_n}}"
+        # pgroup
+        productPropertyTextual4_p: 0.7
+        productPropertyTextual5_p: 0.8
+        productPropertyNumeric4_p: 0.7
+        productPropertyNumeric5_p: 0.8
 
-      # assocation
-    test:
-      - "test_assc_products-producer.sparql"
+    vendor:
+      template: "bsbm/model/watdiv/bsbm-vendor.template"
+      scale_factor: 1
+      params:
+        vendor_n: "${multiply: 3, ${generation.schema.vendor.scale_factor}, ${generation.n_batch}}"
+        offer_n: "${normal_dist: 3, 1, 20}"
+        product_n: "${generation.schema.product.params.product_n}"
 
-  vendor:
-    template: "bsbm/model/watdiv/bsbm-vendor.template"
-    scale_factor: 1
-    params:
-      product_n: ${generation.product.params.product_id}
-      offer_n: 15
-      #vendor_n: 10
+    person:
+      template: "bsbm/model/watdiv/bsbm-person.template"
+      scale_factor: 1
+      params:
+        #type
+        person_n: "${multiply: 3, ${generation.schema.person.scale_factor}, ${generation.n_batch}}"
+        product_n: "${generation.schema.product.params.product_n}"
+        review_n: "${normal_dist: 3, 1, 20}"
 
-  person:
-    template: "bsbm/model/watdiv/bsbm-person.template"
-    scale_factor: 1
-    params:
-      #type
-      product_n: ${generation.product.params.product_id}
-      review_n: 14
-      #pgroup
-      rating1_p: 0.7
-      rating2_p: 0.7
-      rating3_p: 0.7
-      rating4_p: 0.7
-
-  country:
-    template: "bsbm/model/watdiv/bsbm-country.template"
-    params:
+        #pgroup
+        rating1_p: 0.7
+        rating2_p: 0.7
+        rating3_p: 0.7
+        rating4_p: 0.7
 
 evaluation:
   engines:
-    # - virtuoso
-    - fedx
+    fedx:
+      dir: "Federapp/target"
