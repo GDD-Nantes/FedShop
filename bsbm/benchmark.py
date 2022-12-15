@@ -56,8 +56,8 @@ def benchmark(mode, op):
     if mode == "generate":
         if op == "clean":
             print("Cleaning...")
-            if os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} down") != 0 : exit(1)
-            if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} down") != 0 : exit(1)
+            if os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} down -v --remove-orphans") != 0 : exit(1)
+            if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} down -v --remove-orphans") != 0 : exit(1)
             if os.system(f"sh {CLEAN_SCRIPT} deep") != 0 : exit(1)
 
         for batch in range(1, N_BATCH+1):

@@ -17,12 +17,12 @@ generation:
     product:
       # Products are generated once, independant from vendor and person
       template: "bsbm/model/watdiv/bsbm-product.template"
-      scale_factor: 1
+      scale_factor: 10
       params:
         # type
-        product_n: "${multiply: 100, ${generation.schema.product.scale_factor}, ${generation.n_batch}}"
+        product_n: 100
         producer_n: "${normal_dist: 3, 1, 50}"
-        feature_n: 20
+        feature_n: 50
         prod_type: "${product_type_per_product: ${generation.schema.product.params.product_n}}"
         # pgroup
         productPropertyTextual4_p: 0.7
@@ -34,7 +34,7 @@ generation:
       template: "bsbm/model/watdiv/bsbm-vendor.template"
       scale_factor: 1
       params:
-        vendor_n: "${multiply: 3, ${generation.schema.vendor.scale_factor}, ${generation.n_batch}}"
+        vendor_n: "${multiply: 100, ${generation.n_batch}}"
         offer_n: "${normal_dist: 3, 1, 20}"
         product_n: "${generation.schema.product.params.product_n}"
 
@@ -43,7 +43,7 @@ generation:
       scale_factor: 1
       params:
         #type
-        person_n: "${multiply: 3, ${generation.schema.person.scale_factor}, ${generation.n_batch}}"
+        person_n: "${multiply: 100, ${generation.n_batch}}"
         product_n: "${generation.schema.product.params.product_n}"
         review_n: "${normal_dist: 3, 1, 20}"
 

@@ -43,8 +43,14 @@ def run_benchmark(config, query, result, stats, ideal_ss, timeout):
     
     def write_empty_stats():
         with open(stats, "w+") as fout:
-            fout.write("query,exec_time,nb_http_request\n")
-            fout.write(",".join([query, "nan", "nan"])+"\n")
+            fout.write("query,engine,instance,batch,mode,exec_time,distinct_ss,nb_http_request,total_ss\n")
+            basicInfos = re.match(r".*/(\\w+)/(q\\d+)/(\\d+)/batch_(\\d+)/(\\w+)/results", query)
+            engine = basicInfos.group(1)
+            queryName = basicInfos.group(2)
+            instance = basicInfos.group(3)
+            batch = basicInfos.group(4)
+            mode = basicInfos.group(5)
+            fout.write(",".join([queryName, engine, instance, batch, mode, "nan", "nan", "nan", "nan"])+"\n")
             fout.close()
     
     def write_empty_result(msg):

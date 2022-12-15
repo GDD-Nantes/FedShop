@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import os
 from pathlib import Path
@@ -29,8 +30,8 @@ VERBOSE = CONFIG["verbose"]
 N_BATCH = CONFIG["n_batch"]
 
 # Config per batch
-N_VENDOR=CONFIG["schema"]["vendor"]["params"]["vendor_n"]
-N_REVIEWER=CONFIG["schema"]["person"]["params"]["person_n"]
+N_VENDOR=CONFIG["schema"]["vendor"]["params"]["vendor_n"]*CONFIG["schema"]["vendor"]["scale_factor"]
+N_REVIEWER=CONFIG["schema"]["person"]["params"]["person_n"]*CONFIG["schema"]["person"]["scale_factor"]
 
 FEDERATION_COUNT=N_VENDOR+N_REVIEWER
 
@@ -77,11 +78,12 @@ def start_generator(status_file):
 
 def generate_virtuoso_scripts(nqfiles, shfiles, batch_id, n_items):
     nq_files = [ os.path.basename(f) for f in nqfiles ]
-    fileIds = list(range(N_BATCH, N_BATCH*(n_items+1), N_BATCH))
-    fileId = fileIds[batch_id]
+    _, edges = np.histogram(np.arange(n_items), N_BATCH)
+    edges = edges[1:].astype(int)
+    batch = edges[batch_id]
     with open(f"{shfiles}", "w+") as f:
-        f.write(f"echo \"Writing ingest script for {batch_id}, slicing at {fileId}-th source...\"\n")
-        for nq_file in nq_files[:fileId]:
+        f.write(f"echo \"Writing ingest script for {batch_id}, slicing at {batch}-th source...\"\n")
+        for nq_file in nq_files[:batch]:
             f.write(f"docker exec {SPARQL_CONTAINER_NAME} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=ld_dir('/usr/local/virtuoso-opensource/share/virtuoso/vad/', '{nq_file}', 'http://example.com/datasets/default');\"&&\n")
         f.write(f"docker exec {SPARQL_CONTAINER_NAME} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=rdf_loader_run(log_enable=>2);\" &&\n")
         f.write(f"docker exec {SPARQL_CONTAINER_NAME} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=checkpoint;\"&&\n")

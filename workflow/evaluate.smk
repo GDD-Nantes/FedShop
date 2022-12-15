@@ -1,36 +1,43 @@
-from omegaconf import OmegaConf as yaml
+import numpy as np
 import pandas as pd
 import os
 import time
 import requests
 import glob
 
-SPARQL_ENDPOINT = os.environ["RSFB__SPARQL_ENDPOINT"]
-SPARQL_COMPOSE_FILE = os.environ["RSFB__SPARQL_COMPOSE_FILE"]
-SPARQL_CONTAINER_NAME = os.environ["RSFB__SPARQL_CONTAINER_NAME"]
+import sys
+smk_directory = os.path.abspath(workflow.basedir)
+sys.path.append(os.path.join(Path(smk_directory).parent, "scripts"))
 
-WORK_DIR = os.environ["RSFB__WORK_DIR"]
-N_VARIATIONS = int(os.environ["RSFB__N_VARIATIONS"])
-VERBOSE = bool(os.environ["RSFB__VERBOSE"])
-N_BATCH=int(os.environ["RSFB__N_BATCH"])
+from config import load_config
+
+WORK_DIR = "bsbm"
+CONFIG = load_config(f"{WORK_DIR}/config.yaml")
+
+CONFIG_GEN = CONFIG["generation"]
+CONFIG_EVAL = CONFIG["evaluation"]
+
+SPARQL_ENDPOINT = CONFIG_GEN["sparql"]["endpoint"]
+
+SPARQL_COMPOSE_FILE = CONFIG_GEN["sparql"]["compose-file"]
+SPARQL_CONTAINER_NAME = CONFIG_GEN["sparql"]["container-name"]
+
+N_QUERY_INSTANCES = CONFIG_GEN["n_query_instances"]
+N_BATCH = CONFIG_GEN["n_batch"]
 
 # Config per batch
-N_VENDOR=int(os.environ["RSFB__N_VENDOR"])
-N_REVIEWER=int(os.environ["RSFB__N_REVIEWER"])
+N_VENDOR=CONFIG_GEN["schema"]["vendor"]["params"]["vendor_n"]*CONFIG_GEN["schema"]["vendor"]["scale_factor"]
+N_REVIEWER=CONFIG_GEN["schema"]["person"]["params"]["person_n"]*CONFIG_GEN["schema"]["person"]["scale_factor"]
 
-TOTAL_VENDOR = N_VENDOR * N_BATCH
-TOTAL_REVIEWER = N_REVIEWER * N_BATCH 
-
-FEDERATION_COUNT=TOTAL_VENDOR+TOTAL_REVIEWER
-SCALE_FACTOR=int(os.environ["RSFB__SCALE_FACTOR"])
+FEDERATION_COUNT=N_VENDOR+N_REVIEWER
 
 QUERY_DIR = f"{WORK_DIR}/queries"
 MODEL_DIR = f"{WORK_DIR}/model"
 BENCH_DIR = f"{WORK_DIR}/benchmark/evaluation"
-
-config = yaml.load(f"{WORK_DIR}/config.yaml")["evaluation"]
+TEMPLATE_DIR = f"{MODEL_DIR}/watdiv"
 
 # ======== USEFUL FUNCTIONS =========
+
 def wait_for_container(endpoint, outfile, wait=1):
     endpoint_ok = False
     attempt=1
@@ -47,7 +54,7 @@ def wait_for_container(endpoint, outfile, wait=1):
         f.close()
 
 def restart_virtuoso(status_file):
-    os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} up -d {SPARQL_CONTAINER_NAME}")
+    shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} up -d {SPARQL_CONTAINER_NAME}")
     wait_for_container(SPARQL_ENDPOINT, status_file, wait=1)
     return status_file
 
@@ -66,9 +73,9 @@ rule merge_metrics:
     input: 
         expand(
             "{{benchDir}}/{engine}/{query}/{instance_id}/batch_{batch_id}/{mode}/stats.csv", 
-            engine=config["engines"],
+            engine=CONFIG_EVAL["engines"],
             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if "_" not in f],
-            instance_id=range(N_VARIATIONS),
+            instance_id=range(N_QUERY_INSTANCES),
             batch_id=range(N_BATCH),
             mode=["default", "ideal"]
         )
@@ -105,12 +112,12 @@ rule measure_ideal_source_selection_stats:
 rule generate_federation_declaration:
     output: "{benchDir}/{engine}/config/{batch_id}/{engine}.conf"
     run: 
-        person_data_files = [ f"{MODEL_DIR}/exported/person{i}.nq" for i in range(TOTAL_REVIEWER) ]
-        vendor_data_files = [ f"{MODEL_DIR}/exported/vendor{i}.nq" for i in range(TOTAL_VENDOR) ]
+        person_data_files = [ f"{MODEL_DIR}/exported/person{i}.nq" for i in range(N_REVIEWER) ]
+        vendor_data_files = [ f"{MODEL_DIR}/exported/vendor{i}.nq" for i in range(N_VENDOR) ]
 
         batchId = int(wildcards.batch_id)
-        personSliceId = list(range(N_BATCH, (TOTAL_REVIEWER + 1)*N_BATCH, N_BATCH))[batchId]
-        vendorSliceId = list(range(N_BATCH, (TOTAL_VENDOR + 1)*N_BATCH, N_BATCH))[batchId]
+        personSliceId = np.histogram(np.arange(N_REVIEWER), N_BATCH)[1][1:].astype(int)[batchId]
+        vendorSliceId = np.histogram(np.arange(N_VENDOR), N_BATCH)[1][1:].astype(int)[batchId]
         batch_files = person_data_files[:personSliceId] + vendor_data_files[:vendorSliceId]
 
         os.system(f"python scripts/engines/{wildcards.engine}.py generate-config-file {' '.join(batch_files)} {output} --endpoint {SPARQL_ENDPOINT}")

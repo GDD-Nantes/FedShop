@@ -67,5 +67,5 @@
 // Every bsbm:Review is related to [1] bsbm:Product (drawn with a ZIPFIAN) with the probability 1.0 
 #association bsbm:Review bsbm:reviewFor bsbm:Product 2 1 NORMAL NORMAL
 
-// Every bsbm:Review are related to [Many] bsbm:Person (drawn with a ZIPFIAN) with the probability 1.0 
-#association bsbm:Review rev:reviewer bsbm:Person 2 1 NORMAL NORMAL
+// Every existing bsbm:Review are related to [Many] bsbm:Person (drawn with a ZIPFIAN) with the probability 1.0 
+#association1 bsbm:Review rev:reviewer bsbm:Person 2 1 NORMAL NORMAL

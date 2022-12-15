@@ -128,6 +128,7 @@ def build_value_selection_query(queryfile, outfile):
 
     query = open(queryfile).read()
     query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {' '.join(consts)} WHERE", query)
+    #query = re.sub(r"((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(<\S+>))", r"##\1", query)
     query = re.sub(r"(#)*(LIMIT|FILTER|OFFSET|ORDER)", r"##\2", query)
 
     with open(outfile, "w+") as out:
@@ -179,8 +180,7 @@ def inject_constant(queryfile, value_selection, instance_id):
             #         if const != subSrc #and value_selection_values[const].dtype == value_selection_values[subSrc].dtype 
             # ] + [ f"`{subSrc}`.notna()" ])
             # value_selection_values = value_selection_values.query(dedup_query).sample(1)
-            print(value_selection_values)
-            value_selection_values = value_selection_values.dropna().sample(1)
+            value_selection_values = value_selection_values.sample(1)
 
         repl_val = value_selection_values[subSrc].item() if instance_id is None else value_selection_values.loc[instance_id, subSrc]
         if pd.isnull(repl_val): continue
@@ -253,7 +253,7 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
         instance_id (_type_): the query instance id with respect to workload
         endpoint (_type_): the sparql endpoint
     """
-    
+
     def get_uninjected_placeholder(queryfile):
         _, parse_result = __parse_query(queryfile)
         consts = [ const if constSrc is None else constSrc["src"] for const, constSrc in parse_result.items() ]
@@ -262,7 +262,7 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
     query = open(queryfile, "r").read()
     initial_queryfile = queryfile
     consts = get_uninjected_placeholder(initial_queryfile)
-    select = re.search(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", query).group(3)
+    select = re.search(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", query).group(3)     
 
     qname = Path(outfile).stem
     qroot = Path(outfile).parent
@@ -279,22 +279,37 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
         
         # Execute the partially injected query to find the rest of constants
         else:
-            next_value_selection = f"{qroot}/{qname}.csv"
-            ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
-            #next_value_selection = f"{Path(value_selection).parent}/value_selection.csv"
-            query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection)
+            # next_value_selection = f"{qroot}/{qname}.csv"
+            # try: ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
+            # except RuntimeError:
+            #     print("Relaxing query...")
+            #     query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(<\S+>)) ", r"##\2", query)
+            #     print(query)
+            #     with open(next_queryfile, "w+") as f:
+            #         f.write(query)
+            #         f.close()
+            #     ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
+            #     print(f"Relaxed query yield results. See {next_value_selection}")
 
-        query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {select} WHERE", query)
-        query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(\2),", query)
-        query = re.sub(r"(#){2}(LIMIT|FILTER|OFFSET|ORDER)", r"\2", query)
+            next_value_selection = f"{Path(value_selection).parent}/value_selection.csv"
+            query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection)
 
         with open(next_queryfile, "w+") as f:
             f.write(query)
             f.close()
-            
+
         initial_queryfile = next_queryfile
         consts = get_uninjected_placeholder(initial_queryfile)
         itr+=1
+    
+    query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {select} WHERE", query)
+    query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(\2),", query)
+    #query = re.sub(r"(#){2}(LIMIT|FILTER|OFFSET|ORDER|(((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(<\S+>))))", r"\2", query)
+    query = re.sub(r"(#){2}(LIMIT|FILTER|OFFSET|ORDER)", r"\2", query)
+
+    with open(next_queryfile, "w+") as f:
+        f.write(query)
+        f.close()
 
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
@@ -357,7 +372,8 @@ def build_provenance_query(queryfile, outfile):
     with open(outfile, mode="w+") as out:
         query = queryHeader + queryBody
         query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {graph_proj} WHERE", query)
-        query = re.sub(r"(#)*(LIMIT|FILTER|OFFSET|ORDER)", r"##\2", query)
+        #query = re.sub(r"((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(<\S+>))", r"##\1", query)
+        #query = re.sub(r"(#)*(LIMIT|FILTER|OFFSET|ORDER)", r"##\2", query)
         out.write(query)
         out.close()
     

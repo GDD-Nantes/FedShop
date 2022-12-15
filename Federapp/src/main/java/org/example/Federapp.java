@@ -205,22 +205,15 @@ public class Federapp {
         String batch = basicInfos.group(4);
         String mode = basicInfos.group(5);
 
-        // List<String> basicInfos = Arrays.asList(resultPath.split("/"));
-        // Collections.reverse(basicInfos);
-        // String engine = basicInfos.get(5);
-        // String query = basicInfos.get(4);
-        // String instance = basicInfos.get(3);
-        // String batch = basicInfos.get(2);
-        // String mode = basicInfos.get(1);
         String distinct_ss = "" + sumDistinctSourceSelection();
         String total_ss = "" + sumSourceSelection();
 
         int httpqueries = ((AtomicInteger) CONTAINER.get(COUNT_HTTP_REQ_KEY)).get();
 
         String[] header = {"query","engine","instance","batch","mode","exec_time","distinct_ss","nb_http_request","total_ss"};
-        String[] content = {query, engine, instance, batch, mode, Long.toString(durationTime), distinct_ss, Integer.toString(httpqueries), total_ss};
-
         statWriter.writeNext(header);
+
+        String[] content = {query, engine, instance, batch, mode, Long.toString(durationTime), distinct_ss, Integer.toString(httpqueries), total_ss};
         statWriter.writeNext(content);
         statWriter.close();
 

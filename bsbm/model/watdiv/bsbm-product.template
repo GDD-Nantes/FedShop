@@ -104,8 +104,13 @@
 
 </type>
 
-#association bsbm:Product rdf:type bsbm:ProductType 2 {%prod_type} NORMAL NORMAL
-#association bsbm:Product bsbm:productFeature bsbm:ProductFeature 2 {%feature_n} NORMAL NORMAL
-#association bsbm:Product bsbm:producer bsbm:Producer 2 1 NORMAL NORMAL
+// Every products have serveral product type than others
+#association bsbm:Product rdf:type bsbm:ProductType 2 {%prod_type} 1.0 NORMAL
+
+// Every products have serveral product features
+#association bsbm:Product bsbm:productFeature bsbm:ProductFeature 2 {%feature_n} 1.0 NORMAL
+
+// Every product has a producer
+#association bsbm:Product bsbm:producer bsbm:Producer 2 1 1.0 NORMAL
 
 

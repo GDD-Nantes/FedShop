@@ -60,9 +60,10 @@
 
 </type>
 
-// [1] bsbm:Offer is related to [1] bsbm:Product (drawn with a ZIPFIAN) with the probability 1.0 
-#association bsbm:Offer bsbm:product bsbm:Product 2 1 NORMAL NORMAL
-
-// [1] bsbm:Offer is related to [1] bsbm:Vendor (drawn with a ZIPFIAN) with the probability 1.0 
+// Several bsbm:Offer is related to [1] bsbm:Vendor (drawn with a ZIPFIAN) with the probability 1.0 
 #association bsbm:Offer bsbm:vendor bsbm:Vendor 2 1 NORMAL NORMAL
+
+// Every existing bsbm:Offer is related to [1] bsbm:Product (drawn with a ZIPFIAN) with the probability 1.0 
+#association1 bsbm:Offer bsbm:product bsbm:Product 2 1 NORMAL NORMAL
+
 
