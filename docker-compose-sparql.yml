@@ -19,7 +19,3 @@ services:
     ports:
       - "1111:1111"
       - "8890:8890"
-
-networks:
-  default:
-    name: "bsbm-virtuoso-network"

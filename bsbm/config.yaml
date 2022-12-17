@@ -17,7 +17,7 @@ generation:
     product:
       # Products are generated once, independant from vendor and person
       template: "bsbm/model/watdiv/bsbm-product.template"
-      scale_factor: 10
+      scale_factor: 1
       params:
         # type
         product_n: 100
@@ -57,3 +57,4 @@ evaluation:
   engines:
     fedx:
       dir: "Federapp/target"
+      timeout: 10

@@ -17,22 +17,6 @@ import matplotlib.pyplot as plt
 def cli():
     pass
 
-def execute_query(queryfile, endpoint):
-    endpoint_proc = subprocess.run( 
-        f"python utils/query.py execute-query {queryfile} --endpoint {endpoint}", 
-        capture_output=True, shell=True
-    )
-    
-    if endpoint_proc.returncode != 0:
-        raise RuntimeError(endpoint_proc.stderr.decode())
-    
-    data = endpoint_proc.stdout.decode().splitlines()
-
-    result = pd.read_csv(StringIO("\n".join(data[:-1])))
-    records = ast.literal_eval(data[-1])
-
-    return result, records
-
 @cli.command()
 @click.argument("workload", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
 @click.argument("fedcount", type=click.INT)

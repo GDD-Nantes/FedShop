@@ -38,13 +38,14 @@ def run_benchmark(config, query, result, stats, ideal_ss, timeout):
 
     args = [config, query, result, stats, sourceselection, httpreq, ideal_ss]
     args = " ".join(args)
-    timeoutArgs = f'timeout --signal=SIGKILL "{timeout}"' if timeout != 0 else ""
-    cmd = f'{timeoutArgs} java -classpath "{jar}:{lib}" org.example.Federapp {args}'.strip() 
+    #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
+    timeoutCmd = ""
+    cmd = f'{timeoutCmd} java -classpath "{jar}:{lib}" org.example.Federapp {args}'.strip() 
     
     def write_empty_stats():
         with open(stats, "w+") as fout:
             fout.write("query,engine,instance,batch,mode,exec_time,distinct_ss,nb_http_request,total_ss\n")
-            basicInfos = re.match(r".*/(\\w+)/(q\\d+)/(\\d+)/batch_(\\d+)/(\\w+)/results", query)
+            basicInfos = re.match(r".*/(\w+)/(q\d+)/(\d+)/batch_(\d+)/(\w+)/results", result)
             engine = basicInfos.group(1)
             queryName = basicInfos.group(2)
             instance = basicInfos.group(3)

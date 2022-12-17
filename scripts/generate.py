@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 import re
-from omegaconf import OmegaConf as yaml
 import click
 import subprocess
 from config import load_config
@@ -36,15 +35,20 @@ def generate(configfile, section, output, id):
 
     scale_factor = int(schema_config[section]["scale_factor"])
     
-    watdiv_proc = subprocess.run(f"{config['generator']['exec']} -d {outFile} {scale_factor}", capture_output=True, shell=True)
-    
-    if watdiv_proc.returncode != 0:
-        raise RuntimeError(watdiv_proc.stderr.decode())
+    # This consumes memory since it waits till the end and store the output in PIPE
+    # watdiv_proc = subprocess.run(f"{config['generator']['exec']} -d {outFile} {scale_factor}", capture_output=True, shell=True)
+    cmd = f"{config['generator']['exec']} -d {outFile} {scale_factor}"
+    watdiv_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     
     verbose = config["verbose"]
     with open(output, "w") as watdivWriter:
-        watdivWriter.write(watdiv_proc.stdout.decode())
+        for line in iter(watdiv_proc.stdout.readline, b''):
+            watdivWriter.write(line.decode())
         watdivWriter.close()        
-        if not verbose: os.remove(outFile)        
+        if not verbose: os.remove(outFile)    
+
+    watdiv_proc.wait()
+    if watdiv_proc.returncode != 0:
+        raise RuntimeError(watdiv_proc.stderr.read().decode())    
 if __name__ == "__main__":
     cli()

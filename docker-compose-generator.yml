@@ -10,6 +10,3 @@ services:
       - "./bsbm:/opt/watdiv/bsbm"
     entrypoint: "python3 -m http.server"
 
-networks:
-  default:
-    name: "watdiv-network"

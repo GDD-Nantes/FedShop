@@ -61,7 +61,7 @@ def restart_virtuoso(status_file):
 def prerequisite_for_engine(wildcards):
     engine = str(wildcards.engine)
     if engine == "fedx":
-        return f"{WORK_DIR}/fedx/virtuoso-batch{N_BATCH-1}-ok.txt"
+        return f"{BENCH_DIR}/fedx/virtuoso-batch{N_BATCH-1}-ok.txt"
     return "unknown"
 
 # ======== RULES =========
@@ -127,8 +127,8 @@ rule ingest_virtuoso:
     input: 
         vendor=expand("{modelDir}/virtuoso/ingest_vendor_batch{lastBatch}.sh", modelDir=MODEL_DIR, lastBatch=N_BATCH-1),
         person=expand("{modelDir}/virtuoso/ingest_person_batch{lastBatch}.sh", modelDir=MODEL_DIR, lastBatch=N_BATCH-1),
-        virtuoso_status="{benchDir}/fedx/virtuoso-up.txt"
-    output: "{benchDir}/fedx/virtuoso-batch{lastBatch}-ok.txt"
+        virtuoso_status=expand("{benchDir}/{{engine}}/virtuoso-up.txt", benchDir=BENCH_DIR)
+    output: "{benchDir}/{engine}/virtuoso-batch{lastBatch}-ok.txt"
     run: 
         proc = subprocess.run(f"docker exec {SPARQL_CONTAINER_NAME} ls /usr/local/virtuoso-opensource/share/virtuoso/vad | wc -l", shell=True, capture_output=True)
         nFiles = int(proc.stdout.decode())
@@ -139,6 +139,6 @@ rule ingest_virtuoso:
 rule restart_virtuoso:
     priority: 5
     threads: 1
-    output: "{benchDir}/fedx/virtuoso-up.txt"
+    output: "{benchDir}/{engine}/virtuoso-up.txt"
     run: restart_virtuoso(output)
 

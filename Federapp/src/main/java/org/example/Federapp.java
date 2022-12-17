@@ -199,6 +199,7 @@ public class Federapp {
 
         Pattern pattern = Pattern.compile(".*/(\\w+)/(q\\d+)/(\\d+)/batch_(\\d+)/(\\w+)/results");
         Matcher basicInfos = pattern.matcher(resultPath);
+        basicInfos.find();
         String engine = basicInfos.group(1);
         String query = basicInfos.group(2);
         String instance = basicInfos.group(3);

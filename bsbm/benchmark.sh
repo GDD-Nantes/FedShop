@@ -69,7 +69,7 @@ elif [ "${MODE}" = "evaluate" ]; then
     
     if [ "${OP}" = "clean" ]; then
         echo "Cleaning..."
-        #docker-compose -f ${RSFB__SPARQL_COMPOSE_FILE} down &&
+        docker-compose -f ${RSFB__SPARQL_COMPOSE_FILE} down -v --remove-orphans || exit 1
         rm -rf "${RSFB__WORK_DIR}/benchmark/evaluation"
     fi
 
