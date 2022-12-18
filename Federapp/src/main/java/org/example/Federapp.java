@@ -80,19 +80,6 @@ public class Federapp {
         sourceSelectionWriter.close();
     }
 
-    private static void createResultFile(String resultFilePath, List<BindingSet> results) throws Exception {
-        BufferedWriter queryResultWriter = new BufferedWriter(new FileWriter(resultFilePath));
-        System.out.println("SAVING RESULT");
-
-        for (BindingSet b : results) {
-            System.out.println(b.toString());
-            queryResultWriter.write(b.toString() + "\n");
-        }
-
-        System.out.println("SAVED RESULT");
-        queryResultWriter.close();
-    }
-
     private static void createHttpListFile(String path) throws Exception {
         BufferedWriter writer = new BufferedWriter(new FileWriter(path));
 
@@ -179,12 +166,13 @@ public class Federapp {
 
         startTime = System.currentTimeMillis();
 
-        List<BindingSet> results = new ArrayList<>(10000);
         try (RepositoryConnection conn = repo.getConnection()) {
             TupleQuery tq = conn.prepareTupleQuery(rawQuery);
             try (TupleQueryResult res = tq.evaluate()) {
-                while (res.hasNext()) {
-                    results.add(res.next());
+                try (BufferedWriter queryResultWriter = new BufferedWriter(new FileWriter(resultPath))){
+                    while (res.hasNext()) {
+                        queryResultWriter.write(res.next().toString() + "\n");
+                    }
                 }
             }
         }
@@ -218,7 +206,6 @@ public class Federapp {
         statWriter.writeNext(content);
         statWriter.close();
 
-        createResultFile(resultPath, results);
         createSourceSelectionFile(sourceSelectionPath);
         createHttpListFile(httpListFilePath);
 
