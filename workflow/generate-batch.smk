@@ -11,7 +11,7 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent, "scripts"))
 
-from config import load_config
+from utils import load_config
 
 WORK_DIR = "bsbm"
 CONFIG = load_config(f"{WORK_DIR}/config.yaml")["generation"]

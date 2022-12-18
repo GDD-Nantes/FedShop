@@ -9,6 +9,11 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
+import sys
+sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
+
+from utils import kill_process
+
 # Example of use : 
 # python3 utils/generate-fedx-config-file.py bsbm/model/vendor test/out.ttl
 
@@ -58,20 +63,23 @@ def run_benchmark(config, query, result, stats, ideal_ss, timeout):
         with open(result, "w+") as fout:
             fout.write(msg)
             fout.close()
-    
+
+    fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try: 
-        fedx_proc = subprocess.run(cmd, capture_output=True, shell=True, timeout=timeout)
+        fedx_proc.wait(timeout=timeout)
         if fedx_proc.returncode == 0:
             print(f"{query} benchmarked sucessfully")  
         else:
             print(f"{query} reported error")
             write_empty_stats()
-            write_empty_result(fedx_proc.stdout.decode())
+            write_empty_result("error")
            
     except subprocess.TimeoutExpired: 
         print(f"{query} timed out!")
         write_empty_stats()
         write_empty_result("timeout")
+    
+    kill_process(fedx_proc.pid)
 
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)

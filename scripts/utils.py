@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import norm
 from omegaconf import OmegaConf
+import psutil
 
 class NormalDistrGenerator:
     def __init__(self, mu, sigma, avg) -> None:
@@ -39,3 +40,10 @@ OmegaConf.register_new_resolver("normal_dist_range", lambda *args: NormalDistrRa
 
 def load_config(filename):
     return OmegaConf.load(filename)
+
+
+def kill_process(proc_pid):
+    process = psutil.Process(proc_pid)
+    for child in process.children(recursive=True):
+        child.kill()
+    process.kill()

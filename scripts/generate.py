@@ -3,7 +3,8 @@ from pathlib import Path
 import re
 import click
 import subprocess
-from config import load_config
+from scripts.utils import load_config, kill_process
+import psutil
 
 @click.group
 def cli():
@@ -49,6 +50,9 @@ def generate(configfile, section, output, id):
 
     watdiv_proc.wait()
     if watdiv_proc.returncode != 0:
-        raise RuntimeError(watdiv_proc.stderr.read().decode())    
+        raise RuntimeError(watdiv_proc.stderr.read().decode())  
+
+    kill_process(watdiv_proc.pid)  
+
 if __name__ == "__main__":
     cli()

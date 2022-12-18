@@ -6,12 +6,11 @@ import sys
 directory = os.path.abspath(__file__)
 sys.path.append(os.path.join(Path(directory).parent.parent, "scripts"))
 
-
 @click.group
 def cli():
     pass
 
-from config import load_config
+from utils import load_config
 
 WORK_DIR = "bsbm"
 CONFIG = load_config(f"{WORK_DIR}/config.yaml")["generation"]
