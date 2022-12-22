@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 import click
 import subprocess
-from scripts.utils import load_config, kill_process
+from utils import load_config, kill_process
 import psutil
 
 @click.group
@@ -52,7 +52,9 @@ def generate(configfile, section, output, id):
     if watdiv_proc.returncode != 0:
         raise RuntimeError(watdiv_proc.stderr.read().decode())  
 
-    kill_process(watdiv_proc.pid)  
+    try: kill_process(watdiv_proc.pid)  
+    except:
+        print(f"watdiv proc (PID: {watdiv_proc.pid}) is already killed, skipping...")
 
 if __name__ == "__main__":
     cli()

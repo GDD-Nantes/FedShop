@@ -20,7 +20,7 @@ generation:
       scale_factor: 1
       params:
         # type
-        product_n: 100
+        product_n: 200000
         producer_n: "${normal_dist: 3, 1, 50}"
         feature_n: 50
         prod_type: "${product_type_per_product: ${generation.schema.product.params.product_n}}"

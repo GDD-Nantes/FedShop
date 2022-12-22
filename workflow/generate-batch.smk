@@ -145,7 +145,10 @@ rule ingest_virtuoso_next_batches:
         proc = subprocess.run(f"docker exec {SPARQL_CONTAINER_NAME} ls /usr/local/virtuoso-opensource/share/virtuoso/vad | wc -l", shell=True, capture_output=True)
         nFiles = int(proc.stdout.decode())
         expected_nFiles = len(glob.glob(f"{MODEL_DIR}/exported/*.nq"))
-        if nFiles != expected_nFiles: raise RuntimeError(f"Expecting {expected_nFiles} *.nq files in virtuoso container, got {nFiles}!") 
+        if nFiles != expected_nFiles: 
+            print(f"Expecting {expected_nFiles} *.nq files in virtuoso container, got {nFiles}!") 
+            shell(f'docker cp {MODEL_DIR}/expected/*.nq {SPARQL_CONTAINER_NAME}:/usr/local/virtuoso-opensource/share/virtuoso/vad/')
+        
         shell(f'sh {input.vendor} bsbm && sh {input.person} && echo "OK" > {output}')
 
 rule restart_virtuoso:
@@ -194,8 +197,10 @@ rule create_workload_value_selection:
     priority: 8
     input: "{benchDir}/{query}/value_selection.csv"
     output: "{benchDir}/{query}/workload_value_selection.csv"
-    run:
-        pd.read_csv(f"{input}").sample(N_QUERY_INSTANCES).to_csv(f"{output}", index=False)
+    params:
+        n_query_instances = N_QUERY_INSTANCES
+    shell:
+        "python scripts/query.py create-workload-value-selection {input} {output} {params.n_query_instances}"
 
 rule exec_value_selection_query:
     priority: 9
@@ -232,25 +237,28 @@ rule agg_product_vendor:
     output: "{modelDir}/exported/vendor{vendor_id}.nq",   
     shell: 'python scripts/aggregator.py {input.vendor} {input.product} {output} http://www.vendor{wildcards.vendor_id}.fr'
 
-rule split_products:
-    priority: 12
-    threads: 1
-    retries: 2
-    input: "{modelDir}/tmp/product0.nt.tmp"
-    output: directory("{modelDir}/tmp/product/")
-    shell: 'python scripts/splitter.py {input} {output}'
-
 rule generate_reviewers:
-    priority: 13
+    priority: 12
     input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/person{person_id}.nt.tmp"
     shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml person {output} --id {wildcards.person_id}'
 
 rule generate_vendors:
-    priority: 13
+    priority: 12
     input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/vendor{vendor_id}.nt.tmp"
     shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml vendor {output} --id {wildcards.vendor_id}'
+
+# rule all: 
+#     input: expand("{modelDir}/tmp/product/", modelDir=MODEL_DIR)
+
+rule split_products:
+    priority: 13
+    threads: 1
+    retries: 2
+    input: "{modelDir}/tmp/product0.nt.tmp"
+    output: directory("{modelDir}/tmp/product/")
+    shell: 'python scripts/splitter.py {input} {output}'
 
 rule generate_products:
     priority: 14

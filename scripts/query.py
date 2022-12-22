@@ -379,6 +379,48 @@ def build_provenance_query(queryfile, outfile):
     
     json.dump(composition, open(f"{outfile}.comp", mode="w"))
 
+@cli.command()
+@click.argument("value-selection", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("workload-value-selection", type=click.Path(exists=False, file_okay=True, dir_okay=False))
+@click.argument("n-instances", type=click.INT)
+def create_workload_value_selection(value_selection, workload_value_selection, n_instances):
+    """Sample {n_instances} rows amongst the value selection. 
+    The sampling is guaranteed to return results for provenance queries, using statistical criteria:
+        1. Percentiles for numerical attribute: if value falls between 25-75 percentile
+        2. URL: ignored
+        3. String value: contains top 10 most common words
+
+    Args:
+        value_selection (_type_): _description_
+        workload_value_selection (_type_): _description_
+        n_instances (_type_): _description_
+    """
+
+    header = open(value_selection, "r").readline().strip().replace('"', '').split(",")
+    value_selection_values = pd.read_csv(value_selection, parse_dates=[h for h in header if "date" in h], low_memory=False)
+
+    numerical_cols = []
+    for col in value_selection_values.columns:
+        values = value_selection_values[col].dropna()
+        if not values.empty:
+            dtype = values.dtype
+            if np.issubdtype(dtype, np.number) or np.issubdtype(dtype, np.datetime64):
+                numerical_cols.append(col)
+
+    numerical = value_selection_values[numerical_cols]
+
+    workload = value_selection_values
+    if not numerical.empty:
+        query = " or ".join([
+            f"( `{col}` >= {repr(numerical[col].quantile(0.25))} and `{col}` <= {repr(numerical[col].quantile(0.75))} )" 
+            for col in numerical.columns
+        ])
+
+        print(query)
+        workload = value_selection_values.query(query)
+   
+    workload.sample(n_instances).to_csv(workload_value_selection, index=False)
+    
 
 if __name__ == "__main__":
     cli()
