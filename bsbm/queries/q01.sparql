@@ -21,7 +21,7 @@ WHERE {
     ?localProductFeature2 owl:sameAs ?ProductFeature2 .
     ?product bsbm:productPropertyNumeric1 ?value1 . 
     
-    # const ?constValue1 $ ?value1
+    # const ?constValue1 < ?value1
 	FILTER (?value1 > ?constValue1) 
 }
 ORDER BY ?label

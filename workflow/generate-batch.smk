@@ -249,9 +249,6 @@ rule generate_vendors:
     output: "{modelDir}/tmp/vendor{vendor_id}.nt.tmp"
     shell: 'python scripts/generate.py generate {WORK_DIR}/config.yaml vendor {output} --id {wildcards.vendor_id}'
 
-# rule all: 
-#     input: expand("{modelDir}/tmp/product/", modelDir=MODEL_DIR)
-
 rule split_products:
     priority: 13
     threads: 1
@@ -259,6 +256,9 @@ rule split_products:
     input: "{modelDir}/tmp/product0.nt.tmp"
     output: directory("{modelDir}/tmp/product/")
     shell: 'python scripts/splitter.py {input} {output}'
+
+# rule all: 
+#     input: expand("{modelDir}/tmp/product0.nt.tmp", modelDir=MODEL_DIR)
 
 rule generate_products:
     priority: 14

@@ -22,7 +22,7 @@ WHERE {
     FILTER (?p3 < ?y )
     
     OPTIONAL { 
-        # const ?ProductFeature2
+        # const not ?ProductFeature2
         ?localProduct bsbm:productFeature ?localProductFeature2 .
         ?localProductFeature2 owl:sameAs ?ProductFeature2 .
         ?localProduct rdfs:label ?testVar 

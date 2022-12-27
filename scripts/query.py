@@ -66,12 +66,15 @@ def __parse_query(queryfile):
         toks = np.array(re.split(r"\s+", line))
         if "#" in toks:
             if "const" in toks:
-                comp = re.search(r"const\s+(\?\w+)\s+(\W|\w+)\s+(\?\w+)", line)
-                if comp is not None:
+                if (comp := re.search(r"const\s+(\?\w+)\s+(\W|\w+)\s+(\?\w+)", line)) is not None:
                     op = comp.group(2)
                     const = comp.group(1)
                     constSrc = comp.group(3)
-                    parse_result[const] = {"src": constSrc, "op": op}
+                    parse_result[const] = {"type": "comparison", "src": constSrc, "op": op}
+                elif(assertion := re.search(r"const\s+(not)\s+(\?\w+)", line)) is not None:
+                    op = assertion.group(1)
+                    const = assertion.group(2)
+                    parse_result[const] = {"type": "assertion", "op": op}
                 else:
                     const_search = re.search(r"const\s+(\?\w+)", line)
                     if const_search is not None:
@@ -86,6 +89,14 @@ def __parse_query(queryfile):
             prefix_full_to_alias[prefixSub] = prefixName
     
     return prefix_full_to_alias, parse_result
+
+def __get_uninjected_placeholders(queryfile):
+    _, parse_result = __parse_query(queryfile)
+    return [
+        const if (resource is None or resource.get("src") is None ) else resource["src"]
+        for const, resource in parse_result.items()
+    ]
+    
 
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
@@ -122,14 +133,12 @@ def build_value_selection_query(queryfile, outfile):
     Returns:
         _type_: a csv file at outfile containing values for placeholders
     """
-
-    _, parse_result = __parse_query(queryfile)
-    consts = [ const if constSrc is None else constSrc["src"] for const, constSrc in parse_result.items() ]
+    consts = __get_uninjected_placeholders(queryfile)
 
     query = open(queryfile).read()
     query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {' '.join(consts)} WHERE", query)
     #query = re.sub(r"((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(<\S+>))", r"##\1", query)
-    query = re.sub(r"(#)*(LIMIT|FILTER|OFFSET|ORDER)", r"##\2", query)
+    query = re.sub(r"(#)*(LIMIT|FILTER\s+|OFFSET|ORDER)", r"##\2", query)
 
     with open(outfile, "w+") as out:
         out.write(query)
@@ -165,12 +174,13 @@ def inject_constant(queryfile, value_selection, instance_id):
 
     header = open(value_selection, "r").readline().strip().replace('"', '').split(",")
     value_selection_values = pd.read_csv(value_selection, parse_dates=[h for h in header if "date" in h])
+    placeholder_chosen_values = value_selection_values
     
     prefix_full_to_alias, parse_result = __parse_query(queryfile)
 
-    for const, constSrc in parse_result.items():                
+    for const, resource in parse_result.items():                
         # Replace all tokens in subDict
-        subSrc = const[1:] if constSrc is None else constSrc["src"][1:]
+        subSrc = const[1:] if (resource is None or resource.get("src") is None) else resource["src"][1:]
 
         # When not using workload value_selection_query, i.e, filling partially injected queries
         if "workload_" not in value_selection:
@@ -180,22 +190,22 @@ def inject_constant(queryfile, value_selection, instance_id):
             #         if const != subSrc #and value_selection_values[const].dtype == value_selection_values[subSrc].dtype 
             # ] + [ f"`{subSrc}`.notna()" ])
             # value_selection_values = value_selection_values.query(dedup_query).sample(1)
-            value_selection_values = value_selection_values.sample(1)
+            placeholder_chosen_values = value_selection_values.sample(1)
 
-        repl_val = value_selection_values[subSrc].item() if instance_id is None else value_selection_values.loc[instance_id, subSrc]
+        repl_val = placeholder_chosen_values[subSrc].item() if instance_id is None else placeholder_chosen_values.loc[instance_id, subSrc]
         if pd.isnull(repl_val): continue
 
         # Replace for FILTER clauses
-        if constSrc is not None:
+        if resource is not None:
 
-            if ">" in constSrc["op"]:
+            if ">" in resource["op"]:
                 repl_val = value_selection_values[subSrc].dropna().max()
-            elif "<" in constSrc["op"]:
+            elif "<" in resource["op"]:
                 repl_val = value_selection_values[subSrc].dropna().min()
             
             # Special treatment for REGEX
             #   Extract randomly 1 from 10 most common words in the result list
-            elif constSrc["op"] == "in":
+            elif resource["op"] == "in":
                 langs = value_selection_values[subSrc].dropna().apply(lambda x: lang_detect(x))
                 for lang in set(langs):
                     try: stopwords.extend(nltk_stopwords.words(lang))
@@ -205,6 +215,12 @@ def inject_constant(queryfile, value_selection, instance_id):
                 bow = Counter({ k: v for k, v in bow.items() if k not in stopwords})
                 print(bow.most_common(10))
                 repl_val = np.random.choice(list(map(lambda x: x[0], bow.most_common(10))))
+            
+            # Special treatment for exclusion
+            # Query with every other placeholder set
+            elif resource["op"] == "not":
+                exclusion_query = " and ".join([ f"`{k}` != {repr(v)}" for k, v in injection_cache.items() if k != subSrc])
+                repl_val = value_selection_values.query(exclusion_query)[subSrc].sample(1)
             
         # Convert Pandas numpy object to Python object
         try: repl_val = repl_val.item()
@@ -254,14 +270,9 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
         endpoint (_type_): the sparql endpoint
     """
 
-    def get_uninjected_placeholder(queryfile):
-        _, parse_result = __parse_query(queryfile)
-        consts = [ const if constSrc is None else constSrc["src"] for const, constSrc in parse_result.items() ]
-        return consts
-
     query = open(queryfile, "r").read()
     initial_queryfile = queryfile
-    consts = get_uninjected_placeholder(initial_queryfile)
+    consts = __get_uninjected_placeholders(initial_queryfile)
     select = re.search(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", query).group(3)     
 
     qname = Path(outfile).stem
@@ -269,6 +280,7 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
 
     itr = 0
     while len(consts) > 0:
+        print(f"Iteration {itr}...")
         next_queryfile = f"{qroot}/{qname}.sparql"
         ctx.invoke(build_value_selection_query, queryfile=initial_queryfile, outfile=next_queryfile)
 
@@ -279,19 +291,23 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
         
         # Execute the partially injected query to find the rest of constants
         else:
-            # next_value_selection = f"{qroot}/{qname}.csv"
-            # try: ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
-            # except RuntimeError:
-            #     print("Relaxing query...")
-            #     query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(<\S+>)) ", r"##\2", query)
-            #     print(query)
-            #     with open(next_queryfile, "w+") as f:
-            #         f.write(query)
-            #         f.close()
-            #     ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
-            #     print(f"Relaxed query yield results. See {next_value_selection}")
+            query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {' '.join(consts)} WHERE", query)
+            
+            # Option 1: Exclude the partialy injected query to refill
+            next_value_selection = f"{qroot}/{qname}.csv"
+            try: ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
+            except RuntimeError:
+                print("Relaxing query...")
+                query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(<\S+>)) ", r"##\2", query)
+                with open(next_queryfile, "w+") as f:
+                    f.write(query)
+                    f.close()
+                ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
+                print(f"Relaxed query yield results. See {next_value_selection}")
 
-            next_value_selection = f"{Path(value_selection).parent}/value_selection.csv"
+            # Option 2: extract the needed value for placeholders from value_selection.csv
+            # next_value_selection = f"{Path(value_selection).parent}/value_selection.csv"
+            
             query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection)
 
         with open(next_queryfile, "w+") as f:
@@ -299,13 +315,12 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
             f.close()
 
         initial_queryfile = next_queryfile
-        consts = get_uninjected_placeholder(initial_queryfile)
+        consts = __get_uninjected_placeholders(initial_queryfile)
         itr+=1
     
     query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {select} WHERE", query)
     query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(\2),", query)
-    #query = re.sub(r"(#){2}(LIMIT|FILTER|OFFSET|ORDER|(((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(<\S+>))))", r"\2", query)
-    query = re.sub(r"(#){2}(LIMIT|FILTER|OFFSET|ORDER)", r"\2", query)
+    query = re.sub(r"(#){2}(LIMIT|FILTER\s+|OFFSET|ORDER)", r"\2", query)
 
     with open(next_queryfile, "w+") as f:
         f.write(query)
@@ -372,8 +387,6 @@ def build_provenance_query(queryfile, outfile):
     with open(outfile, mode="w+") as out:
         query = queryHeader + queryBody
         query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {graph_proj} WHERE", query)
-        #query = re.sub(r"((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(<\S+>))", r"##\1", query)
-        #query = re.sub(r"(#)*(LIMIT|FILTER|OFFSET|ORDER)", r"##\2", query)
         out.write(query)
         out.close()
     
