@@ -87,13 +87,15 @@ rule measure_default_stats:
     retries: 3
     input: 
         query=expand("{workDir}/benchmark/generation/{{query}}/{{instance_id}}/injected.sparql", workDir=WORK_DIR),
-        configfile="{benchDir}/{engine}/config/{batch_id}/{engine}.conf",
+        engine_config="{benchDir}/{engine}/config/{batch_id}/{engine}.conf",
         prerequisite=prerequisite_for_engine
     output: 
         results="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/default/results",
-        stats="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/default/stats.csv",
+        stats="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/default/stats.csv"
+    params:
+        eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
     shell:
-        "python scripts/engines/{wildcards.engine}.py run-benchmark {input.configfile} {input.query} {output.results} {output.stats}"
+        "python scripts/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats}"
  
 rule measure_ideal_source_selection_stats:
     threads: 1
@@ -101,13 +103,15 @@ rule measure_ideal_source_selection_stats:
     input: 
         query=expand("{workDir}/benchmark/generation/{{query}}/{{instance_id}}/injected.sparql", workDir=WORK_DIR),
         ideal_ss=expand("{workDir}/benchmark/generation/{{query}}/{{instance_id}}/batch_{{batch_id}}/provenance.csv", workDir=WORK_DIR),
-        configfile="{benchDir}/{engine}/config/{batch_id}/{engine}.conf",
+        engine_config="{benchDir}/{engine}/config/{batch_id}/{engine}.conf",
         prerequisite=prerequisite_for_engine
     output: 
         results="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/ideal/results",
         stats="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/ideal/stats.csv",
+    params:
+        eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
     shell: 
-        "python scripts/engines/{wildcards.engine}.py run-benchmark {input.configfile} {input.query} {output.results} {output.stats} --ideal-ss {input.ideal_ss}"
+        "python scripts/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats} --ideal-ss {input.ideal_ss}"
 
 rule generate_federation_declaration:
     output: "{benchDir}/{engine}/config/{batch_id}/{engine}.conf"

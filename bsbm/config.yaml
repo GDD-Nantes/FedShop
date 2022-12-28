@@ -57,4 +57,4 @@ evaluation:
   engines:
     fedx:
       dir: "Federapp/target"
-      timeout: 10
+      timeout: 900

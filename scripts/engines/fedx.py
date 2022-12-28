@@ -12,8 +12,7 @@ from pathlib import Path
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import kill_process
-
+from utils import kill_process, load_config
 # Example of use : 
 # python3 utils/generate-fedx-config-file.py bsbm/model/vendor test/out.ttl
 
@@ -24,16 +23,19 @@ def cli():
     pass
 
 @cli.command()
-@click.argument("config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.argument("fedx-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("query", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("result", type=click.Path(exists=False, file_okay=True, dir_okay=True))
 @click.argument("stats", type=click.Path(exists=False, file_okay=True, dir_okay=True))
 @click.option("--ideal-ss", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
-@click.option("--timeout", type=click.INT, default=300)
-def run_benchmark(config, query, result, stats, ideal_ss, timeout):
-    app = "Federapp/target"
+def run_benchmark(eval_config, fedx_config, query, result, stats, ideal_ss):
+
+    app_config = load_config(eval_config)["evaluation"]["engines"]["fedx"]
+    app = app_config["dir"]
     jar = os.path.join(app, "Federapp-1.0-SNAPSHOT.jar")
     lib = os.path.join(app, "lib/*")
+    timeout = int(app_config["timeout"])
 
     r_root = Path(result).parent
 
@@ -41,7 +43,7 @@ def run_benchmark(config, query, result, stats, ideal_ss, timeout):
     sourceselection = f"{r_root}/provenance"
     httpreq = f"{r_root}/httpreq"
 
-    args = [config, query, result, stats, sourceselection, httpreq, ideal_ss]
+    args = [fedx_config, query, result, stats, sourceselection, httpreq, ideal_ss]
     args = " ".join(args)
     #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
     timeoutCmd = ""
@@ -70,9 +72,10 @@ def run_benchmark(config, query, result, stats, ideal_ss, timeout):
         if fedx_proc.returncode == 0:
             print(f"{query} benchmarked sucessfully")  
         else:
-            print(f"{query} reported error")
-            write_empty_stats()
-            write_empty_result("error")
+            # print(f"{query} reported error")
+            # write_empty_stats()
+            # write_empty_result("error")
+            raise RuntimeError(f"{query} reported error")
            
     except subprocess.TimeoutExpired: 
         print(f"{query} timed out!")
