@@ -25,18 +25,18 @@ mvn clean && mvn install dependency:copy-dependencies package
 
 2. Run experiments
 
-- Tweaks parameters in `bsbm/config.yaml`
-- Tweaks parameters at the beginning of `bsbm/benchmark.sh`
+- Tweaks parameters in `experiments/bsbm/config.yaml`
+- Tweaks parameters at the beginning of `experiments/bsbm/benchmark.sh`
 
 ```bash
 # Run
-sh bsbm/benchmark.sh <task>
+sh experiments/bsbm/benchmark.sh <task>
 
 # Clean and run
-sh bsbm/benchmark.sh <task> clean
+sh experiments/bsbm/benchmark.sh <task> clean
 
 # In case one of the batch did not complete
-sh bsbm/clean.sh && sh bsbm/benchmark.sh <task>
+sh experiments/bsbm/clean.sh && sh experiments/bsbm/benchmark.sh <task>
 
 <task>: generate|evaluate
 ```

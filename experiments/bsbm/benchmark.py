@@ -4,7 +4,7 @@ import click
 
 import sys
 directory = os.path.abspath(__file__)
-sys.path.append(os.path.join(Path(directory).parent.parent, "scripts"))
+sys.path.append(os.path.join(Path(directory).parent.parent, "rsfb"))
 
 @click.group
 def cli():
@@ -12,7 +12,7 @@ def cli():
 
 from utils import load_config
 
-WORK_DIR = "bsbm"
+WORK_DIR = "experiments/bsbm"
 CONFIG = load_config(f"{WORK_DIR}/config.yaml")["generation"]
 
 SPARQL_COMPOSE_FILE = CONFIG["sparql"]["compose-file"]

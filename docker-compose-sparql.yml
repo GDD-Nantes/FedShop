@@ -15,7 +15,7 @@ services:
       VIRT_Parameters_NumberOfBuffers: 1360000
       VIRT_Parameters_MaxDirtyBuffers: 1000000
     volumes:
-      - "./bsbm/model/exported:/usr/local/virtuoso-opensource/share/virtuoso/vad"
+      - "./experiments/bsbm/model/exported:/usr/local/virtuoso-opensource/share/virtuoso/vad"
     ports:
       - "1111:1111"
       - "8890:8890"

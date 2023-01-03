@@ -7,11 +7,11 @@ import glob
 
 import sys
 smk_directory = os.path.abspath(workflow.basedir)
-sys.path.append(os.path.join(Path(smk_directory).parent, "scripts"))
+sys.path.append(os.path.join(Path(smk_directory).parent, "rsfb"))
 
 from utils import load_config
 
-WORK_DIR = "bsbm"
+WORK_DIR = "experiments/bsbm"
 CONFIG = load_config(f"{WORK_DIR}/config.yaml")
 
 CONFIG_GEN = CONFIG["generation"]
@@ -95,7 +95,7 @@ rule measure_default_stats:
     params:
         eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
     shell:
-        "python scripts/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats}"
+        "python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats}"
  
 rule measure_ideal_source_selection_stats:
     threads: 1
@@ -111,7 +111,7 @@ rule measure_ideal_source_selection_stats:
     params:
         eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
     shell: 
-        "python scripts/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats} --ideal-ss {input.ideal_ss}"
+        "python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats} --ideal-ss {input.ideal_ss}"
 
 rule generate_federation_declaration:
     output: "{benchDir}/{engine}/config/{batch_id}/{engine}.conf"
@@ -124,7 +124,7 @@ rule generate_federation_declaration:
         vendorSliceId = np.histogram(np.arange(N_VENDOR), N_BATCH)[1][1:].astype(int)[batchId]
         batch_files = person_data_files[:personSliceId] + vendor_data_files[:vendorSliceId]
 
-        os.system(f"python scripts/engines/{wildcards.engine}.py generate-config-file {' '.join(batch_files)} {output} --endpoint {SPARQL_ENDPOINT}")
+        os.system(f"python rsfb/engines/{wildcards.engine}.py generate-config-file {' '.join(batch_files)} {output} --endpoint {SPARQL_ENDPOINT}")
 
 rule ingest_virtuoso:
     threads: 1

@@ -14,7 +14,7 @@ sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
 from utils import kill_process, load_config
 # Example of use : 
-# python3 utils/generate-fedx-config-file.py bsbm/model/vendor test/out.ttl
+# python3 utils/generate-fedx-config-file.py experiments/bsbm/model/vendor test/out.ttl
 
 # Goal : Generate a configuration file for RDF4J to set the use of named graph as endpoint thanks to data file
 
