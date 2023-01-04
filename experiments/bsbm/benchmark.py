@@ -4,7 +4,7 @@ import click
 
 import sys
 directory = os.path.abspath(__file__)
-sys.path.append(os.path.join(Path(directory).parent.parent, "rsfb"))
+sys.path.append(os.path.join(Path(directory).parent.parent.parent, "rsfb"))
 
 @click.group
 def cli():

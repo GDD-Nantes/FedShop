@@ -1,7 +1,10 @@
+import json
 import numpy as np
 from scipy.stats import norm
 from omegaconf import OmegaConf
 import psutil
+from pathlib import Path
+import os
 
 class NormalDistrGenerator:
     def __init__(self, mu, sigma, avg) -> None:
@@ -38,9 +41,15 @@ OmegaConf.register_new_resolver("normal_dist", lambda *args: NormalDistrGenerato
 OmegaConf.register_new_resolver("normal_dist_range", lambda *args: NormalDistrRangeGenerator(*args).getValue())
 
 
-def load_config(filename):
-    return OmegaConf.load(filename)
-
+def load_config(filename, renew=False):
+    template_file = f"{filename}.template"
+    if not os.path.exists(filename) or renew:
+        config = OmegaConf.load(template_file)
+        config = OmegaConf.to_object(config)
+        OmegaConf.save(config, open(filename, "w+"))
+    else:
+        config = OmegaConf.load(open(filename, "r"))
+    return config
 
 def kill_process(proc_pid):
     process = psutil.Process(proc_pid)

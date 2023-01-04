@@ -16,7 +16,7 @@ def cli():
 @click.argument("output", type=click.Path(file_okay=True, dir_okay=False))
 @click.option("--id", type=click.INT, default=0)
 def generate(configfile, section, output, id):
-    config = load_config(configfile)["generation"]
+    config = load_config(configfile, renew=True)["generation"]
     schema_config = config["schema"]
 
     template = open(schema_config[section]["template"], "r").read()

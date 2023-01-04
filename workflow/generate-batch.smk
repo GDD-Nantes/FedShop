@@ -79,7 +79,7 @@ def start_generator(status_file):
 def generate_virtuoso_scripts(nqfiles, shfiles, batch_id, n_items):
     nq_files = [ os.path.basename(f) for f in nqfiles ]
     _, edges = np.histogram(np.arange(n_items), N_BATCH)
-    edges = edges[1:].astype(int)
+    edges = edges[1:].astype(int) + 1
     batch = edges[batch_id]
     with open(f"{shfiles}", "w+") as f:
         f.write(f"echo \"Writing ingest script for {batch_id}, slicing at {batch}-th source...\"\n")
@@ -237,19 +237,19 @@ rule agg_product_vendor:
         vendor="{modelDir}/tmp/vendor{vendor_id}.nt.tmp",
         product="{modelDir}/tmp/product/"
     output: "{modelDir}/exported/vendor{vendor_id}.nq",   
-    shell: 'python rsfbut} http://www.vendor{wildcards.vendor_id}.fr'
+    shell: 'python rsfb/aggregator.py {input.vendor} {input.product} {output} http://www.vendor{wildcards.vendor_id}.fr'
 
 rule generate_reviewers:
     priority: 12
     input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/person{person_id}.nt.tmp"
-    shell: 'python rsfb/generate.py generate {WORK_DIR}/config.yaml person {output} --id {wildcards.person_id}'
+    shell: "python rsfb/generate.py generate {WORK_DIR}/config_$(date +%s).yaml person {output} --id {wildcards.person_id}"
 
 rule generate_vendors:
     priority: 12
     input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/vendor{vendor_id}.nt.tmp"
-    shell: 'python rsfb/generate.py generate {WORK_DIR}/config.yaml vendor {output} --id {wildcards.vendor_id}'
+    shell: "python rsfb/generate.py generate {WORK_DIR}/config_$(date +%s).yaml vendor {output} --id {wildcards.vendor_id}"
 
 # rule all:
 #     input: expand("{modelDir}/tmp/product/", modelDir=MODEL_DIR)

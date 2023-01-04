@@ -9,7 +9,5 @@ rm -rf experiments/bsbm/model/virtuoso
 rm -rf experiments/bsbm/benchmark
 rm experiments/bsbm/virtuoso*.txt
 rm experiments/bsbm/generator*.txt
-rm -rf experiments/bsbm/benchmark/**/batch*
 rm -rf experiments/bsbm/rulegraph
-rm experiments/bsbm/benchmark/*.csv
 exit 0
