@@ -67,9 +67,9 @@ def normal_test(data: pd.Series, figname=None, **kwargs):
         stat, pvalue = sp.stats.normaltest(data)
         # print(f"D’Agostino and Pearson’s normal test: stat = {stat}, pvalue = {pvalue}")
         # plt = sns.displot(data, kde=True)
-        fig = data.plot(kind="hist", **kwargs)
+        fig = data.plot(kind="hist", edgecolor="black", **kwargs)
         data.plot(kind="kde", ax=fig, secondary_y=True, **kwargs)
-        #plt.show("braille")
+        # plt.show("braille")
 
         if figname is not None and pvalue >= STATS_SIGNIFICANCE_LEVEL:
             plt.savefig(f"{figname}.png")
@@ -93,6 +93,7 @@ class TestGenerationGlobal(unittest.TestCase):
         os.system(f"rm {WORKDIR}/global/*.csv")    
 
     def assertListAlmostEqual(self, first, second, msg, places=None, delta=None):
+        self.assertEqual(len(first), len(second))
         for item1, item2 in zip(first, second):
             self.assertAlmostEqual(item1, item2, msg=msg, places=places, delta=delta)
 
@@ -165,6 +166,7 @@ class TestGenerationProduct(unittest.TestCase):
         os.system(f"rm {WORKDIR}/product/*.csv")    
 
     def assertListAlmostEqual(self, first, second, msg, places=None, delta=None):
+        self.assertEqual(len(first), len(second))
         for item1, item2 in zip(first, second):
             self.assertAlmostEqual(item1, item2, msg=msg, places=places, delta=delta)
 
@@ -195,7 +197,7 @@ class TestGenerationProduct(unittest.TestCase):
         
         self.assertTrue(
             (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
-            "ProductFeatures should follows Normal Distribution for each vendor. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+            "ProductFeatures should follow Normal Distribution for each vendor. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
     
     def test_product_nb_feature_across_product(self):
@@ -216,7 +218,7 @@ class TestGenerationProduct(unittest.TestCase):
         
         self.assertTrue(
             normal_test(result["groupProductFeature"], figname=f"{Path(queryfile).parent}/test_product_nb_feature_across_product"),
-            "Products should follows Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+            "Products should follow Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
 
     def test_product_nb_producer_per_product(self):
@@ -258,7 +260,7 @@ class TestGenerationProduct(unittest.TestCase):
 
         self.assertTrue(
             (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
-            "Producers should follows Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+            "Producers should follow Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
 
     def test_product_numeric_props_range(self):
@@ -301,7 +303,7 @@ class TestGenerationProduct(unittest.TestCase):
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         nbProducts = result["localProduct"].nunique()
-        frequencies = result.groupby("prop")["propVal"].count() / nbProducts
+        frequencies = (result.groupby("prop")["propVal"].count() / nbProducts).round(2)
 
         expected_data = {
             "productPropertyNumeric1": 1.0,
@@ -337,7 +339,7 @@ class TestGenerationProduct(unittest.TestCase):
 
         self.assertTrue(
             (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
-            "Producers should follows Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+            "productPropertyNumeric should follow Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
 
     def test_product_textual_props_frequency(self):
@@ -351,7 +353,7 @@ class TestGenerationProduct(unittest.TestCase):
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         nbProducts = result["localProduct"].nunique()
-        frequencies = result.groupby("prop")["propVal"].count() / nbProducts
+        frequencies = (result.groupby("prop")["propVal"].count() / nbProducts).round(2)
 
         expected_data = {
             "productPropertyTextual1": 1.0,
@@ -387,7 +389,7 @@ class TestGenerationProduct(unittest.TestCase):
 
         self.assertTrue(
             (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
-            "Producers should follows Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+            "productPropertyTextual should follow Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
 
 class TestGenerationVendor(unittest.TestCase):
@@ -399,6 +401,7 @@ class TestGenerationVendor(unittest.TestCase):
         os.system(f"rm {WORKDIR}/vendor/*.csv")    
 
     def assertListAlmostEqual(self, first, second, msg, places=None, delta=None):
+        self.assertEqual(len(first), len(second))
         for item1, item2 in zip(first, second):
             self.assertAlmostEqual(item1, item2, msg=msg, places=places, delta=delta)
 
@@ -429,7 +432,7 @@ class TestGenerationVendor(unittest.TestCase):
         
         self.assertTrue(
             (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
-            "Products should follows Normal Distribution for each vendor. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+            "Products should follow Normal Distribution for each vendor. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
     
     def test_vendor_nb_product_across_vendor(self):
@@ -450,7 +453,7 @@ class TestGenerationVendor(unittest.TestCase):
         
         self.assertTrue(
             normal_test(result["groupProduct"], figname=f"{Path(queryfile).parent}/test_vendor_nb_product_across_vendor"),
-            "Products should follows Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+            "Products should follow Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
     
     def test_vendor_nb_offer_per_vendor(self):
@@ -479,7 +482,7 @@ class TestGenerationVendor(unittest.TestCase):
         
         self.assertTrue(
             (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
-            "Offers should follows Normal Distribution for each vendor. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+            "Offers should follow Normal Distribution for each vendor. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
     
     def test_vendor_nb_offer_across_vendor(self):
@@ -502,7 +505,7 @@ class TestGenerationVendor(unittest.TestCase):
         
         self.assertTrue(
             normal_test_result,
-            "Offers should follows Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+            "Offers should follow Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
     
     def test_vendor_nb_vendor(self):
@@ -522,6 +525,217 @@ class TestGenerationVendor(unittest.TestCase):
 
         for i, test in nbVendor.items():
             self.assertEqual(test, expected[i])
+
+class TestGenerationPerson(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        os.system(f"rm {WORKDIR}/person/*.png")
+        os.system(f"rm {WORKDIR}/person/*.csv")    
+
+    def assertListAlmostEqual(self, first, second, msg, places=None, delta=None):
+        self.assertEqual(len(first), len(second))
+        for item1, item2 in zip(first, second):
+            self.assertAlmostEqual(item1, item2, msg=msg, places=places, delta=delta)
+
+    def test_person_nb_product_per_person(self):
+        """Test whether the products per person follows normal distribution
+
+        D’Agostino and Pearson’s method:
+        H0: The test sample is not drawn from normal distribution
+        H1: The test sample is drawn from normal distribution
+        pvalue < alpha = reject H0
+
+        """
+
+        queryfile = f"{WORKDIR}/person/test_person_nb_product.sparql"
+        result = query(queryfile)
+
+        result["groupProduct"] = result["groupProduct"] \
+            .apply(lambda x: x.split("|"))
+
+        normal_test_result = result.apply(
+            lambda row: normal_test(row["groupProduct"], figname=f"{Path(queryfile).parent}/test_person_nb_product_per_person_{row['personId']}"),
+            axis = 1
+        )
+
+        normal_test_result \
+            .to_frame("pvalue").set_index(result["personId"]) \
+            .to_csv(f"{Path(queryfile).parent}/test_person_nb_product_per_person_normaltest.csv")
+        
+        self.assertTrue(
+            (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
+            "Products should follow Normal Distribution for each person. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        )
+    
+    def test_person_nb_product_across_person(self):
+        """Test whether the products across person follows normal distribution
+
+        D’Agostino and Pearson’s method:
+        H0: The test sample is not drawn from normal distribution
+        H1: The test sample is drawn from normal distribution
+        pvalue < alpha = reject H0
+
+        """
+
+        queryfile = f"{WORKDIR}/person/test_person_nb_product.sparql"
+        result = query(queryfile)
+        result["groupProduct"] = result["groupProduct"] \
+            .apply(lambda x: x.split("|")) \
+            .apply(lambda x: np.unique(x).size)
+        
+        self.assertTrue(
+            normal_test(result["groupProduct"], figname=f"{Path(queryfile).parent}/test_person_nb_product_across_person"),
+            "Products should follow Normal Distribution across persons. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        )
+    
+    def test_person_nb_review_per_person(self):
+        """Test whether the reviews per person follows normal distribution.
+
+        D’Agostino and Pearson’s method:
+        H0: The test sample is not drawn from normal distribution
+        H1: The test sample is drawn from normal distribution
+        pvalue < alpha = reject H0
+
+        """
+
+        queryfile = f"{WORKDIR}/person/test_person_nb_review.sparql"
+        result = query(queryfile)
+        result["groupReview"] = result["groupReview"] \
+            .apply(lambda x: x.split("|"))
+        
+        normal_test_result = result.apply(
+            lambda row: normal_test(row["groupReview"], figname=f"{Path(queryfile).parent}/test_person_nb_review_per_person_{row['personId']}"),
+            axis = 1
+        )
+
+        normal_test_result \
+            .to_frame("pvalue").set_index(result["personId"]) \
+            .to_csv(f"{Path(queryfile).parent}/test_person_nb_review_per_person_normaltest.csv")
+        
+        self.assertTrue(
+            (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
+            "Offers should follow Normal Distribution for each person. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        )
+    
+    def test_person_nb_review_across_person(self):
+        """Test whether the products across person follows normal distribution
+
+        D’Agostino and Pearson’s method:
+        H0: The test sample is not drawn from normal distribution
+        H1: The test sample is drawn from normal distribution
+        pvalue < alpha = reject H0
+
+        """
+
+        queryfile = f"{WORKDIR}/person/test_person_nb_review.sparql"
+        result = query(queryfile)
+        result["groupReview"] = result["groupReview"] \
+            .apply(lambda x: x.split("|")) \
+            .apply(lambda x: np.unique(x).size)
+
+        normal_test_result = normal_test(result["groupReview"], figname=f"{Path(queryfile).parent}/test_person_nb_product_across_person")
+        
+        self.assertTrue(
+            normal_test_result,
+            "Offers should follow Normal Distribution across persons. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        )
+    
+    def test_person_nb_person(self):
+        """Test whether the number of producers follows normal distribution .
+        """
+
+        data = np.arange(CONFIG["schema"]["person"]["params"]["person_n"])
+        _, edges = np.histogram(data, CONFIG["n_batch"])
+        edges = edges[1:].astype(int)
+
+        result = query(f"{WORKDIR}/person/test_person_nb_person.sparql")
+        result["batchId"] = result["batchId"].apply(lambda x: np.argwhere((x <= edges)).min().item())
+        
+        nbPerson = result.groupby("batchId")["nbPerson"].sum()
+
+        expected = edges + 1
+
+        for i, test in nbPerson.items():
+            self.assertEqual(test, expected[i])
+    
+    def test_person_ratings_range(self):
+        """Test whether productPropertyNumeric matches expected frequencies .
+        """
+
+        queryfile = f"{WORKDIR}/person/test_person_ratings.sparql"
+        result = query(queryfile)
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+
+        minVals = result.groupby("prop")["propVal"].min()
+        maxVals = result.groupby("prop")["propVal"].max()
+
+        expected_data = pd.DataFrame.from_dict({
+            "rating1": {"min": 1, "max": 10},
+            "rating2": {"min": 1, "max": 10},
+            "rating3": {"min": 1, "max": 10},
+            "rating4": {"min": 1, "max": 10}
+        }).T
+        
+        self.assertTrue(
+            np.greater_equal(minVals, expected_data["min"]).all(),
+            "The min value for productPropertyNumeric must be greater or equal to WatDiv config's ."
+        )
+            
+        self.assertTrue(
+            np.less_equal(maxVals, expected_data["max"]).all(),
+            "The max value for productPropertyNumeric must be less or equal to WatDiv config's ."
+        )
+
+    def test_person_ratings_frequency(self):
+        """Test whether productPropertyNumeric approximately matches expected frequencies .
+        """
+
+        tolerance = 0.07
+
+        queryfile = f"{WORKDIR}/person/test_person_ratings.sparql"
+        result = query(queryfile)
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+
+        nbProducts = result["localReview"].nunique()
+        frequencies = (result.groupby("prop")["propVal"].count() / nbProducts).round(2)
+
+        expected_data = {
+            "rating1": CONFIG["schema"]["person"]["params"]["rating1_p"],
+            "rating2": CONFIG["schema"]["person"]["params"]["rating2_p"],
+            "rating3": CONFIG["schema"]["person"]["params"]["rating3_p"],
+            "rating4": CONFIG["schema"]["person"]["params"]["rating4_p"],
+        }
+        
+        self.assertListAlmostEqual(
+            frequencies.to_list(), list(expected_data.values()),
+            delta=tolerance,
+            msg="The frequency for bsbm:rating1..n should match config's."
+        )
+                
+    def test_person_ratings_normal(self):
+        """Test whether productPropertyNumeric follows Normal distribution .
+        """
+
+        queryfile = f"{WORKDIR}/person/test_person_ratings.sparql"
+        result = query(queryfile)
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+
+        normal_test_data = result.groupby("prop")["propVal"].aggregate(list).to_frame("propVal").reset_index()
+        normal_test_result = normal_test_data.apply(
+            lambda row: normal_test(row["propVal"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_{row['prop']}"), 
+            axis=1
+        )
+        
+        normal_test_result \
+            .to_frame("pvalue").set_index(normal_test_data["prop"]) \
+            .to_csv(f"{Path(queryfile).parent}/test_person_ratings_normaltest.csv")
+
+        self.assertTrue(
+            (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
+            "Ratings should follow Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        )
 
 if __name__ == "__main__":
     unittest.main()

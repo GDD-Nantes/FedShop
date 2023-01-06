@@ -8,5 +8,5 @@ SELECT ?localProduct ?prop ?propVal
 WHERE {
     ?localOfferOrReview bsbm:product|bsbm:reviewFor ?localProduct .
     ?localProduct ?prop ?propVal .
-    FILTER(REGEX(?prop, "productPropertyTextual")) .
+    FILTER(REGEX(?prop, "productPropertyTextual\\d+")) .
 }
