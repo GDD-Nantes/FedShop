@@ -4,11 +4,10 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
-SELECT ?product (COUNT(DISTINCT ?producer) as ?nbProducer) 
+SELECT ?batchId ?prop ?lang
 WHERE {
-    ?localOfferOrReview bsbm:product|bsbm:reviewFor ?localProduct .
-    ?localProduct bsbm:producer ?localProducer .
-    ?localProduct owl:sameAs ?product .
-    ?localProducer owl:sameAs ?producer .
+    ?subject ?prop ?propVal .
+    BIND (REPLACE(STR(?subject), ".*(vendor|person)(\\d+).*", "$2") as ?batchId ) 
+    BIND (LANG(?propVal) as ?lang) .
+    FILTER(LANG(?propVal) != "") .
 }
-GROUP BY ?product

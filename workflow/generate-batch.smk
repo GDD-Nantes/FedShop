@@ -243,13 +243,13 @@ rule generate_reviewers:
     priority: 12
     input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/person{person_id}.nt.tmp"
-    shell: "python rsfb/generate.py generate {WORK_DIR}/config_$(date +%s).yaml person {output} --id {wildcards.person_id}"
+    shell: "python rsfb/generate.py generate {WORK_DIR}/config.yaml person {output} --id {wildcards.person_id}"
 
 rule generate_vendors:
     priority: 12
     input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/vendor{vendor_id}.nt.tmp"
-    shell: "python rsfb/generate.py generate {WORK_DIR}/config_$(date +%s).yaml vendor {output} --id {wildcards.vendor_id}"
+    shell: "python rsfb/generate.py generate {WORK_DIR}/config.yaml vendor {output} --id {wildcards.vendor_id}"
 
 # rule all:
 #     input: expand("{modelDir}/tmp/product/", modelDir=MODEL_DIR)
@@ -261,9 +261,6 @@ rule split_products:
     input: "{modelDir}/tmp/product0.nt.tmp"
     output: directory("{modelDir}/tmp/product/")
     shell: 'python rsfb/splitter.py {input} {output}'
-
-# rule all: 
-#     input: expand("{modelDir}/tmp/product0.nt.tmp", modelDir=MODEL_DIR)
 
 rule generate_products:
     priority: 14

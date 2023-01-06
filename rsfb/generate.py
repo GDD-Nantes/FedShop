@@ -16,7 +16,10 @@ def cli():
 @click.argument("output", type=click.Path(file_okay=True, dir_okay=False))
 @click.option("--id", type=click.INT, default=0)
 def generate(configfile, section, output, id):
-    config = load_config(configfile, renew=True)["generation"]
+
+    output_base = f"{Path(output).parent}/{section}{id}"
+
+    config = load_config(configfile, saveAs=f"{output_base}.yaml")["generation"]
     schema_config = config["schema"]
 
     template = open(schema_config[section]["template"], "r").read()
@@ -27,7 +30,7 @@ def generate(configfile, section, output, id):
             #if param == f"{section}_n": continue
             template = re.sub(re.escape(f"{{%{param}}}"), str(value), template)
 
-    outFile = os.path.join(Path(output).parent, f"{section}{id}.txt.tmp")
+    outFile = f"{output_base}.txt.tmp"
     Path(outFile).parent.mkdir(parents=True, exist_ok=True)
     with open(outFile, "w") as outWriter:
         out = re.sub(re.escape(f"{{%{section}_id}}"), str(id), template)

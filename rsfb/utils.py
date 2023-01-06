@@ -5,6 +5,7 @@ from omegaconf import OmegaConf
 import psutil
 from pathlib import Path
 import os
+import tempfile
 
 class NormalDistrGenerator:
     def __init__(self, mu, sigma, avg) -> None:
@@ -41,14 +42,26 @@ OmegaConf.register_new_resolver("normal_dist", lambda *args: NormalDistrGenerato
 OmegaConf.register_new_resolver("normal_dist_range", lambda *args: NormalDistrRangeGenerator(*args).getValue())
 
 
-def load_config(filename, renew=False):
-    template_file = f"{filename}.template"
-    if not os.path.exists(filename) or renew:
-        config = OmegaConf.load(template_file)
+def load_config(filename, saveAs=None):
+    """Load configuration from a file. By default, attributes are interpolated at access time.
+
+    Args:
+        filename ([type]): an input template config file
+        saveAs ([type], optional): When specified, interpolate all attributes and persist to a file. Defaults to None, meaning that attributes will be interpolated at access time.
+
+    Returns:
+        [type]: [description]
+    """
+    config = OmegaConf.load(filename)
+    if saveAs is not None:
         config = OmegaConf.to_object(config)
-        OmegaConf.save(config, open(filename, "w+"))
-    else:
-        config = OmegaConf.load(open(filename, "r"))
+        if not os.path.exists(saveAs):
+            with open(saveAs, "w+") as tmpfile:
+                OmegaConf.save(config, tmpfile)
+        else:
+            with open(saveAs, "r") as tmpfile:
+                config = OmegaConf.load(tmpfile)
+
     return config
 
 def kill_process(proc_pid):
