@@ -36,7 +36,14 @@ class NormalDistrRangeGenerator:
         
         return int(((randVal / self._normalLimit) * self._maxValue) + 1);
 
+def divide(*args):
+    if len(args) != 2:
+        raise ValueError(f"The number of arguments must not exceed 2. Args: {args}")
+    
+    return int(args[0] / args[1])
+
 OmegaConf.register_new_resolver("multiply", lambda *args: np.prod(args).item())
+OmegaConf.register_new_resolver("divide", divide)
 OmegaConf.register_new_resolver("product_type_per_product", lambda nbProd: int(4**np.log10(nbProd).item()))
 OmegaConf.register_new_resolver("normal_dist", lambda *args: NormalDistrGenerator(*args).getValue())
 OmegaConf.register_new_resolver("normal_dist_range", lambda *args: NormalDistrRangeGenerator(*args).getValue())

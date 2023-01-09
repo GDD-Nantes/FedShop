@@ -8,5 +8,5 @@ SELECT ?batchId ?country
 WHERE {
     ?subject bsbm:country ?localCountry .
     ?localCountry owl:sameAs ?country .
-    BIND (REPLACE(STR(?subject), ".*(vendor|person)(\\d+).*", "$2") as ?batchId ) 
+    BIND (REPLACE(STR(?subject), ".*(vendor|ratingsite)(\\d+).*", "$2") as ?batchId ) 
 }

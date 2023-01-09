@@ -37,17 +37,18 @@ generation:
       scale_factor: 1
       params:
         vendor_n: "${multiply: 10, ${generation.n_batch}}"
-        offer_n: "${normal_dist: 3, 1, 50}"
+        offer_n: "${normal_dist: 3, 1, 2000}" # specs: 100 productsVendorsRatio * 20 avgOffersPerProduct, ref: bsbmtools
         product_n: "${generation.schema.product.params.product_n}"
 
-    person:
-      template: "experiments/bsbm/model/watdiv/bsbm-person.template"
+    ratingsite:
+      template: "experiments/bsbm/model/watdiv/bsbm-ratingsite.template"
       scale_factor: 1
       params:
         #type
-        person_n: "${multiply: 10, ${generation.n_batch}}"
+        ratingsite_n: "${multiply: 10, ${generation.n_batch}}"
         product_n: "${generation.schema.product.params.product_n}"
-        review_n: "${normal_dist: 3, 1, 50}"
+        review_n: "${normal_dist: 3, 1, 10000}" # specs: 10000
+        person_n: "${divide: ${generation.schema.ratingsite.params.review_n}, 20}"
 
         #pgroup
         rating1_p: 0.7

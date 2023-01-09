@@ -4,10 +4,9 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
-SELECT ?productHash (GROUP_CONCAT(?localProductFeature, "|") as ?groupProductFeature) 
+SELECT ?localProduct (GROUP_CONCAT(?localProductFeature, "|") as ?groupProductFeature) 
 WHERE {
     ?localOfferOrReview bsbm:product|bsbm:reviewFor ?localProduct .
-    BIND (MD5(?localProduct) as ?productHash) .
     ?localProduct bsbm:productFeature ?localProductFeature .
 }
-GROUP BY ?productHash
+GROUP BY ?localProduct

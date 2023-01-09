@@ -31,9 +31,9 @@ N_BATCH = CONFIG["n_batch"]
 
 # Config per batch
 N_VENDOR=CONFIG["schema"]["vendor"]["params"]["vendor_n"]*CONFIG["schema"]["vendor"]["scale_factor"]
-N_REVIEWER=CONFIG["schema"]["person"]["params"]["person_n"]*CONFIG["schema"]["person"]["scale_factor"]
+N_RATINGSITE=CONFIG["schema"]["ratingsite"]["params"]["ratingsite_n"]*CONFIG["schema"]["ratingsite"]["scale_factor"]
 
-FEDERATION_COUNT=N_VENDOR+N_REVIEWER
+FEDERATION_COUNT=N_VENDOR+N_RATINGSITE
 
 QUERY_DIR = f"{WORK_DIR}/queries"
 MODEL_DIR = f"{WORK_DIR}/model"
@@ -133,12 +133,15 @@ rule exec_provenance_query:
     shell: 
         'python rsfb/query.py execute-query {input.provenance_query} {output} --endpoint {params.endpoint}'
 
+# rule test_generation_next_batches:
+#     TODO
+
 rule ingest_virtuoso_next_batches:
     priority: 4
     threads: 1
     input: 
         vendor=expand("{modelDir}/virtuoso/ingest_vendor_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
-        person=expand("{modelDir}/virtuoso/ingest_person_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
+        ratingsite=expand("{modelDir}/virtuoso/ingest_ratingsite_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
         virtuoso_status="{benchDir}/virtuoso-up.txt"
     output: "{benchDir}/virtuoso-batch{batch_id}-ok.txt"
     run: 
@@ -151,7 +154,7 @@ rule ingest_virtuoso_next_batches:
             for expected_file in expected_files:
                 shell(f'docker cp {expected_file} {SPARQL_CONTAINER_NAME}:/usr/local/virtuoso-opensource/share/virtuoso/vad/')
         
-        shell(f'sh {input.vendor} bsbm && sh {input.person} && echo "OK" > {output}')
+        shell(f'sh {input.vendor} bsbm && sh {input.ratingsite} && echo "OK" > {output}')
 
 rule restart_virtuoso:
     priority: 5
@@ -166,12 +169,12 @@ rule make_virtuoso_ingest_command_for_vendor:
     output: "{modelDir}/virtuoso/ingest_vendor_batch{batch_id}.sh"
     run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), N_VENDOR)
 
-rule make_virtuoso_ingest_command_for_person:
+rule make_virtuoso_ingest_command_for_ratingsite:
     priority: 5
     threads: 1
-    input: expand("{modelDir}/exported/person{person_id}.nq", person_id=range(N_REVIEWER), modelDir=MODEL_DIR)
-    output: "{modelDir}/virtuoso/ingest_person_batch{batch_id}.sh"
-    run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), N_REVIEWER)
+    input: expand("{modelDir}/exported/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR)
+    output: "{modelDir}/virtuoso/ingest_ratingsite_batch{batch_id}.sh"
+    run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), N_RATINGSITE)
 
 rule build_provenance_query: 
     """
@@ -221,14 +224,22 @@ rule build_value_selection_query:
     output: "{benchDir}/{query}/value_selection.sparql"
     shell: "python rsfb/query.py build-value-selection-query {input.queryfile} {output}"
 
-rule agg_product_person:
+rule agg_product_ratingsite:
     priority: 11
     retries: 2
     input:
-        person="{modelDir}/tmp/person{person_id}.nt.tmp",
+        ratingsite="{modelDir}/tmp/ratingsite{ratingsite_id}.nt.tmp",
         product="{modelDir}/tmp/product/",
-    output: "{modelDir}/exported/person{person_id}.nq"
-    shell: 'python rsfb/aggregator.py {input.person} {input.product} {output} http://www.person{wildcards.person_id}.fr'
+    output: "{modelDir}/exported/ratingsite{ratingsite_id}.nq"
+    shell: 'python rsfb/aggregator.py {input.ratingsite} {input.product} {output} http://www.ratingsite{wildcards.ratingsite_id}.fr'
+
+# rule all:
+#     input: 
+#         expand(
+#             "{modelDir}/exported/vendor{vendor_id}.nq", 
+#             modelDir=MODEL_DIR,
+#             vendor_id=range(N_VENDOR)
+#         )
 
 rule agg_product_vendor:
     priority: 11
@@ -239,11 +250,11 @@ rule agg_product_vendor:
     output: "{modelDir}/exported/vendor{vendor_id}.nq",   
     shell: 'python rsfb/aggregator.py {input.vendor} {input.product} {output} http://www.vendor{wildcards.vendor_id}.fr'
 
-rule generate_reviewers:
+rule generate_ratingsites:
     priority: 12
     input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
-    output: "{modelDir}/tmp/person{person_id}.nt.tmp"
-    shell: "python rsfb/generate.py generate {WORK_DIR}/config.yaml person {output} --id {wildcards.person_id}"
+    output: "{modelDir}/tmp/ratingsite{ratingsite_id}.nt.tmp"
+    shell: "python rsfb/generate.py generate {WORK_DIR}/config.yaml ratingsite {output} --id {wildcards.ratingsite_id}"
 
 rule generate_vendors:
     priority: 12

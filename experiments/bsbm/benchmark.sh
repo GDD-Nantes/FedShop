@@ -4,7 +4,7 @@
 RSFB__SPARQL_COMPOSE_FILE="docker-compose-sparql.yml"
 RSFB__GENERATOR_COMPOSE_FILE="docker-compose-generator.yml"
 
-RSFB__WORK_DIR="bsbm"
+RSFB__WORK_DIR="experiments/bsbm"
 RSFB__N_BATCH=3
 
 N_CORES=1 # any number or "all"

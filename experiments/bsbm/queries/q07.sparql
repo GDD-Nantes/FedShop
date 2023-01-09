@@ -22,7 +22,6 @@ WHERE {
         ?vendor rdfs:label ?vendorTitle .
         ?vendor bsbm:country ?country . # it was a constant
         ?country owl:sameAs <http://downlode.org/rdf/iso-3166/countries#DE> .
-        #?offer dc:publisher ?vendor .
         ?offer bsbm:validTo ?date .
 
         # const ?currentDate < ?date 

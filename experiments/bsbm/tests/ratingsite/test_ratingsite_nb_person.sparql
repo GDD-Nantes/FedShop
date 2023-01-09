@@ -3,12 +3,11 @@ PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rev: <http://purl.org/stuff/rev#>
 
-SELECT ?product (COUNT(DISTINCT ?producer) as ?nbProducer) 
+SELECT ?ratingsiteId (GROUP_CONCAT(?localReviewer, "|") as ?groupReviewer) 
 WHERE {
-    ?localOfferOrReview bsbm:product|bsbm:reviewFor ?localProduct .
-    ?localProduct bsbm:producer ?localProducer .
-    ?localProduct owl:sameAs ?product .
-    ?localProducer owl:sameAs ?producer .
+    ?localReview rev:reviewer ?localReviewer .
+    BIND (REPLACE(STR(?localReview), ".*(ratingsite)(\\d+).*", "$1$2") as ?ratingsiteId ) .
 }
-GROUP BY ?product
+GROUP BY ?ratingsiteId

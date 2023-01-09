@@ -2,12 +2,16 @@
 
 if [ $# -eq 1 -a "$1" = "deep" ]; then
     rm -rf experiments/bsbm/model/tmp
+    rm -rf experiments/bsbm/model/exported  
+    rm -rf experiments/bsbm/model/virtuoso
 fi
 
-rm -rf experiments/bsbm/model/exported  
-rm -rf experiments/bsbm/model/virtuoso
+if [ $# -eq 1 -a "$1" = "model" ]; then
+    rm -rf experiments/bsbm/model/exported  
+    rm -rf experiments/bsbm/model/virtuoso
+fi
+
 rm -rf experiments/bsbm/benchmark
-rm experiments/bsbm/virtuoso*.txt
-rm experiments/bsbm/generator*.txt
 rm -rf experiments/bsbm/rulegraph
+
 exit 0

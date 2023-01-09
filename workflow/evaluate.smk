@@ -27,9 +27,9 @@ N_BATCH = CONFIG_GEN["n_batch"]
 
 # Config per batch
 N_VENDOR=CONFIG_GEN["schema"]["vendor"]["params"]["vendor_n"]*CONFIG_GEN["schema"]["vendor"]["scale_factor"]
-N_REVIEWER=CONFIG_GEN["schema"]["person"]["params"]["person_n"]*CONFIG_GEN["schema"]["person"]["scale_factor"]
+N_RATINGSITE=CONFIG_GEN["schema"]["ratingsite"]["params"]["ratingsite_n"]*CONFIG_GEN["schema"]["ratingsite"]["scale_factor"]
 
-FEDERATION_COUNT=N_VENDOR+N_REVIEWER
+FEDERATION_COUNT=N_VENDOR+N_RATINGSITE
 
 QUERY_DIR = f"{WORK_DIR}/queries"
 MODEL_DIR = f"{WORK_DIR}/model"
@@ -116,13 +116,13 @@ rule measure_ideal_source_selection_stats:
 rule generate_federation_declaration:
     output: "{benchDir}/{engine}/config/{batch_id}/{engine}.conf"
     run: 
-        person_data_files = [ f"{MODEL_DIR}/exported/person{i}.nq" for i in range(N_REVIEWER) ]
+        ratingsite_data_files = [ f"{MODEL_DIR}/exported/ratingsite{i}.nq" for i in range(N_RATINGSITE) ]
         vendor_data_files = [ f"{MODEL_DIR}/exported/vendor{i}.nq" for i in range(N_VENDOR) ]
 
         batchId = int(wildcards.batch_id)
-        personSliceId = np.histogram(np.arange(N_REVIEWER), N_BATCH)[1][1:].astype(int)[batchId]
+        ratingsiteSliceId = np.histogram(np.arange(N_RATINGSITE), N_BATCH)[1][1:].astype(int)[batchId]
         vendorSliceId = np.histogram(np.arange(N_VENDOR), N_BATCH)[1][1:].astype(int)[batchId]
-        batch_files = person_data_files[:personSliceId] + vendor_data_files[:vendorSliceId]
+        batch_files = ratingsite_data_files[:ratingsiteSliceId] + vendor_data_files[:vendorSliceId]
 
         os.system(f"python rsfb/engines/{wildcards.engine}.py generate-config-file {' '.join(batch_files)} {output} --endpoint {SPARQL_ENDPOINT}")
 
@@ -130,7 +130,7 @@ rule ingest_virtuoso:
     threads: 1
     input: 
         vendor=expand("{modelDir}/virtuoso/ingest_vendor_batch{lastBatch}.sh", modelDir=MODEL_DIR, lastBatch=N_BATCH-1),
-        person=expand("{modelDir}/virtuoso/ingest_person_batch{lastBatch}.sh", modelDir=MODEL_DIR, lastBatch=N_BATCH-1),
+        ratingsite=expand("{modelDir}/virtuoso/ingest_ratingsite_batch{lastBatch}.sh", modelDir=MODEL_DIR, lastBatch=N_BATCH-1),
         virtuoso_status=expand("{benchDir}/{{engine}}/virtuoso-up.txt", benchDir=BENCH_DIR)
     output: "{benchDir}/{engine}/virtuoso-batch{lastBatch}-ok.txt"
     run: 
@@ -138,7 +138,7 @@ rule ingest_virtuoso:
         nFiles = int(proc.stdout.decode())
         expected_nFiles = len(glob.glob(f"{MODEL_DIR}/exported/*.nq"))
         if nFiles != expected_nFiles: raise RuntimeError(f"Expecting {expected_nFiles} *.nq files in virtuoso container, got {nFiles}!") 
-        os.system(f'sh {input.vendor} bsbm && sh {input.person} && echo "OK" > {output}')
+        os.system(f'sh {input.vendor} bsbm && sh {input.ratingsite} && echo "OK" > {output}')
 
 rule restart_virtuoso:
     priority: 5

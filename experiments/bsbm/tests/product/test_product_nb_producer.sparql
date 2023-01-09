@@ -4,10 +4,10 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
-SELECT ?batchId (GROUP_CONCAT(DISTINCT ?producer, "|") as ?groupProducer) 
+SELECT ?batchId ?localProduct (GROUP_CONCAT(?producer, "|") as ?groupProducer) 
 WHERE {
     ?localOfferOrReview bsbm:product|bsbm:reviewFor ?localProduct .
-    BIND (REPLACE(STR(?localOfferOrReview), ".*(vendor|person)(\\d+).*", "$2") as ?batchId ) 
+    BIND (REPLACE(STR(?localOfferOrReview), ".*(vendor|ratingsite)(\\d+).*", "$2") as ?batchId ) 
     #BIND (?localOfferOrReview as ?batchId) .
     ?localProduct bsbm:producer ?localProducer .
     ?localProducer owl:sameAs ?producer .

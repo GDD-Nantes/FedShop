@@ -7,7 +7,7 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 SELECT ?batchId ?prop ?lang
 WHERE {
     ?subject ?prop ?propVal .
-    BIND (REPLACE(STR(?subject), ".*(vendor|person)(\\d+).*", "$2") as ?batchId ) 
+    BIND (REPLACE(STR(?subject), ".*(vendor|ratingsite)(\\d+).*", "$2") as ?batchId ) 
     BIND (LANG(?propVal) as ?lang) .
     FILTER(LANG(?propVal) != "") .
 }

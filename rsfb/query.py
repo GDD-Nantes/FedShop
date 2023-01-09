@@ -218,9 +218,9 @@ def inject_constant(queryfile, value_selection, instance_id):
             
             # Special treatment for exclusion
             # Query with every other placeholder set
-            elif resource["op"] == "not":
-                exclusion_query = " and ".join([ f"`{k}` != {repr(v)}" for k, v in injection_cache.items() if k != subSrc])
-                repl_val = value_selection_values.query(exclusion_query)[subSrc].sample(1)
+            # elif resource["op"] == "not":
+            #     exclusion_query = " and ".join([ f"`{k}` != {repr(v)}" for k, v in injection_cache.items() if k != subSrc])
+            #     repl_val = value_selection_values.query(exclusion_query)[subSrc].sample(1)
             
         # Convert Pandas numpy object to Python object
         try: repl_val = repl_val.item()

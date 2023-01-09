@@ -1,0 +1,14 @@
+PREFIX bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rev: <http://purl.org/stuff/rev#>
+
+SELECT ?batchId (COUNT(DISTINCT ?ratingsiteId) as ?nbRatingSite) 
+WHERE {
+    ?localReview rev:reviewer ?localPerson .
+    BIND (REPLACE(STR(?localReview), ".*(ratingsite)(\\d+).*", "$1$2") as ?ratingsiteId ) .
+    BIND (REPLACE(STR(?localReview), ".*(ratingsite)(\\d+).*", "$2") as ?batchId ) .
+}
+GROUP BY ?batchId

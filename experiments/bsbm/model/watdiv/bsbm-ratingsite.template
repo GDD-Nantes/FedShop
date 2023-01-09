@@ -12,9 +12,23 @@
 <type> bsbm:Product {%product_n}
 </type>
 
+// ----- RatingSite ----- //
+
+<type> bsbm:RatingSite 1
+
+<pgroup> 1.0
+#predicate rdfs:label string
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:country country
+</pgroup>
+
+</type>
+
 // ----- Person ----- //
 
-<type> bsbm:Person 1
+<type> bsbm:Person {%person_n}
 
 <pgroup> 1.0
 #predicate foaf:name name
@@ -63,9 +77,11 @@
 
 </type>
 
+// Every bsbm:Review is related to [1] bsbm:RatingSite (drawn with a ZIPFIAN) with the probability 1.0 
+#association bsbm:Review dc:publisher bsbm:RatingSite 2 1 NORMAL NORMAL
 
-// Every bsbm:Review is related to [1] bsbm:Product (drawn with a ZIPFIAN) with the probability 1.0 
-#association bsbm:Review bsbm:reviewFor bsbm:Product 2 1 NORMAL NORMAL
+// Every generated bsbm:Review is related to [1] bsbm:Product (drawn with a ZIPFIAN) with the probability 1.0 
+#association1 bsbm:Review bsbm:reviewFor bsbm:Product 2 1 NORMAL NORMAL
 
-// Every existing bsbm:Review are related to [Many] bsbm:Person (drawn with a ZIPFIAN) with the probability 1.0 
+// Every generated existing bsbm:Review are related to [Many] bsbm:Person (drawn with a ZIPFIAN) with the probability 1.0 
 #association1 bsbm:Review rev:reviewer bsbm:Person 2 1 NORMAL NORMAL

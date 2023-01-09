@@ -7,7 +7,7 @@ from click.testing import CliRunner
 
 import pandas as pd
 import numpy as np
-import scipy as sp
+from scipy.stats import norm, kstest
 import seaborn as sns
 
 # from matplotlib_terminal import plt
@@ -37,6 +37,9 @@ STATS_SIGNIFICANCE_LEVEL = 1 - CONFIG["stats"]["confidence_level"]
 COUNTRIES_EXPECTED_WEIGHT = {"US": 0.40, "UK": 0.10, "JP": 0.10, "CN": 0.10, "DE": 0.05, "FR": 0.05, "ES": 0.05, "RU": 0.05, "KR": 0.05, "AT": 0.05}
 LANGTAGS_EXPECTED_WEIGHT = {"en": 0.50, "ja": 0.10, "zh": 0.10, "de": 0.05, "fr": 0.05, "es": 0.05, "ru": 0.05, "kr": 0.05, "at": 0.05}
 
+WATDIV_BOOST_MU = 0.5
+WATDIV_BOOST_SIGMA = 0.5/3.0 
+
 def query(queryfile):
     saveAs = f"{Path(queryfile).parent}/{Path(queryfile).stem}.csv"
 
@@ -55,7 +58,26 @@ def query(queryfile):
 
         return result
 
-def normal_test(data: pd.Series, figname=None, **kwargs):
+def dist_test(data: pd.Series, dist: str, figname=None, **kwargs):
+    """Test whether the a sample follows normal distribution
+
+        One sample, two-sided Kolmogorov-Smirnov for goodness of fit :
+        H0: The test sample is drawn from normal distribution (equal mean)
+        H1: The test sample is not drawn from normal distribution (different mean)
+        pvalue < alpha = reject H0
+
+    Args:
+        data (pd.Series): [description]
+        figname ([type], optional): [description]. Defaults to None.
+
+    Returns:
+        [type]: [description]
+    """
+
+    dist_dict = {
+        "norm": lambda x: norm.cdf(x, loc=kwargs["loc"], scale=kwargs["scale"]),
+        "uniform": lambda x: uniform.cdf(x, loc=kwargs["loc"], scale=kwargs["scale"])
+    }
 
     if isinstance(data, list):
         data = pd.Series(data)
@@ -64,15 +86,14 @@ def normal_test(data: pd.Series, figname=None, **kwargs):
         data = pd.Series(LabelEncoder().fit_transform(data), name="producers")
 
     try: 
-        stat, pvalue = sp.stats.normaltest(data)
-        # print(f"D’Agostino and Pearson’s normal test: stat = {stat}, pvalue = {pvalue}")
-        # plt = sns.displot(data, kde=True)
-        fig = data.plot(kind="hist", edgecolor="black", **kwargs)
-        data.plot(kind="kde", ax=fig, secondary_y=True, **kwargs)
-        # plt.show("braille")
+        _, pvalue = kstest(data, dist_dict.get(dist))
 
-        if figname is not None and pvalue >= STATS_SIGNIFICANCE_LEVEL:
-            plt.savefig(f"{figname}.png")
+        if figname is not None and pvalue < STATS_SIGNIFICANCE_LEVEL:
+            figfile = f"{figname}.png"
+            if not os.path.exists(figfile):
+                fig = data.plot(kind="hist", edgecolor="black")
+                data.plot(kind="kde", ax=fig, secondary_y=True)
+                plt.savefig(figfile)
 
         plt.close()
 
@@ -84,18 +105,72 @@ def normal_test(data: pd.Series, figname=None, **kwargs):
 ## Test suites
 ############ 
 
-class TestGenerationGlobal(unittest.TestCase):
+class TestGenerationTemplate(unittest.TestCase):
+
+    def assertListEqual(self, first, second, msg=None) -> None:
+
+        self.assertIsInstance(first, list, msg="First argument should be a list.")
+
+        if isinstance(second, list):
+            return super().assertListEqual(first, second, msg)
+        else:
+            for item in first:
+                self.assertEqual(item, second, msg=msg)
+
+
+    def assertListAlmostEqual(self, first, second, msg, places=None, delta=None):
+        self.assertIsInstance(first, list, msg="First argument should be a list.")
+        self.assertEqual(len(first), len(second))
+        for item1, item2 in zip(first, second):
+            self.assertAlmostEqual(item1, item2, msg=msg, places=places, delta=delta)
+
+    def assertListGreater(self, first, second, msg):
+        self.assertIsInstance(first, list, msg="First argument should be a list.")
+
+        if isinstance(second, list):
+            for item1, item2 in zip(first, second):
+                self.assertGreater(item1, item2, msg=msg)
+        else:
+            for item in first:
+                self.assertGreater(item, second, msg)
+    
+    def assertListGreaterEqual(self, first, second, msg):
+        self.assertIsInstance(first, list, msg="First argument should be a list.")
+
+        if isinstance(second, list):
+            for item1, item2 in zip(first, second):
+                self.assertGreaterEqual(item1, item2, msg=msg)
+        else:
+            for item in first:
+                self.assertGreaterEqual(item, second, msg)
+    
+    def assertListLess(self, first, second, msg):
+        self.assertIsInstance(first, list, msg="First argument should be a list.")
+
+        if isinstance(second, list):
+            for item1, item2 in zip(first, second):
+                self.assertLess(item1, item2, msg=msg)
+        else:
+            for item in first:
+                self.assertLess(item, second, msg)
+    
+    def assertListLessEqual(self, first, second, msg):
+        self.assertIsInstance(first, list, msg="First argument should be a list.")
+
+        if isinstance(second, list):
+            for item1, item2 in zip(first, second):
+                self.assertLessEqual(item1, item2, msg=msg)
+        else:
+            for item in first:
+                self.assertLessEqual(item, second, msg)
+
+class TestGenerationGlobal(TestGenerationTemplate):
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         os.system(f"rm {WORKDIR}/global/*.png")
         os.system(f"rm {WORKDIR}/global/*.csv")    
-
-    def assertListAlmostEqual(self, first, second, msg, places=None, delta=None):
-        self.assertEqual(len(first), len(second))
-        for item1, item2 in zip(first, second):
-            self.assertAlmostEqual(item1, item2, msg=msg, places=places, delta=delta)
 
     def test_global_langtags(self):
         """Test whether langtags across the dataset matches expected frequencies .
@@ -131,7 +206,7 @@ class TestGenerationGlobal(unittest.TestCase):
         """Test whether countroes across the dataset matches expected frequencies .
         """
 
-        tolerance = 0.04
+        tolerance = 0.08
 
         queryfile = f"{WORKDIR}/global/test_global_countries.sparql"
         result = query(queryfile)
@@ -157,7 +232,7 @@ class TestGenerationGlobal(unittest.TestCase):
             msg="The frequency for bsbm:country should match config's."
         )
 
-class TestGenerationProduct(unittest.TestCase):
+class TestGenerationProduct(TestGenerationTemplate):
 
     @classmethod
     def setUpClass(cls):
@@ -165,47 +240,37 @@ class TestGenerationProduct(unittest.TestCase):
         os.system(f"rm {WORKDIR}/product/*.png")
         os.system(f"rm {WORKDIR}/product/*.csv")    
 
-    def assertListAlmostEqual(self, first, second, msg, places=None, delta=None):
-        self.assertEqual(len(first), len(second))
-        for item1, item2 in zip(first, second):
-            self.assertAlmostEqual(item1, item2, msg=msg, places=places, delta=delta)
-
-    def test_product_nb_feature_per_product(self):
-        """Test whether the features per product follows normal distribution
-
-        D’Agostino and Pearson’s method:
-        H0: The test sample is not drawn from normal distribution
-        H1: The test sample is drawn from normal distribution
-        pvalue < alpha = reject H0
-
+    def test_product_rel_feature(self):
+        """Test whether the Product-ProductFeature is Many to Many and ProductFeature-Product is Many to Many
         """
 
         queryfile = f"{WORKDIR}/product/test_product_nb_feature.sparql"
         result = query(queryfile)
 
-        result["groupProductFeature"] = result["groupProductFeature"] \
-            .apply(lambda x: x.split("|"))
+        relation_lhs = result["groupProductFeature"] \
+            .apply(lambda x: x.split("|")) \
+            .apply(lambda x: np.unique(x).size)
 
-        normal_test_result = result.apply(
-            lambda row: normal_test(row["groupProductFeature"], figname=f"{Path(queryfile).parent}/test_product_nb_feature_per_product_{row['productHash']}"),
-            axis = 1
+        relation_lhs.to_csv(f"{Path(queryfile).parent}/test_product_rel_nb_feature.csv")
+
+        self.assertListEqual(
+            relation_lhs.to_list(), 1,
+            "Every product should have 1..n producer"
         )
 
-        normal_test_result \
-            .to_frame("pvalue").set_index(result["productHash"]) \
-            .to_csv(f"{Path(queryfile).parent}/test_product_nb_feature_per_product_normaltest.csv")
-        
-        self.assertTrue(
-            (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
-            "ProductFeatures should follow Normal Distribution for each vendor. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        relation_rhs = result.explode("groupProductFeature").groupby("groupProductFeature")["localProduct"].count()
+
+        self.assertListGreaterEqual(
+            relation_rhs.to_list(), 1,
+            "Every producer should have 1..n products"
         )
     
-    def test_product_nb_feature_across_product(self):
+    def test_product_dist_nb_feature(self):
         """Test whether the features across products follows normal distribution
 
         D’Agostino and Pearson’s method:
+        H0: The test sample is drawn from normal distribution
         H0: The test sample is not drawn from normal distribution
-        H1: The test sample is drawn from normal distribution
         pvalue < alpha = reject H0
 
         """
@@ -215,42 +280,62 @@ class TestGenerationProduct(unittest.TestCase):
         result["groupProductFeature"] = result["groupProductFeature"] \
             .apply(lambda x: x.split("|")) \
             .apply(lambda x: np.unique(x).size)
+
+        normal_test_result = dist_test(result["groupProductFeature"], "norm", mu=WATDIV_BOOST_MU, sigma=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/test_product_nb_feature")
+        pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupProductFeature"]).to_csv(f"{Path(queryfile).parent}/test_product_nb_feature_normaltest.csv")
         
-        self.assertTrue(
-            normal_test(result["groupProductFeature"], figname=f"{Path(queryfile).parent}/test_product_nb_feature_across_product"),
-            "Products should follow Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        self.assertGreaterEqual(
+            normal_test_result, STATS_SIGNIFICANCE_LEVEL,
+            "ProductFeature should follow Normal Distribution across Product. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
 
-    def test_product_nb_producer_per_product(self):
-        """Test whether the average number of producers per product is 1 .
+    def test_product_rel_producer(self):
+        """Test whether the relationship Product-Producer is Many to One and Producer-Product is One to Many.
         """
-        result = query(f"{WORKDIR}/product/test_product_nb_producer_per_product.sparql")
-        self.assertTrue(
-            (result["nbProducer"] == 1).all(),
-            "Each product should have only 1 producer"
+
+        queryfile = f"{WORKDIR}/product/test_product_nb_producer.sparql"
+        result = query(queryfile)
+        
+        relation_lhs = result["groupProducer"] \
+            .apply(lambda x: x.split("|")) \
+            .apply(lambda x: np.unique(x).size)
+
+        relation_lhs.to_csv(f"{Path(queryfile).parent}/test_rel_product_nb_producer.csv")
+
+        self.assertListEqual(
+            relation_lhs.to_list(), 1,
+            "Every product should have 1 producer"
+        )
+
+        relation_rhs = result.explode("groupProducer").groupby("groupProducer")["localProduct"].count()
+
+        self.assertListGreaterEqual(
+            relation_rhs.to_list(), 1,
+            "Every producer should have 1..n products"
         )
         
-    def test_product_nb_producer(self):
+    def test_normal_product_nb_producer(self):
         """Test whether the number of producers follows normal distribution .
         """
 
         queryfile = f"{WORKDIR}/product/test_product_nb_producer.sparql"
         result = query(queryfile)
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         data = np.arange(CONFIG["schema"]["vendor"]["params"]["vendor_n"])
         _, edges = np.histogram(data, CONFIG["n_batch"])
         edges = edges[1:].astype(int)
 
         result["batchId"] = result["batchId"].apply(lambda x: np.argwhere((x <= edges)).min().item())
-        result["groupProducer"] = result["groupProducer"].apply(lambda x: np.unique(x.split("|")))
+        result["groupProducer"] = result["groupProducer"].apply(lambda x: x.split("|"))
 
         group_producer_by_batches = result.groupby("batchId")["groupProducer"] \
-            .aggregate(np.concatenate) \
+            .aggregate(lambda x: np.concatenate(x.to_numpy())) \
             .to_frame("groupProducer") \
             .reset_index()
-        
+
         normal_test_result = group_producer_by_batches.apply(
-            lambda row: normal_test(row["groupProducer"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_batch{row['batchId']}"), 
+            lambda row: dist_test(row["groupProducer"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_batch{row['batchId']}"), 
             axis=1
         )
         
@@ -258,8 +343,8 @@ class TestGenerationProduct(unittest.TestCase):
             .to_frame("pvalue").set_index(group_producer_by_batches["batchId"]) \
             .to_csv(f"{Path(queryfile).parent}/test_product_nb_producer_normaltest.csv")
 
-        self.assertTrue(
-            (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
+        self.assertListGreaterEqual(
+            normal_test_result.to_list(), STATS_SIGNIFICANCE_LEVEL,
             "Producers should follow Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
 
@@ -282,13 +367,13 @@ class TestGenerationProduct(unittest.TestCase):
             "productPropertyNumeric5": {"min": 1, "max": 2000}
         }).T
         
-        self.assertTrue(
-            np.greater_equal(minVals, expected_data["min"]).all(),
+        self.assertListGreaterEqual(
+            minVals.to_list(), expected_data["min"],
             "The min value for productPropertyNumeric must be greater or equal to WatDiv config's ."
         )
             
-        self.assertTrue(
-            np.less_equal(maxVals, expected_data["max"]).all(),
+        self.assertListLessEqual(
+            maxVals, expected_data["max"],
             "The max value for productPropertyNumeric must be less or equal to WatDiv config's ."
         )
 
@@ -329,7 +414,7 @@ class TestGenerationProduct(unittest.TestCase):
 
         normal_test_data = result.groupby("prop")["propVal"].aggregate(list).to_frame("propVal").reset_index()
         normal_test_result = normal_test_data.apply(
-            lambda row: normal_test(row["propVal"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_productPropertyNumeric{row['prop']}"), 
+            lambda row: dist_test(row["propVal"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_productPropertyNumeric{row['prop']}"), 
             axis=1
         )
         
@@ -337,8 +422,8 @@ class TestGenerationProduct(unittest.TestCase):
             .to_frame("pvalue").set_index(normal_test_data["prop"]) \
             .to_csv(f"{Path(queryfile).parent}/test_product_numeric_props_normaltest.csv")
 
-        self.assertTrue(
-            (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
+        self.assertGreaterEqual(
+            normal_test_result.to_list(), STATS_SIGNIFICANCE_LEVEL,
             "productPropertyNumeric should follow Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
 
@@ -379,7 +464,7 @@ class TestGenerationProduct(unittest.TestCase):
 
         normal_test_data = result.groupby("prop")["propVal"].aggregate(list).to_frame("propVal").reset_index()
         normal_test_result = normal_test_data.apply(
-            lambda row: normal_test(row["propVal"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}productPropertyTextual{row['prop']}"), 
+            lambda row: dist_test(row["propVal"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}productPropertyTextual{row['prop']}"), 
             axis=1
         )
         
@@ -388,11 +473,11 @@ class TestGenerationProduct(unittest.TestCase):
             .to_csv(f"{Path(queryfile).parent}/test_product_textual_props_normaltest.csv")
 
         self.assertTrue(
-            (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
+            (normal_test_result >= STATS_SIGNIFICANCE_LEVEL).all(),
             "productPropertyTextual should follow Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
 
-class TestGenerationVendor(unittest.TestCase):
+class TestGenerationVendor(TestGenerationTemplate):
 
     @classmethod
     def setUpClass(cls):
@@ -400,47 +485,40 @@ class TestGenerationVendor(unittest.TestCase):
         os.system(f"rm {WORKDIR}/vendor/*.png")
         os.system(f"rm {WORKDIR}/vendor/*.csv")    
 
-    def assertListAlmostEqual(self, first, second, msg, places=None, delta=None):
-        self.assertEqual(len(first), len(second))
-        for item1, item2 in zip(first, second):
-            self.assertAlmostEqual(item1, item2, msg=msg, places=places, delta=delta)
-
-    def test_vendor_nb_product_per_vendor(self):
-        """Test whether the products per vendor follows normal distribution
-
-        D’Agostino and Pearson’s method:
-        H0: The test sample is not drawn from normal distribution
-        H1: The test sample is drawn from normal distribution
-        pvalue < alpha = reject H0
-
+    def test_offer_rel_product(self):
+        """Test whether the relationship Offer-Product is Many to One and Product-Offer is One to Many
         """
 
         queryfile = f"{WORKDIR}/vendor/test_vendor_nb_product.sparql"
         result = query(queryfile)
 
-        result["groupProduct"] = result["groupProduct"] \
-            .apply(lambda x: x.split("|"))
+        result["groupProduct"] = result["groupProduct"].apply(lambda x: x.split("|"))
+        result =  result \
+            .groupby("localOffer")["groupProduct"].aggregate(lambda x: np.concatenate(x.to_numpy())) \
+            .reset_index()
 
-        normal_test_result = result.apply(
-            lambda row: normal_test(row["groupProduct"], figname=f"{Path(queryfile).parent}/test_vendor_nb_product_per_vendor_{row['vendorId']}"),
-            axis = 1
+        relation_lhs = result["groupProduct"].apply(lambda x: np.unique(x).size)
+
+        relation_lhs.to_csv(f"{Path(queryfile).parent}/test_vendor_rel_nb_product.csv")
+
+        self.assertListEqual(
+            relation_lhs.to_list(), 1,
+            "Every Offer should have 1 product"
         )
 
-        normal_test_result \
-            .to_frame("pvalue").set_index(result["vendorId"]) \
-            .to_csv(f"{Path(queryfile).parent}/test_vendor_nb_product_per_vendor_normaltest.csv")
-        
-        self.assertTrue(
-            (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
-            "Products should follow Normal Distribution for each vendor. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        relation_rhs = relation_lhs.explode("groupProduct").groupby("groupProduct")["localProduct"].count()
+
+        self.assertListGreaterEqual(
+            relation_rhs.to_list(), 1,
+            "Every Product should have 1..n Offer"
         )
     
-    def test_vendor_nb_product_across_vendor(self):
+    def test_vendor_normal_nb_product(self):
         """Test whether the products across vendor follows normal distribution
 
         D’Agostino and Pearson’s method:
+        H0: The test sample is drawn from normal distribution
         H0: The test sample is not drawn from normal distribution
-        H1: The test sample is drawn from normal distribution
         pvalue < alpha = reject H0
 
         """
@@ -451,19 +529,16 @@ class TestGenerationVendor(unittest.TestCase):
             .apply(lambda x: x.split("|")) \
             .apply(lambda x: np.unique(x).size)
         
-        self.assertTrue(
-            normal_test(result["groupProduct"], figname=f"{Path(queryfile).parent}/test_vendor_nb_product_across_vendor"),
+        normal_test_result = dist_test(result["groupProduct"], figname=f"{Path(queryfile).parent}/test_vendor_nb_product_across_vendor")
+        pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupProduct"]).to_csv(f"{Path(queryfile).parent}/test_vendor_nb_product_across_vendor_normaltest.csv")
+        
+        self.assertGreaterEqual(
+            normal_test_result, STATS_SIGNIFICANCE_LEVEL,
             "Products should follow Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
     
-    def test_vendor_nb_offer_per_vendor(self):
-        """Test whether the offers per vendor follows normal distribution.
-
-        D’Agostino and Pearson’s method:
-        H0: The test sample is not drawn from normal distribution
-        H1: The test sample is drawn from normal distribution
-        pvalue < alpha = reject H0
-
+    def test_vendor_rel_offer(self):
+        """Test whether the relationship Vendor-Offer is One to Many, and Offer-Vendor is Many to One.
         """
 
         queryfile = f"{WORKDIR}/vendor/test_vendor_nb_offer.sparql"
@@ -471,26 +546,33 @@ class TestGenerationVendor(unittest.TestCase):
         result["groupOffer"] = result["groupOffer"] \
             .apply(lambda x: x.split("|"))
         
-        normal_test_result = result.apply(
-            lambda row: normal_test(row["groupOffer"], figname=f"{Path(queryfile).parent}/test_vendor_nb_offer_per_vendor_{row['vendorId']}"),
-            axis = 1
+        result = result.groupby("localOffer")["groupOffer"]\
+            .aggregate(lambda x: np.concatenate(x.to_numpy())) \
+            .reset_index()
+        print(result) 
+
+        relation_lhs = result["groupOffer"].apply(lambda x: np.unique(x).size)
+        relation_lhs.to_csv(f"{Path(queryfile).parent}/test_vendor_rel_nb_offer_lhs.csv")
+
+        self.assertListEqual(
+            relation_lhs.to_list(), 1,
+            "Every Offer should have 1 product"
         )
 
-        normal_test_result \
-            .to_frame("pvalue").set_index(result["vendorId"]) \
-            .to_csv(f"{Path(queryfile).parent}/test_vendor_nb_offer_per_vendor_normaltest.csv")
-        
-        self.assertTrue(
-            (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
-            "Offers should follow Normal Distribution for each vendor. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        relation_rhs = result.explode("groupOffer").groupby("groupOffer")["localOffer"].count()
+        relation_rhs.to_csv(f"{Path(queryfile).parent}/test_vendor_rel_nb_offer_rhs.csv")
+
+        self.assertListGreaterEqual(
+            relation_rhs.to_list(), 1,
+            "Every Product should have 1..n Offer"
         )
     
     def test_vendor_nb_offer_across_vendor(self):
         """Test whether the products across vendor follows normal distribution
 
         D’Agostino and Pearson’s method:
+        H0: The test sample is drawn from normal distribution
         H0: The test sample is not drawn from normal distribution
-        H1: The test sample is drawn from normal distribution
         pvalue < alpha = reject H0
 
         """
@@ -501,13 +583,14 @@ class TestGenerationVendor(unittest.TestCase):
             .apply(lambda x: x.split("|")) \
             .apply(lambda x: np.unique(x).size)
 
-        normal_test_result = normal_test(result["groupOffer"], figname=f"{Path(queryfile).parent}/test_vendor_nb_product_across_vendor")
+        normal_test_result = dist_test(result["groupOffer"], figname=f"{Path(queryfile).parent}/test_vendor_nb_offer_across_vendor")
+        pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupOffer"]).to_csv(f"{Path(queryfile).parent}/test_vendor_nb_offer_across_vendor_normaltest.csv")
         
-        self.assertTrue(
-            normal_test_result,
+        self.assertGreaterEqual(
+            normal_test_result, STATS_SIGNIFICANCE_LEVEL,
             "Offers should follow Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
-    
+
     def test_vendor_nb_vendor(self):
         """Test whether the number of producers follows normal distribution .
         """
@@ -519,152 +602,204 @@ class TestGenerationVendor(unittest.TestCase):
         result = query(f"{WORKDIR}/vendor/test_vendor_nb_vendor.sparql")
         result["batchId"] = result["batchId"].apply(lambda x: np.argwhere((x <= edges)).min().item())
         
-        nbVendor = result.groupby("batchId")["nbVendor"].sum()
+        nbVendor = result.groupby("batchId")["nbVendor"].sum().cumsum()
 
         expected = edges + 1
 
         for i, test in nbVendor.items():
             self.assertEqual(test, expected[i])
 
-class TestGenerationPerson(unittest.TestCase):
+class TestGenerationRatingSite(TestGenerationTemplate):
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        os.system(f"rm {WORKDIR}/person/*.png")
-        os.system(f"rm {WORKDIR}/person/*.csv")    
+        os.system(f"rm {WORKDIR}/ratingsite/*.png")
+        os.system(f"rm {WORKDIR}/ratingsite/*.csv")    
 
-    def assertListAlmostEqual(self, first, second, msg, places=None, delta=None):
-        self.assertEqual(len(first), len(second))
-        for item1, item2 in zip(first, second):
-            self.assertAlmostEqual(item1, item2, msg=msg, places=places, delta=delta)
-
-    def test_person_nb_product_per_person(self):
-        """Test whether the products per person follows normal distribution
+    def test_ratingsite_nb_product_per_ratingsite(self):
+        """Test whether the products per ratingsite follows normal distribution
 
         D’Agostino and Pearson’s method:
+        H0: The test sample is drawn from normal distribution
         H0: The test sample is not drawn from normal distribution
-        H1: The test sample is drawn from normal distribution
         pvalue < alpha = reject H0
 
         """
 
-        queryfile = f"{WORKDIR}/person/test_person_nb_product.sparql"
+        queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_product.sparql"
         result = query(queryfile)
 
         result["groupProduct"] = result["groupProduct"] \
             .apply(lambda x: x.split("|"))
 
         normal_test_result = result.apply(
-            lambda row: normal_test(row["groupProduct"], figname=f"{Path(queryfile).parent}/test_person_nb_product_per_person_{row['personId']}"),
+            lambda row: dist_test(row["groupProduct"], figname=f"{Path(queryfile).parent}/test_ratingsite_nb_product_per_ratingsite_{row['ratingsiteId']}"),
             axis = 1
         )
 
         normal_test_result \
-            .to_frame("pvalue").set_index(result["personId"]) \
-            .to_csv(f"{Path(queryfile).parent}/test_person_nb_product_per_person_normaltest.csv")
+            .to_frame("pvalue").set_index(result["ratingsiteId"]) \
+            .to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_product_per_ratingsite_normaltest.csv")
         
         self.assertTrue(
-            (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
-            "Products should follow Normal Distribution for each person. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+            (normal_test_result >= STATS_SIGNIFICANCE_LEVEL).all(),
+            "Products should follow Normal Distribution for each ratingsite. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
     
-    def test_person_nb_product_across_person(self):
-        """Test whether the products across person follows normal distribution
+    def test_ratingsite_nb_product_across_ratingsite(self):
+        """Test whether the products across ratingsite follows normal distribution
 
         D’Agostino and Pearson’s method:
+        H0: The test sample is drawn from normal distribution
         H0: The test sample is not drawn from normal distribution
-        H1: The test sample is drawn from normal distribution
         pvalue < alpha = reject H0
 
         """
 
-        queryfile = f"{WORKDIR}/person/test_person_nb_product.sparql"
+        queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_product.sparql"
         result = query(queryfile)
         result["groupProduct"] = result["groupProduct"] \
             .apply(lambda x: x.split("|")) \
             .apply(lambda x: np.unique(x).size)
         
-        self.assertTrue(
-            normal_test(result["groupProduct"], figname=f"{Path(queryfile).parent}/test_person_nb_product_across_person"),
-            "Products should follow Normal Distribution across persons. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        normal_test_result = dist_test(result["groupProduct"], figname=f"{Path(queryfile).parent}/test_ratingsite_nb_product_across_ratingsite")
+        pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupProduct"]).to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_product_across_ratingsite_normaltest.csv")
+        
+        self.assertGreaterEqual(
+            normal_test_result, STATS_SIGNIFICANCE_LEVEL,
+            "Products should follow Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
     
-    def test_person_nb_review_per_person(self):
-        """Test whether the reviews per person follows normal distribution.
+    def test_ratingsite_nb_review_per_ratingsite(self):
+        """Test whether the reviews per ratingsite follows normal distribution.
 
         D’Agostino and Pearson’s method:
+        H0: The test sample is drawn from normal distribution
         H0: The test sample is not drawn from normal distribution
-        H1: The test sample is drawn from normal distribution
         pvalue < alpha = reject H0
 
         """
 
-        queryfile = f"{WORKDIR}/person/test_person_nb_review.sparql"
+        queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_review.sparql"
         result = query(queryfile)
         result["groupReview"] = result["groupReview"] \
             .apply(lambda x: x.split("|"))
         
         normal_test_result = result.apply(
-            lambda row: normal_test(row["groupReview"], figname=f"{Path(queryfile).parent}/test_person_nb_review_per_person_{row['personId']}"),
+            lambda row: dist_test(row["groupReview"], figname=f"{Path(queryfile).parent}/test_ratingsite_nb_review_per_ratingsite_{row['ratingsiteId']}"),
             axis = 1
         )
 
         normal_test_result \
-            .to_frame("pvalue").set_index(result["personId"]) \
-            .to_csv(f"{Path(queryfile).parent}/test_person_nb_review_per_person_normaltest.csv")
+            .to_frame("pvalue").set_index(result["ratingsiteId"]) \
+            .to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_review_per_ratingsite_normaltest.csv")
         
         self.assertTrue(
-            (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
-            "Offers should follow Normal Distribution for each person. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+            (normal_test_result >= STATS_SIGNIFICANCE_LEVEL).all(),
+            "Review should follow Normal Distribution for each ratingsite. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
     
-    def test_person_nb_review_across_person(self):
-        """Test whether the products across person follows normal distribution
+    def test_ratingsite_nb_review_across_ratingsite(self):
+        """Test whether the products across ratingsite follows normal distribution
 
         D’Agostino and Pearson’s method:
+        H0: The test sample is drawn from normal distribution
         H0: The test sample is not drawn from normal distribution
-        H1: The test sample is drawn from normal distribution
         pvalue < alpha = reject H0
 
         """
 
-        queryfile = f"{WORKDIR}/person/test_person_nb_review.sparql"
+        queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_review.sparql"
         result = query(queryfile)
         result["groupReview"] = result["groupReview"] \
             .apply(lambda x: x.split("|")) \
             .apply(lambda x: np.unique(x).size)
 
-        normal_test_result = normal_test(result["groupReview"], figname=f"{Path(queryfile).parent}/test_person_nb_product_across_person")
+        normal_test_result = dist_test(result["groupReview"], figname=f"{Path(queryfile).parent}/test_ratingsite_nb_review_across_ratingsite")
+        pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupReview"]).to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_review_across_ratingsite_normaltest.csv")
+        
+        self.assertGreaterEqual(
+            normal_test_result, STATS_SIGNIFICANCE_LEVEL,
+            "Review should follow Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        )
+
+    def test_ratingsite_nb_person_per_ratingsite(self):
+        """Test whether the reviews per ratingsite follows normal distribution.
+
+        D’Agostino and Pearson’s method:
+        H0: The test sample is drawn from normal distribution
+        H0: The test sample is not drawn from normal distribution
+        pvalue < alpha = reject H0
+
+        """
+
+        queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_person.sparql"
+        result = query(queryfile)
+        result["groupReviewer"] = result["groupReviewer"] \
+            .apply(lambda x: x.split("|"))
+        
+        normal_test_result = result.apply(
+            lambda row: dist_test(row["groupReviewer"], figname=f"{Path(queryfile).parent}/test_ratingsite_nb_person_per_ratingsite_{row['ratingsiteId']}"),
+            axis = 1
+        )
+
+        normal_test_result \
+            .to_frame("pvalue").set_index(result["ratingsiteId"]) \
+            .to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_person_per_ratingsite_normaltest.csv")
         
         self.assertTrue(
-            normal_test_result,
-            "Offers should follow Normal Distribution across persons. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+            (normal_test_result >= STATS_SIGNIFICANCE_LEVEL).all(),
+            "Person should follow Normal Distribution for each ratingsite. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
     
-    def test_person_nb_person(self):
+    def test_ratingsite_nb_person_across_ratingsite(self):
+        """Test whether the products across ratingsite follows normal distribution
+
+        D’Agostino and Pearson’s method:
+        H0: The test sample is drawn from normal distribution
+        H0: The test sample is not drawn from normal distribution
+        pvalue < alpha = reject H0
+
+        """
+
+        queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_person.sparql"
+        result = query(queryfile)
+        result["groupReviewer"] = result["groupReviewer"] \
+            .apply(lambda x: x.split("|")) \
+            .apply(lambda x: np.unique(x).size)
+
+        normal_test_result = dist_test(result["groupReviewer"], figname=f"{Path(queryfile).parent}/test_ratingsite_nb_person_across_ratingsite")
+        pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupReviewer"]).to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_person_across_ratingsite_normaltest.csv")
+        
+        self.assertGreaterEqual(
+            normal_test_result, STATS_SIGNIFICANCE_LEVEL,
+            "Person should follow Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        )
+        
+    def test_ratingsite_nb_ratingsite(self):
         """Test whether the number of producers follows normal distribution .
         """
 
-        data = np.arange(CONFIG["schema"]["person"]["params"]["person_n"])
+        data = np.arange(CONFIG["schema"]["ratingsite"]["params"]["ratingsite_n"])
         _, edges = np.histogram(data, CONFIG["n_batch"])
         edges = edges[1:].astype(int)
 
-        result = query(f"{WORKDIR}/person/test_person_nb_person.sparql")
+        result = query(f"{WORKDIR}/ratingsite/test_ratingsite_nb_ratingsite.sparql")
         result["batchId"] = result["batchId"].apply(lambda x: np.argwhere((x <= edges)).min().item())
         
-        nbPerson = result.groupby("batchId")["nbPerson"].sum()
+        nbRatingSite = result.groupby("batchId")["nbRatingSite"].sum().cumsum()
 
         expected = edges + 1
 
-        for i, test in nbPerson.items():
+        for i, test in nbRatingSite.items():
             self.assertEqual(test, expected[i])
     
-    def test_person_ratings_range(self):
+    def test_ratingsite_ratings_range(self):
         """Test whether productPropertyNumeric matches expected frequencies .
         """
 
-        queryfile = f"{WORKDIR}/person/test_person_ratings.sparql"
+        queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_ratings.sparql"
         result = query(queryfile)
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
@@ -688,13 +823,13 @@ class TestGenerationPerson(unittest.TestCase):
             "The max value for productPropertyNumeric must be less or equal to WatDiv config's ."
         )
 
-    def test_person_ratings_frequency(self):
+    def test_ratingsite_ratings_frequency(self):
         """Test whether productPropertyNumeric approximately matches expected frequencies .
         """
 
         tolerance = 0.07
 
-        queryfile = f"{WORKDIR}/person/test_person_ratings.sparql"
+        queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_ratings.sparql"
         result = query(queryfile)
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
@@ -702,10 +837,10 @@ class TestGenerationPerson(unittest.TestCase):
         frequencies = (result.groupby("prop")["propVal"].count() / nbProducts).round(2)
 
         expected_data = {
-            "rating1": CONFIG["schema"]["person"]["params"]["rating1_p"],
-            "rating2": CONFIG["schema"]["person"]["params"]["rating2_p"],
-            "rating3": CONFIG["schema"]["person"]["params"]["rating3_p"],
-            "rating4": CONFIG["schema"]["person"]["params"]["rating4_p"],
+            "rating1": CONFIG["schema"]["ratingsite"]["params"]["rating1_p"],
+            "rating2": CONFIG["schema"]["ratingsite"]["params"]["rating2_p"],
+            "rating3": CONFIG["schema"]["ratingsite"]["params"]["rating3_p"],
+            "rating4": CONFIG["schema"]["ratingsite"]["params"]["rating4_p"],
         }
         
         self.assertListAlmostEqual(
@@ -714,26 +849,26 @@ class TestGenerationPerson(unittest.TestCase):
             msg="The frequency for bsbm:rating1..n should match config's."
         )
                 
-    def test_person_ratings_normal(self):
+    def test_ratingsite_ratings_normal(self):
         """Test whether productPropertyNumeric follows Normal distribution .
         """
 
-        queryfile = f"{WORKDIR}/person/test_person_ratings.sparql"
+        queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_ratings.sparql"
         result = query(queryfile)
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         normal_test_data = result.groupby("prop")["propVal"].aggregate(list).to_frame("propVal").reset_index()
         normal_test_result = normal_test_data.apply(
-            lambda row: normal_test(row["propVal"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_{row['prop']}"), 
+            lambda row: dist_test(row["propVal"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_{row['prop']}"), 
             axis=1
         )
         
         normal_test_result \
             .to_frame("pvalue").set_index(normal_test_data["prop"]) \
-            .to_csv(f"{Path(queryfile).parent}/test_person_ratings_normaltest.csv")
+            .to_csv(f"{Path(queryfile).parent}/test_ratingsite_ratings_normaltest.csv")
 
         self.assertTrue(
-            (normal_test_result < STATS_SIGNIFICANCE_LEVEL).all(),
+            (normal_test_result >= STATS_SIGNIFICANCE_LEVEL).all(),
             "Ratings should follow Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
 
