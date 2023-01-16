@@ -12,4 +12,4 @@ WHERE {
     ?localProduct bsbm:producer ?localProducer .
     ?localProducer owl:sameAs ?producer .
 }
-GROUP BY ?batchId
+GROUP BY ?batchId ?localProduct

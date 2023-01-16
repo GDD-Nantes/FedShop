@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import LabelEncoder
 
+from statsmodels.stats.proportion import proportions_ztest
+
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -85,21 +87,18 @@ def dist_test(data: pd.Series, dist: str, figname=None, **kwargs):
     if not np.issubdtype(data.dtype, np.number):
         data = pd.Series(LabelEncoder().fit_transform(data), name="producers")
 
-    try: 
-        _, pvalue = kstest(data, dist_dict.get(dist))
+    _, pvalue = kstest(data, dist_dict.get(dist))
 
-        if figname is not None and pvalue < STATS_SIGNIFICANCE_LEVEL:
-            figfile = f"{figname}.png"
-            if not os.path.exists(figfile):
-                fig = data.plot(kind="hist", edgecolor="black")
-                data.plot(kind="kde", ax=fig, secondary_y=True)
-                plt.savefig(figfile)
+    if figname is not None and pvalue < STATS_SIGNIFICANCE_LEVEL:
+        figfile = f"{figname}.png"
+        if not os.path.exists(figfile):
+            fig = data.plot(kind="hist", edgecolor="black")
+            data.plot(kind="kde", ax=fig, secondary_y=True)
+            plt.savefig(figfile)
 
         plt.close()
-
-        return pvalue
-    except ValueError:
-        return np.nan
+    
+    return pvalue
 
 ############
 ## Test suites
@@ -116,7 +115,6 @@ class TestGenerationTemplate(unittest.TestCase):
         else:
             for item in first:
                 self.assertEqual(item, second, msg=msg)
-
 
     def assertListAlmostEqual(self, first, second, msg, places=None, delta=None):
         self.assertIsInstance(first, list, msg="First argument should be a list.")
@@ -180,6 +178,8 @@ class TestGenerationGlobal(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/global/test_global_langtags.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         data = np.arange(CONFIG["schema"]["vendor"]["params"]["vendor_n"])
@@ -210,6 +210,9 @@ class TestGenerationGlobal(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/global/test_global_countries.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
         result.replace("http://downlode.org/rdf/iso-3166/countries#", "", regex=True, inplace=True)
 
         data = np.arange(CONFIG["schema"]["vendor"]["params"]["vendor_n"])
@@ -246,6 +249,9 @@ class TestGenerationProduct(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/product/test_product_nb_feature.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         relation_lhs = result["groupProductFeature"] \
             .apply(lambda x: x.split("|")) \
@@ -253,16 +259,16 @@ class TestGenerationProduct(TestGenerationTemplate):
 
         relation_lhs.to_csv(f"{Path(queryfile).parent}/test_product_rel_nb_feature.csv")
 
-        self.assertListEqual(
+        self.assertListGreaterEqual(
             relation_lhs.to_list(), 1,
-            "Every product should have 1..n producer"
+            "Every product should have 1..n ProductFeature"
         )
 
         relation_rhs = result.explode("groupProductFeature").groupby("groupProductFeature")["localProduct"].count()
 
         self.assertListGreaterEqual(
             relation_rhs.to_list(), 1,
-            "Every producer should have 1..n products"
+            "Every producer should have 1..n ProductFeature"
         )
     
     def test_product_dist_nb_feature(self):
@@ -277,11 +283,15 @@ class TestGenerationProduct(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/product/test_product_nb_feature.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+
         result["groupProductFeature"] = result["groupProductFeature"] \
             .apply(lambda x: x.split("|")) \
             .apply(lambda x: np.unique(x).size)
 
-        normal_test_result = dist_test(result["groupProductFeature"], "norm", mu=WATDIV_BOOST_MU, sigma=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/test_product_nb_feature")
+        normal_test_result = dist_test(result["groupProductFeature"], "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/test_product_nb_feature")
         pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupProductFeature"]).to_csv(f"{Path(queryfile).parent}/test_product_nb_feature_normaltest.csv")
         
         self.assertGreaterEqual(
@@ -295,6 +305,9 @@ class TestGenerationProduct(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/product/test_product_nb_producer.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
         
         relation_lhs = result["groupProducer"] \
             .apply(lambda x: x.split("|")) \
@@ -314,12 +327,14 @@ class TestGenerationProduct(TestGenerationTemplate):
             "Every producer should have 1..n products"
         )
         
-    def test_normal_product_nb_producer(self):
+    def test_product_dist_nb_producer(self):
         """Test whether the number of producers follows normal distribution .
         """
 
         queryfile = f"{WORKDIR}/product/test_product_nb_producer.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         data = np.arange(CONFIG["schema"]["vendor"]["params"]["vendor_n"])
@@ -335,7 +350,7 @@ class TestGenerationProduct(TestGenerationTemplate):
             .reset_index()
 
         normal_test_result = group_producer_by_batches.apply(
-            lambda row: dist_test(row["groupProducer"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_batch{row['batchId']}"), 
+            lambda row: dist_test(row["groupProducer"], "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_batch{row['batchId']}"), 
             axis=1
         )
         
@@ -354,6 +369,8 @@ class TestGenerationProduct(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/product/test_product_numeric_props.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         minVals = result.groupby("prop")["propVal"].min()
@@ -368,12 +385,12 @@ class TestGenerationProduct(TestGenerationTemplate):
         }).T
         
         self.assertListGreaterEqual(
-            minVals.to_list(), expected_data["min"],
+            minVals.to_list(), expected_data["min"].to_list(),
             "The min value for productPropertyNumeric must be greater or equal to WatDiv config's ."
         )
             
         self.assertListLessEqual(
-            maxVals, expected_data["max"],
+            maxVals.to_list(), expected_data["max"].to_list(),
             "The max value for productPropertyNumeric must be less or equal to WatDiv config's ."
         )
 
@@ -381,28 +398,35 @@ class TestGenerationProduct(TestGenerationTemplate):
         """Test whether productPropertyNumeric approximately matches expected frequencies .
         """
 
-        tolerance = 0.1
-
         queryfile = f"{WORKDIR}/product/test_product_numeric_props.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         nbProducts = result["localProduct"].nunique()
-        frequencies = (result.groupby("prop")["propVal"].count() / nbProducts).round(2)
+        frequencies = result.groupby("prop")["propVal"].nunique()
 
-        expected_data = {
+        expected_prop = pd.Series({
             "productPropertyNumeric1": 1.0,
             "productPropertyNumeric2": 1.0,
             "productPropertyNumeric3": 1.0,
             "productPropertyNumeric4": CONFIG["schema"]["product"]["params"]["productPropertyNumeric4_p"],
             "productPropertyNumeric5": CONFIG["schema"]["product"]["params"]["productPropertyNumeric5_p"]
-        }
-        
-        self.assertListAlmostEqual(
-            frequencies.to_list(), list(expected_data.values()),
-            delta=tolerance,
-            msg="The frequency for productPropertyNumeric should match config's."
-        )
+        })
+
+        for expected_p, freq in zip(expected_prop, frequencies):
+            _, pvalue = proportions_ztest(
+                count=int(expected_p * nbProducts),
+                nobs=nbProducts,
+                value=(freq / nbProducts),
+                alternative="larger" # two-sided, smaller, larger
+            )
+            
+            self.assertGreaterEqual(
+                pvalue, STATS_SIGNIFICANCE_LEVEL,
+                msg="The proportion for bsbm:productPropertyNumeric1..n should match config's. Either (1) increase sample size, (2) decrease confidence level or (3) change alternative hypothesis"
+            )
                 
     def test_product_numeric_props_normal(self):
         """Test whether productPropertyNumeric follows Normal distribution .
@@ -410,11 +434,13 @@ class TestGenerationProduct(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/product/test_product_numeric_props.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         normal_test_data = result.groupby("prop")["propVal"].aggregate(list).to_frame("propVal").reset_index()
         normal_test_result = normal_test_data.apply(
-            lambda row: dist_test(row["propVal"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_productPropertyNumeric{row['prop']}"), 
+            lambda row: dist_test(row["propVal"], "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_productPropertyNumeric{row['prop']}"), 
             axis=1
         )
         
@@ -422,7 +448,7 @@ class TestGenerationProduct(TestGenerationTemplate):
             .to_frame("pvalue").set_index(normal_test_data["prop"]) \
             .to_csv(f"{Path(queryfile).parent}/test_product_numeric_props_normaltest.csv")
 
-        self.assertGreaterEqual(
+        self.assertListGreaterEqual(
             normal_test_result.to_list(), STATS_SIGNIFICANCE_LEVEL,
             "productPropertyNumeric should follow Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
@@ -431,28 +457,35 @@ class TestGenerationProduct(TestGenerationTemplate):
         """Test whether productPropertyTextual approximately matches expected frequencies .
         """
 
-        tolerance = 0.1
-
         queryfile = f"{WORKDIR}/product/test_product_textual_props.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         nbProducts = result["localProduct"].nunique()
-        frequencies = (result.groupby("prop")["propVal"].count() / nbProducts).round(2)
+        frequencies = result.groupby("prop")["propVal"].nunique()
 
-        expected_data = {
+        expected_prop = pd.Series({
             "productPropertyTextual1": 1.0,
             "productPropertyTextual2": 1.0,
             "productPropertyTextual3": 1.0,
             "productPropertyTextual4": CONFIG["schema"]["product"]["params"]["productPropertyTextual4_p"],
             "productPropertyTextual5": CONFIG["schema"]["product"]["params"]["productPropertyTextual5_p"]
-        }
-        
-        self.assertListAlmostEqual(
-            frequencies.to_list(), list(expected_data.values()),
-            delta=tolerance,
-            msg="The frequency for productPropertyTextual should match config's."
-        )
+        })
+
+        for expected_p, freq in zip(expected_prop, frequencies):
+            _, pvalue = proportions_ztest(
+                count=int(expected_p * nbProducts),
+                nobs=nbProducts,
+                value=(freq / nbProducts),
+                alternative="larger" # two-sided, smaller, larger
+            )
+            
+            self.assertGreaterEqual(
+                pvalue, STATS_SIGNIFICANCE_LEVEL,
+                msg="The proportion for bsbm:productPropertyTextual1..n should match config's. Either (1) increase sample size, (2) decrease confidence level or (3) change alternative hypothesis"
+            )
                 
     def test_product_textual_props_normal(self):
         """Test whether productPropertyTextual follows Normal distribution .
@@ -460,11 +493,13 @@ class TestGenerationProduct(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/product/test_product_textual_props.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         normal_test_data = result.groupby("prop")["propVal"].aggregate(list).to_frame("propVal").reset_index()
         normal_test_result = normal_test_data.apply(
-            lambda row: dist_test(row["propVal"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}productPropertyTextual{row['prop']}"), 
+            lambda row: dist_test(row["propVal"], "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}productPropertyTextual{row['prop']}"), 
             axis=1
         )
         
@@ -472,8 +507,8 @@ class TestGenerationProduct(TestGenerationTemplate):
             .to_frame("pvalue").set_index(normal_test_data["prop"]) \
             .to_csv(f"{Path(queryfile).parent}/test_product_textual_props_normaltest.csv")
 
-        self.assertTrue(
-            (normal_test_result >= STATS_SIGNIFICANCE_LEVEL).all(),
+        self.assertListGreaterEqual(
+            normal_test_result.to_list(), STATS_SIGNIFICANCE_LEVEL,
             "productPropertyTextual should follow Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
 
@@ -491,6 +526,9 @@ class TestGenerationVendor(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/vendor/test_vendor_nb_product.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         result["groupProduct"] = result["groupProduct"].apply(lambda x: x.split("|"))
         result =  result \
@@ -506,14 +544,14 @@ class TestGenerationVendor(TestGenerationTemplate):
             "Every Offer should have 1 product"
         )
 
-        relation_rhs = relation_lhs.explode("groupProduct").groupby("groupProduct")["localProduct"].count()
+        relation_rhs = result.explode("groupProduct").groupby("groupProduct")["localOffer"].count()
 
         self.assertListGreaterEqual(
             relation_rhs.to_list(), 1,
             "Every Product should have 1..n Offer"
         )
     
-    def test_vendor_normal_nb_product(self):
+    def test_vendor_dist_nb_product(self):
         """Test whether the products across vendor follows normal distribution
 
         D’Agostino and Pearson’s method:
@@ -525,12 +563,17 @@ class TestGenerationVendor(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/vendor/test_vendor_nb_product.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+
         result["groupProduct"] = result["groupProduct"] \
-            .apply(lambda x: x.split("|")) \
-            .apply(lambda x: np.unique(x).size)
-        
-        normal_test_result = dist_test(result["groupProduct"], figname=f"{Path(queryfile).parent}/test_vendor_nb_product_across_vendor")
-        pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupProduct"]).to_csv(f"{Path(queryfile).parent}/test_vendor_nb_product_across_vendor_normaltest.csv")
+            .apply(lambda x: x.split("|")) 
+
+        sample = result.groupby("offerId")["groupProduct"].count()   
+
+        normal_test_result = dist_test(sample, "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/test_vendor_dist_nb_product")
+        pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupProduct"]).to_csv(f"{Path(queryfile).parent}/test_vendor_dist_nb_product_normaltest.csv")
         
         self.assertGreaterEqual(
             normal_test_result, STATS_SIGNIFICANCE_LEVEL,
@@ -543,31 +586,27 @@ class TestGenerationVendor(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/vendor/test_vendor_nb_offer.sparql"
         result = query(queryfile)
-        result["groupOffer"] = result["groupOffer"] \
-            .apply(lambda x: x.split("|"))
-        
-        result = result.groupby("localOffer")["groupOffer"]\
-            .aggregate(lambda x: np.concatenate(x.to_numpy())) \
-            .reset_index()
-        print(result) 
+        self.assertFalse(result.empty, "The test query should return results...")
 
-        relation_lhs = result["groupOffer"].apply(lambda x: np.unique(x).size)
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+        
+        relation_lhs = result.groupby("localOffer")["vendorId"].nunique()
         relation_lhs.to_csv(f"{Path(queryfile).parent}/test_vendor_rel_nb_offer_lhs.csv")
 
         self.assertListEqual(
             relation_lhs.to_list(), 1,
-            "Every Offer should have 1 product"
+            "Every Offer should have 1 Vendor"
         )
 
-        relation_rhs = result.explode("groupOffer").groupby("groupOffer")["localOffer"].count()
+        relation_rhs = result.groupby("vendorId")["localOffer"].nunique()
         relation_rhs.to_csv(f"{Path(queryfile).parent}/test_vendor_rel_nb_offer_rhs.csv")
 
         self.assertListGreaterEqual(
             relation_rhs.to_list(), 1,
-            "Every Product should have 1..n Offer"
+            "Every Vendor should have 1..n Offer"
         )
     
-    def test_vendor_nb_offer_across_vendor(self):
+    def test_vendor_dist_nb_offer(self):
         """Test whether the products across vendor follows normal distribution
 
         D’Agostino and Pearson’s method:
@@ -579,12 +618,14 @@ class TestGenerationVendor(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/vendor/test_vendor_nb_offer.sparql"
         result = query(queryfile)
-        result["groupOffer"] = result["groupOffer"] \
-            .apply(lambda x: x.split("|")) \
-            .apply(lambda x: np.unique(x).size)
+        self.assertFalse(result.empty, "The test query should return results...")
 
-        normal_test_result = dist_test(result["groupOffer"], figname=f"{Path(queryfile).parent}/test_vendor_nb_offer_across_vendor")
-        pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupOffer"]).to_csv(f"{Path(queryfile).parent}/test_vendor_nb_offer_across_vendor_normaltest.csv")
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+
+        sample = result.groupby("vendorId")["localOffer"].nunique()
+
+        normal_test_result = dist_test(sample, "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/test_vendor_dist_nb_offer")
+        pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupOffer"]).to_csv(f"{Path(queryfile).parent}/test_vendor_dist_nb_offer_normaltest.csv")
         
         self.assertGreaterEqual(
             normal_test_result, STATS_SIGNIFICANCE_LEVEL,
@@ -592,7 +633,7 @@ class TestGenerationVendor(TestGenerationTemplate):
         )
 
     def test_vendor_nb_vendor(self):
-        """Test whether the number of producers follows normal distribution .
+        """Test whether the number of vendor per batch match expected .
         """
 
         data = np.arange(CONFIG["schema"]["vendor"]["params"]["vendor_n"])
@@ -617,37 +658,34 @@ class TestGenerationRatingSite(TestGenerationTemplate):
         os.system(f"rm {WORKDIR}/ratingsite/*.png")
         os.system(f"rm {WORKDIR}/ratingsite/*.csv")    
 
-    def test_ratingsite_nb_product_per_ratingsite(self):
+    def test_ratingsite_rel_nb_product(self):
         """Test whether the products per ratingsite follows normal distribution
-
-        D’Agostino and Pearson’s method:
-        H0: The test sample is drawn from normal distribution
-        H0: The test sample is not drawn from normal distribution
-        pvalue < alpha = reject H0
-
         """
 
         queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_product.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
 
-        result["groupProduct"] = result["groupProduct"] \
-            .apply(lambda x: x.split("|"))
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+        result["groupProduct"] = result["groupProduct"].apply(lambda x: x.split("|"))
+        
+        relation_lhs = result["groupProduct"].apply(lambda x: np.unique(x).size)
+        relation_lhs.to_csv(f"{Path(queryfile).parent}/test_ratingsite_rel_nb_product_lhs.csv")
 
-        normal_test_result = result.apply(
-            lambda row: dist_test(row["groupProduct"], figname=f"{Path(queryfile).parent}/test_ratingsite_nb_product_per_ratingsite_{row['ratingsiteId']}"),
-            axis = 1
+        self.assertListEqual(
+            relation_lhs.to_list(), 1,
+            "Every Review should have 1 Product"
         )
 
-        normal_test_result \
-            .to_frame("pvalue").set_index(result["ratingsiteId"]) \
-            .to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_product_per_ratingsite_normaltest.csv")
-        
-        self.assertTrue(
-            (normal_test_result >= STATS_SIGNIFICANCE_LEVEL).all(),
-            "Products should follow Normal Distribution for each ratingsite. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        relation_rhs = result.explode("groupProduct").groupby("groupProduct")["localRatingSite"].nunique()
+        relation_rhs.to_csv(f"{Path(queryfile).parent}/test_ratingsite_rel_nb_product_rhs.csv")
+
+        self.assertListGreaterEqual(
+            relation_rhs.to_list(), 1,
+            "Every Product should have 1..n Review"
         )
     
-    def test_ratingsite_nb_product_across_ratingsite(self):
+    def test_ratingsite_dist_nb_product(self):
         """Test whether the products across ratingsite follows normal distribution
 
         D’Agostino and Pearson’s method:
@@ -659,48 +697,55 @@ class TestGenerationRatingSite(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_product.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+
         result["groupProduct"] = result["groupProduct"] \
             .apply(lambda x: x.split("|")) \
             .apply(lambda x: np.unique(x).size)
+
+        print()
+        print(result)
         
-        normal_test_result = dist_test(result["groupProduct"], figname=f"{Path(queryfile).parent}/test_ratingsite_nb_product_across_ratingsite")
-        pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupProduct"]).to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_product_across_ratingsite_normaltest.csv")
+        normal_test_result = dist_test(result["groupProduct"], "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/test_ratingsite_dist_nb_product")
+        pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupProduct"]).to_csv(f"{Path(queryfile).parent}/test_ratingsite_dist_nb_product_normaltest.csv")
         
         self.assertGreaterEqual(
             normal_test_result, STATS_SIGNIFICANCE_LEVEL,
             "Products should follow Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
     
-    def test_ratingsite_nb_review_per_ratingsite(self):
-        """Test whether the reviews per ratingsite follows normal distribution.
-
-        D’Agostino and Pearson’s method:
-        H0: The test sample is drawn from normal distribution
-        H0: The test sample is not drawn from normal distribution
-        pvalue < alpha = reject H0
-
+    def test_ratingsite_rel_nb_review(self):
+        """Test whether the relationship RatingSite-Review is One-To-Many and Review-RatingSite is Many-To-One.
         """
 
         queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_review.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+
         result["groupReview"] = result["groupReview"] \
             .apply(lambda x: x.split("|"))
         
-        normal_test_result = result.apply(
-            lambda row: dist_test(row["groupReview"], figname=f"{Path(queryfile).parent}/test_ratingsite_nb_review_per_ratingsite_{row['ratingsiteId']}"),
-            axis = 1
+        relation_lhs = result["groupReview"].apply(lambda x: np.unique(x).size)
+
+        relation_lhs.to_csv(f"{Path(queryfile).parent}/test_rel_product_nb_producer.csv")
+
+        self.assertListGreaterEqual(
+            relation_lhs.to_list(), 1,
+            "Every RatingSite should have 1..n Review"
         )
 
-        normal_test_result \
-            .to_frame("pvalue").set_index(result["ratingsiteId"]) \
-            .to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_review_per_ratingsite_normaltest.csv")
-        
-        self.assertTrue(
-            (normal_test_result >= STATS_SIGNIFICANCE_LEVEL).all(),
-            "Review should follow Normal Distribution for each ratingsite. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        relation_rhs = result.explode("groupReview").groupby("groupReview")["ratingsiteId"].nunique()
+
+        self.assertListEqual(
+            relation_rhs.to_list(), 1,
+            "Every Review should have 1 RatingSite"
         )
     
-    def test_ratingsite_nb_review_across_ratingsite(self):
+    def test_ratingsite_dist_nb_review(self):
         """Test whether the products across ratingsite follows normal distribution
 
         D’Agostino and Pearson’s method:
@@ -712,11 +757,17 @@ class TestGenerationRatingSite(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_review.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+
         result["groupReview"] = result["groupReview"] \
             .apply(lambda x: x.split("|")) \
             .apply(lambda x: np.unique(x).size)
 
-        normal_test_result = dist_test(result["groupReview"], figname=f"{Path(queryfile).parent}/test_ratingsite_nb_review_across_ratingsite")
+        print(result["groupReview"])
+
+        normal_test_result = dist_test(result["groupReview"], "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/test_ratingsite_nb_review_across_ratingsite")
         pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupReview"]).to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_review_across_ratingsite_normaltest.csv")
         
         self.assertGreaterEqual(
@@ -724,37 +775,37 @@ class TestGenerationRatingSite(TestGenerationTemplate):
             "Review should follow Normal Distribution across vendors. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
 
-    def test_ratingsite_nb_person_per_ratingsite(self):
+    def test_ratingsite_rel_nb_person(self):
         """Test whether the reviews per ratingsite follows normal distribution.
-
-        D’Agostino and Pearson’s method:
-        H0: The test sample is drawn from normal distribution
-        H0: The test sample is not drawn from normal distribution
-        pvalue < alpha = reject H0
-
         """
 
         queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_person.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+
         result["groupReviewer"] = result["groupReviewer"] \
             .apply(lambda x: x.split("|"))
-        
-        normal_test_result = result.apply(
-            lambda row: dist_test(row["groupReviewer"], figname=f"{Path(queryfile).parent}/test_ratingsite_nb_person_per_ratingsite_{row['ratingsiteId']}"),
-            axis = 1
+                
+        relation_lhs = result["groupReviewer"].apply(lambda x: np.unique(x).size)
+
+        relation_lhs.to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_person.csv")
+
+        self.assertListGreaterEqual(
+            relation_lhs.to_list(), 1,
+            "Every RatingSite should have 1..n Reviewer"
         )
 
-        normal_test_result \
-            .to_frame("pvalue").set_index(result["ratingsiteId"]) \
-            .to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_person_per_ratingsite_normaltest.csv")
-        
-        self.assertTrue(
-            (normal_test_result >= STATS_SIGNIFICANCE_LEVEL).all(),
-            "Person should follow Normal Distribution for each ratingsite. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
+        relation_rhs = result.explode("groupReviewer").groupby("groupReviewer")["ratingsiteId"].nunique()
+
+        self.assertListEqual(
+            relation_rhs.to_list(), 1,
+            "Every Reviewer should have 1 RatingSite"
         )
     
-    def test_ratingsite_nb_person_across_ratingsite(self):
-        """Test whether the products across ratingsite follows normal distribution
+    def test_ratingsite_dist_nb_person(self):
+        """Test whether the person across ratingsite follows normal distribution
 
         D’Agostino and Pearson’s method:
         H0: The test sample is drawn from normal distribution
@@ -765,11 +816,15 @@ class TestGenerationRatingSite(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_person.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
+        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+
         result["groupReviewer"] = result["groupReviewer"] \
             .apply(lambda x: x.split("|")) \
             .apply(lambda x: np.unique(x).size)
 
-        normal_test_result = dist_test(result["groupReviewer"], figname=f"{Path(queryfile).parent}/test_ratingsite_nb_person_across_ratingsite")
+        normal_test_result = dist_test(result["groupReviewer"], "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/test_ratingsite_nb_person_across_ratingsite")
         pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupReviewer"]).to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_person_across_ratingsite_normaltest.csv")
         
         self.assertGreaterEqual(
@@ -778,7 +833,7 @@ class TestGenerationRatingSite(TestGenerationTemplate):
         )
         
     def test_ratingsite_nb_ratingsite(self):
-        """Test whether the number of producers follows normal distribution .
+        """Test whether the number of RatingSite per batch matches expectation .
         """
 
         data = np.arange(CONFIG["schema"]["ratingsite"]["params"]["ratingsite_n"])
@@ -796,11 +851,13 @@ class TestGenerationRatingSite(TestGenerationTemplate):
             self.assertEqual(test, expected[i])
     
     def test_ratingsite_ratings_range(self):
-        """Test whether productPropertyNumeric matches expected frequencies .
+        """Test whether productPropertyNumeric values range from 1 to 10 .
         """
 
         queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_ratings.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         minVals = result.groupby("prop")["propVal"].min()
@@ -813,41 +870,54 @@ class TestGenerationRatingSite(TestGenerationTemplate):
             "rating4": {"min": 1, "max": 10}
         }).T
         
-        self.assertTrue(
-            np.greater_equal(minVals, expected_data["min"]).all(),
+        self.assertListGreaterEqual(
+            minVals.to_list(), expected_data["min"].to_list(),
             "The min value for productPropertyNumeric must be greater or equal to WatDiv config's ."
         )
             
-        self.assertTrue(
-            np.less_equal(maxVals, expected_data["max"]).all(),
+        self.assertListLessEqual(
+            maxVals.to_list(), expected_data["max"].to_list(),
             "The max value for productPropertyNumeric must be less or equal to WatDiv config's ."
         )
 
     def test_ratingsite_ratings_frequency(self):
         """Test whether productPropertyNumeric approximately matches expected frequencies .
-        """
 
-        tolerance = 0.07
+            Use 1-sample two-sided proportion_ztest to test for proportion:
+            - H0: the sample proportion matches expected proportion.
+            - H1: the sample proportion is not expected proportion.
+
+            pvalue < alpha: reject H0
+        """
 
         queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_ratings.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         nbProducts = result["localReview"].nunique()
-        frequencies = (result.groupby("prop")["propVal"].count() / nbProducts).round(2)
+        frequencies = (result.groupby("prop")["propVal"].count())
 
-        expected_data = {
+        expected_prop = pd.Series({
             "rating1": CONFIG["schema"]["ratingsite"]["params"]["rating1_p"],
             "rating2": CONFIG["schema"]["ratingsite"]["params"]["rating2_p"],
             "rating3": CONFIG["schema"]["ratingsite"]["params"]["rating3_p"],
             "rating4": CONFIG["schema"]["ratingsite"]["params"]["rating4_p"],
-        }
-        
-        self.assertListAlmostEqual(
-            frequencies.to_list(), list(expected_data.values()),
-            delta=tolerance,
-            msg="The frequency for bsbm:rating1..n should match config's."
-        )
+        })
+
+        for expected_p, freq in zip(expected_prop, frequencies):
+            _, pvalue = proportions_ztest(
+                count=int(expected_p * nbProducts),
+                nobs=nbProducts,
+                value=(freq / nbProducts),
+                alternative="larger"
+            )
+            
+            self.assertGreaterEqual(
+                pvalue, STATS_SIGNIFICANCE_LEVEL,
+                msg="The proportion for bsbm:rating1..n should match config's."
+            )
                 
     def test_ratingsite_ratings_normal(self):
         """Test whether productPropertyNumeric follows Normal distribution .
@@ -855,11 +925,13 @@ class TestGenerationRatingSite(TestGenerationTemplate):
 
         queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_ratings.sparql"
         result = query(queryfile)
+        self.assertFalse(result.empty, "The test query should return results...")
+
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         normal_test_data = result.groupby("prop")["propVal"].aggregate(list).to_frame("propVal").reset_index()
         normal_test_result = normal_test_data.apply(
-            lambda row: dist_test(row["propVal"], figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_{row['prop']}"), 
+            lambda row: dist_test(row["propVal"], "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/{Path(queryfile).stem}_{row['prop']}"), 
             axis=1
         )
         
@@ -867,8 +939,8 @@ class TestGenerationRatingSite(TestGenerationTemplate):
             .to_frame("pvalue").set_index(normal_test_data["prop"]) \
             .to_csv(f"{Path(queryfile).parent}/test_ratingsite_ratings_normaltest.csv")
 
-        self.assertTrue(
-            (normal_test_result >= STATS_SIGNIFICANCE_LEVEL).all(),
+        self.assertListGreaterEqual(
+            normal_test_result.to_list(), STATS_SIGNIFICANCE_LEVEL, 
             "Ratings should follow Normal Distribution for each batch. Either (1) increase sample size, (2) decrease confidence level or (3) rely on visual check."
         )
 

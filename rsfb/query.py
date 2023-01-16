@@ -198,10 +198,17 @@ def inject_constant(queryfile, value_selection, instance_id):
         # Replace for FILTER clauses
         if resource is not None:
 
+            dtype = value_selection_values[subSrc].dtype
+            epsilon = None
+            if np.issubdtype(dtype, np.number):
+                epsilon = 0
+            elif np.issubdtype(dtype, np.datetime64):
+                epsilon = pd.Timedelta(1, unit="ns")
+
             if ">" in resource["op"]:
-                repl_val = value_selection_values[subSrc].dropna().max()
+                repl_val = value_selection_values[subSrc].dropna().max() + epsilon
             elif "<" in resource["op"]:
-                repl_val = value_selection_values[subSrc].dropna().min()
+                repl_val = value_selection_values[subSrc].dropna().min() - epsilon
             
             # Special treatment for REGEX
             #   Extract randomly 1 from 10 most common words in the result list
@@ -210,17 +217,27 @@ def inject_constant(queryfile, value_selection, instance_id):
                 for lang in set(langs):
                     try: stopwords.extend(nltk_stopwords.words(lang))
                     except: continue
+                
+                words = [
+                    token for token in
+                    tokenizer.tokenize(str(value_selection_values[subSrc].str.cat(sep=" ")).lower())
+                    if token not in stopwords
+                ]
                     
-                bow = Counter(tokenizer.tokenize(str(value_selection_values[subSrc].str.cat(sep=" ")).lower()))
-                bow = Counter({ k: v for k, v in bow.items() if k not in stopwords})
-                print(bow.most_common(10))
-                repl_val = np.random.choice(list(map(lambda x: x[0], bow.most_common(10))))
+                # Option 1: Choose randomly amongst 10 most common words
+                # bow = Counter(words)
+                # bow = Counter({ k: v for k, v in bow.items() if k not in stopwords})
+                # print(bow.most_common(10))
+                # repl_val = np.random.choice(list(map(lambda x: x[0], bow.most_common(10))))
+
+                # Option 2: Choose randomly amongst words
+                repl_val = np.random.choice(words)
             
             # Special treatment for exclusion
             # Query with every other placeholder set
-            # elif resource["op"] == "not":
-            #     exclusion_query = " and ".join([ f"`{k}` != {repr(v)}" for k, v in injection_cache.items() if k != subSrc])
-            #     repl_val = value_selection_values.query(exclusion_query)[subSrc].sample(1)
+            elif resource["op"] == "not":
+                exclusion_query = f"`{subSrc}` != {repr(repl_val)}"
+                repl_val = value_selection_values.query(exclusion_query)[subSrc].sample(1)
             
         # Convert Pandas numpy object to Python object
         try: repl_val = repl_val.item()
@@ -293,21 +310,15 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
         else:
             query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {' '.join(consts)} WHERE", query)
             
-            # Option 1: Exclude the partialy injected query to refill
-            next_value_selection = f"{qroot}/{qname}.csv"
-            try: ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
-            except RuntimeError:
-                print("Relaxing query...")
-                query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(<\S+>)) ", r"##\2", query)
-                with open(next_queryfile, "w+") as f:
-                    f.write(query)
-                    f.close()
+            try: 
+                # Option 1: Exclude the partialy injected query to refill
+                next_value_selection = f"{qroot}/{qname}.csv"
                 ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
-                print(f"Relaxed query yield results. See {next_value_selection}")
-
-            # Option 2: extract the needed value for placeholders from value_selection.csv
-            # next_value_selection = f"{Path(value_selection).parent}/value_selection.csv"
+            except RuntimeError:
+                # Option 2: extract the needed value for placeholders from value_selection.csv
+                next_value_selection = f"{Path(value_selection).parent}/value_selection.csv"
             
+            print(next_value_selection)
             query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection)
 
         with open(next_queryfile, "w+") as f:

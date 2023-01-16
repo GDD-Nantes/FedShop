@@ -45,7 +45,7 @@ if [ "${MODE}" = "generate" ]; then
         echo "Cleaning..."
         docker-compose -f ${RSFB__GENERATOR_COMPOSE_FILE} down -v --remove-orphans || exit 1
         docker-compose -f ${RSFB__SPARQL_COMPOSE_FILE} down -v --remove-orphans || exit 1
-        sh ${CLEAN_SCRIPT} deep || exit 1
+        sh ${CLEAN_SCRIPT} || exit 1
     fi
 
     for batch in $( seq 1 $RSFB__N_BATCH)

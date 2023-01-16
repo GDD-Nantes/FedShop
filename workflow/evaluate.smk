@@ -26,8 +26,8 @@ N_QUERY_INSTANCES = CONFIG_GEN["n_query_instances"]
 N_BATCH = CONFIG_GEN["n_batch"]
 
 # Config per batch
-N_VENDOR=CONFIG_GEN["schema"]["vendor"]["params"]["vendor_n"]*CONFIG_GEN["schema"]["vendor"]["scale_factor"]
-N_RATINGSITE=CONFIG_GEN["schema"]["ratingsite"]["params"]["ratingsite_n"]*CONFIG_GEN["schema"]["ratingsite"]["scale_factor"]
+N_VENDOR=CONFIG_GEN["schema"]["vendor"]["params"]["vendor_n"]
+N_RATINGSITE=CONFIG_GEN["schema"]["ratingsite"]["params"]["ratingsite_n"]
 
 FEDERATION_COUNT=N_VENDOR+N_RATINGSITE
 

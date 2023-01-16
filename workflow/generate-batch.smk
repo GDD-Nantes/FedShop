@@ -30,8 +30,8 @@ VERBOSE = CONFIG["verbose"]
 N_BATCH = CONFIG["n_batch"]
 
 # Config per batch
-N_VENDOR=CONFIG["schema"]["vendor"]["params"]["vendor_n"]*CONFIG["schema"]["vendor"]["scale_factor"]
-N_RATINGSITE=CONFIG["schema"]["ratingsite"]["params"]["ratingsite_n"]*CONFIG["schema"]["ratingsite"]["scale_factor"]
+N_VENDOR=CONFIG["schema"]["vendor"]["params"]["vendor_n"]
+N_RATINGSITE=CONFIG["schema"]["ratingsite"]["params"]["ratingsite_n"]
 
 FEDERATION_COUNT=N_VENDOR+N_RATINGSITE
 
@@ -257,7 +257,7 @@ rule generate_ratingsites:
     shell: "python rsfb/generate.py generate {WORK_DIR}/config.yaml ratingsite {output} --id {wildcards.ratingsite_id}"
 
 rule generate_vendors:
-    priority: 12
+    priority: 13
     input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
     output: "{modelDir}/tmp/vendor{vendor_id}.nt.tmp"
     shell: "python rsfb/generate.py generate {WORK_DIR}/config.yaml vendor {output} --id {wildcards.vendor_id}"

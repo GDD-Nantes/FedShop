@@ -30,7 +30,7 @@ class AggSink(Sink):
         self.domain: URIRef = domain
         self.indir = indir
         self.outfile = oufile
-        self.files = files
+        self.cache = files
 
     def triple(self, s: Node, p: Node, o: Node):
         #print(f"{s.n3()} {p.n3()} {o.n3()} .")
@@ -50,16 +50,17 @@ class AggSink(Sink):
                 output.write(f"{object_renamed.n3()}\t{sameAs.n3()}\t{o.n3()}\t{self.domain.n3()}.\n")
 
             output.write(f"{subject_renamed.n3()}\t{p.n3()}\t{object_renamed.n3()}\t{self.domain.n3()}.\n")
-
+        
         if isinstance(o, URIRef):
         #if str(o).startswith("http://"):
-            objectfile = os.path.join(self.indir, f"{re.split(r'#|/', o.toPython())[-1]}.nt")
-            if (os.path.exists(objectfile) and (objectfile not in self.files)):
-                self.files.append(objectfile)
+            objectname = re.split(r'#|/', o.toPython())[-1]
+            objectfile = os.path.join(self.indir, f"{objectname}.nt")
+            if (os.path.exists(objectfile) and objectname not in self.cache):
+                self.cache.add(objectname)
                 logger.info(f"Reading file: {objectfile}")
                 with open(objectfile,"rb") as input:
-                    NTParser(AggSink(domain=self.domain, indir=self.indir, oufile=self.outfile, files=self.files)).skipparse(input)
-        return self.files
+                    NTParser(AggSink(domain=self.domain, indir=self.indir, oufile=self.outfile, files=self.cache)).skipparse(input)
+        return self.cache
 
 @click.command()
 @click.argument("infile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
@@ -67,7 +68,7 @@ class AggSink(Sink):
 @click.argument("outfile", type=click.Path(dir_okay=False, file_okay=True))
 @click.argument("domain", type=click.STRING)
 def aggregate(infile, indir, outfile, domain):
-    sink=AggSink(domain=URIRef(domain), indir=indir,oufile=outfile, files=[])
+    sink=AggSink(domain=URIRef(domain), indir=indir,oufile=outfile, files=set())
     n=NTParser(sink)
     with open(infile, "rb") as input_file:
         n.skipparse(input_file)
