@@ -702,13 +702,13 @@ class TestGenerationRatingSite(TestGenerationTemplate):
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
         result["groupProduct"] = result["groupProduct"] \
-            .apply(lambda x: x.split("|")) \
-            .apply(lambda x: np.unique(x).size)
+            .apply(lambda x: x.split("|"))
 
-        print()
-        print(result)
+        normal_sample = result.groupby("localRatingSite")["groupProduct"]\
+            .aggregate(lambda x: np.concatenate(x.to_numpy())) \
+            .apply(np.unique).apply(len)
         
-        normal_test_result = dist_test(result["groupProduct"], "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/test_ratingsite_dist_nb_product")
+        normal_test_result = dist_test(normal_sample, "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/test_ratingsite_dist_nb_product")
         pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupProduct"]).to_csv(f"{Path(queryfile).parent}/test_ratingsite_dist_nb_product_normaltest.csv")
         
         self.assertGreaterEqual(
@@ -764,8 +764,6 @@ class TestGenerationRatingSite(TestGenerationTemplate):
         result["groupReview"] = result["groupReview"] \
             .apply(lambda x: x.split("|")) \
             .apply(lambda x: np.unique(x).size)
-
-        print(result["groupReview"])
 
         normal_test_result = dist_test(result["groupReview"], "norm", loc=WATDIV_BOOST_MU, scale=WATDIV_BOOST_SIGMA, figname=f"{Path(queryfile).parent}/test_ratingsite_nb_review_across_ratingsite")
         pd.DataFrame([normal_test_result], columns=["pvalue"], index=["groupReview"]).to_csv(f"{Path(queryfile).parent}/test_ratingsite_nb_review_across_ratingsite_normaltest.csv")
@@ -842,7 +840,7 @@ class TestGenerationRatingSite(TestGenerationTemplate):
 
         result = query(f"{WORKDIR}/ratingsite/test_ratingsite_nb_ratingsite.sparql")
         result["batchId"] = result["batchId"].apply(lambda x: np.argwhere((x <= edges)).min().item())
-        
+        result["nbRatingSite"] = result["nbRatingSite"].apply(lambda x: x.split("|")).apply(np.unique).apply(len)
         nbRatingSite = result.groupby("batchId")["nbRatingSite"].sum().cumsum()
 
         expected = edges + 1

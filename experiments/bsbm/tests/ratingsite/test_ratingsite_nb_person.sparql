@@ -9,7 +9,6 @@ PREFIX dc: <http://purl.org/dc/elements/1.1/>
 SELECT ?ratingsiteId (GROUP_CONCAT(?localReviewer, "|") as ?groupReviewer) 
 WHERE {
     ?localReview rev:reviewer ?localReviewer .
-    ?localReview dc:publisher ?localRatingSite .
-    ?localRatingSite owl:sameAs ?ratingsiteId .
+    ?localReview dc:publisher ?ratingsiteId .
 }
 GROUP BY ?ratingsiteId

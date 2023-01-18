@@ -136,6 +136,41 @@ rule exec_provenance_query:
 # rule test_generation_next_batches:
 #     TODO
 
+def check_file_presence(status_file):
+    proc = subprocess.run(f'docker exec {SPARQL_CONTAINER_NAME} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | wc -l"', shell=True, capture_output=True)
+    nFiles = int(proc.stdout.decode())
+    expected_files = glob.glob(f"{MODEL_DIR}/exported/*.nq")
+    expected_nFiles = len(expected_files)
+    while nFiles != expected_nFiles: 
+        print(f"Expecting {expected_nFiles} *.nq files in virtuoso container, got {nFiles}!") 
+        shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans")
+        time.sleep(2)
+        restart_virtuoso(status_file)
+        # for expected_file in expected_files:
+        #     shell(f'docker cp {expected_file} {SPARQL_CONTAINER_NAME}:/usr/local/virtuoso-opensource/share/virtuoso/vad/')
+
+        proc = subprocess.run(f'docker exec {SPARQL_CONTAINER_NAME} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | wc -l"', shell=True, capture_output=True)
+        nFiles = int(proc.stdout.decode())
+
+def check_file_stats():
+    cmd = 'stat -c "%Y" '
+    proc = subprocess.run(f'docker exec {SPARQL_CONTAINER_NAME} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | sort"', shell=True, capture_output=True)
+    container_files = str(proc.stdout.decode()).split("\n")
+    local_files = sorted(glob.glob(f"{MODEL_DIR}/exported/*.nq"))
+
+    for local_file, container_file in zip(local_files, container_files):
+        
+        if Path(local_file).stem != Path(container_file).stem:
+            raise RuntimeError(f"Mismatch between local file {Path(local_file).stem} and container file {Path(container_file).stem}")
+
+        ctn_mod_time = int(subprocess.run(f'docker exec {SPARQL_CONTAINER_NAME} {cmd} {container_file}', shell=True, capture_output=True).stdout.decode())
+        local_mod_time = int(subprocess.run(f"{cmd} {local_file}", shell=True, capture_output=True).stdout.decode())
+
+        if ctn_mod_time < local_mod_time:
+            raise RuntimeError(f"Container file {container_file} is older than local file {local_file}")
+            # shell(f"docker exec {SPARQL_CONTAINER_NAME} rm /usr/local/virtuoso-opensource/share/virtuoso/vad/{container_file}")
+            # shell(f'docker cp {local_file} {SPARQL_CONTAINER_NAME}:/usr/local/virtuoso-opensource/share/virtuoso/vad/')
+
 rule ingest_virtuoso_next_batches:
     priority: 4
     threads: 1
@@ -145,20 +180,16 @@ rule ingest_virtuoso_next_batches:
         virtuoso_status="{benchDir}/virtuoso-up.txt"
     output: "{benchDir}/virtuoso-batch{batch_id}-ok.txt"
     run: 
-        proc = subprocess.run(f"docker exec {SPARQL_CONTAINER_NAME} ls /usr/local/virtuoso-opensource/share/virtuoso/vad | wc -l", shell=True, capture_output=True)
-        nFiles = int(proc.stdout.decode())
-        expected_files = glob.glob(f"{MODEL_DIR}/exported/*.nq")
-        expected_nFiles = len(expected_files)
-        if nFiles != expected_nFiles: 
-            print(f"Expecting {expected_nFiles} *.nq files in virtuoso container, got {nFiles}!") 
-            for expected_file in expected_files:
-                shell(f'docker cp {expected_file} {SPARQL_CONTAINER_NAME}:/usr/local/virtuoso-opensource/share/virtuoso/vad/')
-        
+        check_file_presence(input.virtuoso_status)
+        check_file_stats()
         shell(f'sh {input.vendor} bsbm && sh {input.ratingsite} && echo "OK" > {output}')
 
 rule restart_virtuoso:
     priority: 5
     threads: 1
+    input:
+        vendor=expand("{modelDir}/exported/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR),
+        ratingsite=expand("{modelDir}/exported/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR)
     output: "{benchDir}/virtuoso-up.txt"
     run: restart_virtuoso(output)
 
@@ -224,15 +255,6 @@ rule build_value_selection_query:
     output: "{benchDir}/{query}/value_selection.sparql"
     shell: "python rsfb/query.py build-value-selection-query {input.queryfile} {output}"
 
-rule agg_product_ratingsite:
-    priority: 11
-    retries: 2
-    input:
-        ratingsite="{modelDir}/tmp/ratingsite{ratingsite_id}.nt.tmp",
-        product="{modelDir}/tmp/product/",
-    output: "{modelDir}/exported/ratingsite{ratingsite_id}.nq"
-    shell: 'python rsfb/aggregator.py {input.ratingsite} {input.product} {output} http://www.ratingsite{wildcards.ratingsite_id}.fr'
-
 # rule all:
 #     input: 
 #         expand(
@@ -241,44 +263,32 @@ rule agg_product_ratingsite:
 #             vendor_id=range(N_VENDOR)
 #         )
 
-rule agg_product_vendor:
-    priority: 11
-    retries: 2
-    input: 
-        vendor="{modelDir}/tmp/vendor{vendor_id}.nt.tmp",
-        product="{modelDir}/tmp/product/"
-    output: "{modelDir}/exported/vendor{vendor_id}.nq",   
-    shell: 'python rsfb/aggregator.py {input.vendor} {input.product} {output} http://www.vendor{wildcards.vendor_id}.fr'
 
 rule generate_ratingsites:
     priority: 12
-    input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
-    output: "{modelDir}/tmp/ratingsite{ratingsite_id}.nt.tmp"
+    input: 
+        status=expand("{workDir}/generator-ok.txt", workDir=WORK_DIR),
+        product=ancient(CONFIG["schema"]["product"]["export_output_dir"])
+    output: "{modelDir}/exported/ratingsite{ratingsite_id}.nq"
     shell: "python rsfb/generate.py generate {WORK_DIR}/config.yaml ratingsite {output} --id {wildcards.ratingsite_id}"
 
 rule generate_vendors:
     priority: 13
-    input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
-    output: "{modelDir}/tmp/vendor{vendor_id}.nt.tmp"
+    input: 
+        status=expand("{workDir}/generator-ok.txt", workDir=WORK_DIR),
+        product=ancient(CONFIG["schema"]["product"]["export_output_dir"])
+    output: "{modelDir}/exported/vendor{vendor_id}.nq"
     shell: "python rsfb/generate.py generate {WORK_DIR}/config.yaml vendor {output} --id {wildcards.vendor_id}"
 
 # rule all:
 #     input: expand("{modelDir}/tmp/product/", modelDir=MODEL_DIR)
 
-rule split_products:
-    priority: 13
-    threads: 1
-    retries: 2
-    input: "{modelDir}/tmp/product0.nt.tmp"
-    output: directory("{modelDir}/tmp/product/")
-    shell: 'python rsfb/splitter.py {input} {output}'
-
 rule generate_products:
     priority: 14
-    input: expand("{benchDir}/generator-ok.txt", benchDir=BENCH_DIR)
-    output: "{modelDir}/tmp/product0.nt.tmp", 
+    input: expand("{workDir}/generator-ok.txt", workDir=WORK_DIR)
+    output: directory(CONFIG["schema"]["product"]["export_output_dir"]), 
     shell: 'python rsfb/generate.py generate {WORK_DIR}/config.yaml product {output}'
 
 rule start_generator_container:
-    output: "{benchDir}/generator-ok.txt"
+    output: "{workDir}/generator-ok.txt"
     run: start_generator(f"{output}")

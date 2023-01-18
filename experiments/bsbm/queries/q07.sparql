@@ -8,8 +8,7 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
 SELECT ?productLabel ?offer ?price ?vendor ?vendorTitle ?review ?revTitle ?reviewer ?revName ?rating1 ?rating2
 WHERE { 
-    ?localProduct rdf:type ?localProductClass .
-    ?localProductClass owl:sameAs bsbm:Product .
+    ?localProduct rdf:type bsbm:Product .
     ?localProduct owl:sameAs ?ProductXYZ .
     ?localProduct rdfs:label ?productLabel .
 
@@ -20,8 +19,7 @@ WHERE {
         ?offer bsbm:price ?price .
         ?offer bsbm:vendor ?vendor .
         ?vendor rdfs:label ?vendorTitle .
-        ?vendor bsbm:country ?country . # it was a constant
-        ?country owl:sameAs <http://downlode.org/rdf/iso-3166/countries#DE> .
+        ?vendor bsbm:country <http://downlode.org/rdf/iso-3166/countries#DE> . # it was a constant
         ?offer bsbm:validTo ?date .
 
         # const ?currentDate < ?date 

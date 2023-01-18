@@ -13,7 +13,7 @@ def cli():
 @cli.command
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("section", type=click.STRING)
-@click.argument("output", type=click.Path(file_okay=True, dir_okay=False))
+@click.argument("output", type=click.Path(file_okay=True, dir_okay=True))
 @click.option("--id", type=click.INT, default=0)
 def generate(configfile, section, output, id):
 
@@ -30,34 +30,38 @@ def generate(configfile, section, output, id):
             #if param == f"{section}_n": continue
             template = re.sub(re.escape(f"{{%{param}}}"), str(value), template)
 
-    outFile = f"{output_base}.txt.tmp"
-    Path(outFile).parent.mkdir(parents=True, exist_ok=True)
-    with open(outFile, "w") as outWriter:
-        out = re.sub(re.escape(f"{{%{section}_id}}"), str(id), template)
+    model_file = f"{output_base}.txt.tmp"
+    Path(model_file).parent.mkdir(parents=True, exist_ok=True)
+    with open(model_file, "w") as outWriter:
+        out = re.sub(re.escape(f"{{%{section}_id}}"), f"{section}{id}", template)
+        out = re.sub(re.escape("{%export_output_dir}"), schema_config[section]["export_output_dir"], out)
+        if schema_config[section].get("export_dep_output_dir") is not None:
+            out = re.sub(re.escape("{%export_dep_output_dir}"), schema_config[section]["export_dep_output_dir"], out)
         outWriter.write(out)
         outWriter.close()
 
     scale_factor = int(schema_config[section]["scale_factor"])
+
+    cmd = f"{config['generator']['exec']} -d {model_file} {scale_factor}"
     
     # This consumes memory since it waits till the end and store the output in PIPE
-    # watdiv_proc = subprocess.run(f"{config['generator']['exec']} -d {outFile} {scale_factor}", capture_output=True, shell=True)
-    cmd = f"{config['generator']['exec']} -d {outFile} {scale_factor}"
-    watdiv_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    
-    verbose = config["verbose"]
-    with open(output, "w") as watdivWriter:
-        for line in iter(watdiv_proc.stdout.readline, b''):
-            watdivWriter.write(line.decode())
-        watdivWriter.close()        
-        if not verbose: os.remove(outFile)    
+    watdiv_proc = subprocess.run(cmd, capture_output=False, shell=True)
+    # watdiv_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
-    watdiv_proc.wait()
+    # verbose = config["verbose"]
+    # with open(output, "w") as watdivWriter:
+    #     for line in iter(watdiv_proc.stdout.readline, b''):
+    #         watdivWriter.write(line.decode())
+    #     watdivWriter.close()        
+    #     if not verbose: os.remove(model_file)    
+    # watdiv_proc.wait()
+
     if watdiv_proc.returncode != 0:
         raise RuntimeError(watdiv_proc.stderr.read().decode())  
 
-    try: kill_process(watdiv_proc.pid)  
-    except:
-        print(f"watdiv proc (PID: {watdiv_proc.pid}) is already killed, skipping...")
+    # try: kill_process(watdiv_proc.pid)  
+    # except:
+    #     print(f"watdiv proc (PID: {watdiv_proc.pid}) is already killed, skipping...")
 
 if __name__ == "__main__":
     cli()

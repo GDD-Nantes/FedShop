@@ -1,5 +1,5 @@
 generation:
-  n_batch: 3
+  n_batch: 10
   n_query_instances: 10
   verbose: true
   stats:
@@ -20,6 +20,7 @@ generation:
       # Products are generated once, independant from vendor and person
       template: "experiments/bsbm/model/watdiv/bsbm-product.template"
       scale_factor: 1
+      export_output_dir: "experiments/bsbm/model/tmp/product"
       params:
         # type
         product_n: 200000
@@ -34,6 +35,8 @@ generation:
 
     vendor:
       template: "experiments/bsbm/model/watdiv/bsbm-vendor.template"
+      export_output_dir: "experiments/bsbm/model/exported"
+      export_dep_output_dir: "${generation.schema.product.export_output_dir}"
       scale_factor: 1
       params:
         vendor_n: "${multiply: 10, ${generation.n_batch}}"
@@ -42,6 +45,8 @@ generation:
 
     ratingsite:
       template: "experiments/bsbm/model/watdiv/bsbm-ratingsite.template"
+      export_output_dir: "experiments/bsbm/model/exported"
+      export_dep_output_dir: "${generation.schema.product.export_output_dir}"
       scale_factor: 1
       params:
         #type

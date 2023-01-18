@@ -6,11 +6,10 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX rev: <http://purl.org/stuff/rev#>
 PREFIX dc: <http://purl.org/dc/elements/1.1/>
 
-SELECT ?batchId (COUNT(DISTINCT ?ratingsiteId) as ?nbRatingSite) 
+SELECT ?batchId (GROUP_CONCAT(?localRatingSite, "|") as ?nbRatingSite) 
 WHERE {
     ?localReview rev:reviewer ?localPerson .
     ?localReview dc:publisher ?localRatingSite .
-    ?localRatingSite owl:sameAs ?ratingsiteId .
     BIND (REPLACE(STR(?localReview), ".*(ratingsite)(\\d+).*", "$2") as ?batchId ) .
 }
 GROUP BY ?batchId
