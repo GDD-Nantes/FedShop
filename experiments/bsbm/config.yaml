@@ -1,6 +1,8 @@
 generation:
+  workdir: "experiments/bsbm"
   n_batch: 10
   n_query_instances: 10
+  n_federation_members: "${sum: ${generation.schema.vendor.params.vendor_n}, ${generation.schema.ratingsite.params.ratingsite_n}}" 
   verbose: true
   stats:
     confidence_level: 0.90
@@ -8,19 +10,19 @@ generation:
     #exec: "docker exec watdiv watdiv"
     exec: "watdiv"
     endpoint: "http://localhost:8000"
-    compose-file: "docker-compose-generator.yml"
+    compose-file: "${generation.workdir}/docker-compose-generator.yml"
     container-name: "bsbm-watdiv"
   sparql:
     endpoint: "http://localhost:8890/sparql"
-    compose-file: "docker-compose-sparql.yml"
+    compose-file: "${generation.workdir}/docker-compose-sparql.yml"
     container-name: "bsbm-virtuoso"
   schema:
     # Configuration for ONE batch
     product:
       # Products are generated once, independant from vendor and person
-      template: "experiments/bsbm/model/watdiv/bsbm-product.template"
+      template: "${generation.workdir}/model/watdiv/bsbm-product.template"
       scale_factor: 1
-      export_output_dir: "experiments/bsbm/model/tmp/product"
+      export_output_dir: "${generation.workdir}/model/tmp/product"
       params:
         # type
         product_n: 200000
@@ -34,8 +36,8 @@ generation:
         productPropertyNumeric5_p: 0.8
 
     vendor:
-      template: "experiments/bsbm/model/watdiv/bsbm-vendor.template"
-      export_output_dir: "experiments/bsbm/model/exported"
+      template: "${generation.workdir}/model/watdiv/bsbm-vendor.template"
+      export_output_dir: "${generation.workdir}/model/dataset"
       export_dep_output_dir: "${generation.schema.product.export_output_dir}"
       scale_factor: 1
       params:
@@ -44,8 +46,8 @@ generation:
         product_n: "${generation.schema.product.params.product_n}"
 
     ratingsite:
-      template: "experiments/bsbm/model/watdiv/bsbm-ratingsite.template"
-      export_output_dir: "experiments/bsbm/model/exported"
+      template: "${generation.workdir}/model/watdiv/bsbm-ratingsite.template"
+      export_output_dir: "${generation.workdir}/model/dataset"
       export_dep_output_dir: "${generation.schema.product.export_output_dir}"
       scale_factor: 1
       params:

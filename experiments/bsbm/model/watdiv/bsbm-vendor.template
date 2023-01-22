@@ -10,6 +10,7 @@
 #namespace  __output_file={%vendor_id}
 #namespace  __output_dep={%export_dep_output_dir}
 #namespace  __output_dep_org=fragmented
+#namespace  __output_dep_rename_exception_predicates=<http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/country>;
 
 // ===== ENTITIES & LITERAL PROPERTIES ===== //
 

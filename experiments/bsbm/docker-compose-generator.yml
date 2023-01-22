@@ -7,6 +7,6 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - "./bsbm:/opt/watdiv/bsbm"
+      - ".:/opt/watdiv/experiments/bsbm"
     entrypoint: "python3 -m http.server"
 

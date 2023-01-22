@@ -102,15 +102,31 @@ def __get_uninjected_placeholders(queryfile):
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.option("--sample", type=click.INT)
+@click.option("--ignore-errors", is_flag=True, default=False)
 @click.option("--endpoint", type=str, default="http://localhost:8890/sparql", help="URL to a SPARQL endpoint")
-def execute_query(queryfile, outfile, sample, endpoint):
+def execute_query(queryfile, outfile, sample, ignore_errors, endpoint):
+    """Execute query, export to an output file and return number of rows .
+
+    Args:
+        queryfile ([type]): the query file name
+        outfile ([type]): the output file name
+        sample ([type]): the number of rows randomly sampled
+        ignore_errors ([type]): if set, ignore when the result is empty
+        endpoint ([type]): the SPARQL endpoint
+
+    Raises:
+        RuntimeError: the result is empty
+
+    Returns:
+        [type]: the number of rows
+    """
     query_text = open(queryfile, mode="r").read()
     _, result = exec_query(query_text, endpoint, error_when_timeout=True)  
 
     header = BytesIO(result).readline().decode().strip().replace('"', '').split(",")
     csvOut = pd.read_csv(BytesIO(result), parse_dates=[h for h in header if "date" in h])
 
-    if csvOut.empty:
+    if csvOut.empty and not ignore_errors:
         print(query_text)
         raise RuntimeError(f"{queryfile} returns no result...")
 
@@ -118,6 +134,8 @@ def execute_query(queryfile, outfile, sample, endpoint):
         csvOut.to_csv(outfile, index=False)
     else:
         csvOut.sample(sample).to_csv(outfile, index=False)
+
+    return csvOut.shape[0]
 
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
@@ -148,22 +166,34 @@ def build_value_selection_query(queryfile, outfile):
 
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
-@click.argument("value-selection", type=click.Path(exists=True, file_okay=True, dir_okay=False))
-@click.option("--instance-id", type=click.INT)
-def inject_constant(queryfile, value_selection, instance_id):
-    """ This fuction extract the {instance_id}-th row in {value_selection},
-        replace the placeholders with their corresponding columns.
+@click.argument("injection_cache", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+def inject_from_cache(queryfile, cache_file):
+    
+    query = open(queryfile, "r").read()
+    injection_cache = json.load(open(cache_file, "r"))
+    for variable, value in injection_cache.items():
+        query = re.sub(rf"{re.escape(variable)}(\W)", rf"{value}\1", query)
 
-    TODO:
-        [x] Force injecting distinct variable
+@cli.command()
+@click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("value-selection", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.option("--ignore-errors", is_flag=True, default=False)
+@click.option("--accept-random", is_flag=True, default=False)
+@click.option("--instance-id", type=click.INT)
+def inject_constant(queryfile, value_selection, ignore_errors, accept_random, instance_id):
+    """Inject constant in placeholders for a query template.
 
     Args:
-        queryfile (_type_): _description_
-        value_selection (_type_): _description_
-        instance_id (int, optional): _description_. Defaults to 0.
+        queryfile ([type]): [description]
+        value_selection ([type]): [description]
+        instance_id ([type]): [description]
+        ignore_errors ([type]): [description]
+
+    Raises:
+        RuntimeError: [description]
 
     Returns:
-        _type_: _description_
+        [type]: [description]
     """
 
     qroot = Path(queryfile).parent
@@ -180,7 +210,7 @@ def inject_constant(queryfile, value_selection, instance_id):
 
     for const, resource in parse_result.items():                
         # Replace all tokens in subDict
-        subSrc = const[1:] if (resource is None or resource.get("src") is None) else resource["src"][1:]
+        column = const[1:] if (resource is None or resource.get("src") is None) else resource["src"][1:]
 
         # When not using workload value_selection_query, i.e, filling partially injected queries
         if "workload_" not in value_selection:
@@ -192,35 +222,39 @@ def inject_constant(queryfile, value_selection, instance_id):
             # value_selection_values = value_selection_values.query(dedup_query).sample(1)
             placeholder_chosen_values = value_selection_values.sample(1)
 
-        repl_val = placeholder_chosen_values[subSrc].item() if instance_id is None else placeholder_chosen_values.loc[instance_id, subSrc]
-        if pd.isnull(repl_val): continue
+        repl_val = placeholder_chosen_values[column].item() if instance_id is None else placeholder_chosen_values.loc[instance_id, column]
+        if pd.isnull(repl_val): 
+            if accept_random:
+                repl_val = value_selection_values[column].dropna().sample(1).item()
+            elif ignore_errors: continue
+            else: raise RuntimeError(f"There is no value for {column}")
 
         # Replace for FILTER clauses
         if resource is not None:
 
-            dtype = value_selection_values[subSrc].dtype
+            dtype = value_selection_values[column].dtype
             epsilon = None
             if np.issubdtype(dtype, np.number):
                 epsilon = 0
             elif np.issubdtype(dtype, np.datetime64):
-                epsilon = pd.Timedelta(1, unit="ns")
+                epsilon = pd.Timedelta(1, unit="day")
 
             if ">" in resource["op"]:
-                repl_val = value_selection_values[subSrc].dropna().max() + epsilon
+                repl_val = value_selection_values[column].dropna().max() + epsilon
             elif "<" in resource["op"]:
-                repl_val = value_selection_values[subSrc].dropna().min() - epsilon
+                repl_val = value_selection_values[column].dropna().min() - epsilon
             
             # Special treatment for REGEX
             #   Extract randomly 1 from 10 most common words in the result list
             elif resource["op"] == "in":
-                langs = value_selection_values[subSrc].dropna().apply(lambda x: lang_detect(x))
+                langs = value_selection_values[column].dropna().apply(lambda x: lang_detect(x))
                 for lang in set(langs):
                     try: stopwords.extend(nltk_stopwords.words(lang))
                     except: continue
                 
                 words = [
                     token for token in
-                    tokenizer.tokenize(str(value_selection_values[subSrc].str.cat(sep=" ")).lower())
+                    tokenizer.tokenize(str(value_selection_values[column].str.cat(sep=" ")).lower())
                     if token not in stopwords
                 ]
                     
@@ -236,15 +270,13 @@ def inject_constant(queryfile, value_selection, instance_id):
             # Special treatment for exclusion
             # Query with every other placeholder set
             elif resource["op"] == "not":
-                exclusion_query = f"`{subSrc}` != {repr(repl_val)}"
-                repl_val = value_selection_values.query(exclusion_query)[subSrc].sample(1)
+                # From q03: user asks for products having several features but not having a specific other feature. 
+                exclusion_query = " and ".join([f"`{column}` != {repr(repl_val)}"] + [ f"`{k}` != {repr(v)}" for k, v in injection_cache.items() ])
+                repl_val = value_selection_values.query(exclusion_query)[column].sample(1)
             
         # Convert Pandas numpy object to Python object
         try: repl_val = repl_val.item()
         except: pass
-
-        # Stringify time object and cache
-        injection_cache[subSrc] = repl_val.strftime("%Y-%m-%d") if isinstance(repl_val, pd._libs.tslibs.timestamps.Timestamp) else repl_val 
 
         if str(repl_val).startswith("http") or str(repl_val).startswith("nodeID"): 
             repl_val = URIRef(repl_val).n3()
@@ -259,6 +291,7 @@ def inject_constant(queryfile, value_selection, instance_id):
                 if re.search(re.escape(missing_prefix), query) is None:
                     query = f"PREFIX {prefixName}: <{prefixSub}>" + "\n" + query
         
+        injection_cache[column] = repl_val
         query = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", query)
     
     json.dump(injection_cache, open(cache_filename, "w"))
@@ -289,11 +322,14 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
 
     query = open(queryfile, "r").read()
     initial_queryfile = queryfile
+    initial_query = query
     consts = __get_uninjected_placeholders(initial_queryfile)
     select = re.search(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", query).group(3)     
 
     qname = Path(outfile).stem
     qroot = Path(outfile).parent
+
+    solution_option = 1
 
     itr = 0
     while len(consts) > 0:
@@ -304,22 +340,51 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
         # First iteration, inject value using initial value_selection of the workload
         if itr == 0:
             next_value_selection = value_selection
-            query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, instance_id=instance_id)
+            query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=True, instance_id=instance_id)
         
         # Execute the partially injected query to find the rest of constants
         else:
             query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {' '.join(consts)} WHERE", query)
             
-            try: 
-                # Option 1: Exclude the partialy injected query to refill
-                next_value_selection = f"{qroot}/{qname}.csv"
-                ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
-            except RuntimeError:
-                # Option 2: extract the needed value for placeholders from value_selection.csv
-                next_value_selection = f"{Path(value_selection).parent}/value_selection.csv"
+            # Option 1: Exclude the partialy injected query to refill
+            if solution_option == 1:
+                try:
+                    print("Option 1: Exclude the partialy injected query to refill")
+                    next_value_selection = f"{qroot}/{qname}.csv"
+                    ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
+                    query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=False)
+                except RuntimeError:
+                    solution_option = 2  
+                    continue
             
-            print(next_value_selection)
-            query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection)
+            # Option 2: extract the needed value for placeholders from value_selection.csv
+            elif solution_option == 2:
+                try:
+                    print("Option 2: extract the needed value for placeholders from value_selection.csv")
+                    next_value_selection = f"{Path(value_selection).parent}/value_selection.csv"
+                    query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=False)
+                except RuntimeError:
+                    solution_option = 3
+                    continue
+
+            # Option 3: Relaxing the query knowing we are in an optional clause
+            elif solution_option == 3:
+                try:
+                    print("Option 3: Relax the query knowing we are in an optional clause")
+                    print("Relaxing query...")
+                    relaxed_query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>)) ", r"##\2", query)
+                    next_queryfile = f"{qroot}/{qname}_relaxed.sparql"
+                    with open(next_queryfile, "w+") as f:
+                        f.write(relaxed_query)
+                        f.close()
+
+                    next_value_selection = f"{qroot}/{qname}.csv"
+                    ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
+                    relaxed_query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=False)
+                    print("Restoring query...")
+                    query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>)) ", r"\2", relaxed_query)
+                except:
+                    raise RuntimeError("Something went wrong: (1) The data are not properly ingested. (2) The generated files are corrupted due to interuption.")
 
         with open(next_queryfile, "w+") as f:
             f.write(query)

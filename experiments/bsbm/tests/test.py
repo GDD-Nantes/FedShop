@@ -1,4 +1,5 @@
 from io import BytesIO
+import math
 import os
 from pathlib import Path
 import unittest
@@ -8,6 +9,7 @@ from click.testing import CliRunner
 import pandas as pd
 import numpy as np
 from scipy.stats import norm, kstest
+from scipy.stats.contingency import expected_freq
 import seaborn as sns
 
 # from matplotlib_terminal import plt
@@ -15,7 +17,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import LabelEncoder
 
-from statsmodels.stats.proportion import proportions_ztest
+from statsmodels.stats.proportion import proportions_chisquare, proportions_ztest
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -98,7 +100,7 @@ def dist_test(data: pd.Series, dist: str, figname=None, **kwargs):
 
         plt.close()
     
-    return pvalue
+    return pvalue    
 
 ############
 ## Test suites
@@ -161,6 +163,18 @@ class TestGenerationTemplate(unittest.TestCase):
         else:
             for item in first:
                 self.assertLessEqual(item, second, msg)
+    
+    def assertInterval(self, a, lower, upper, msg):
+        self.assertGreaterEqual(a, lower, msg=msg)
+        self.assertLessEqual(a, upper, msg=msg)
+
+    def assertListInterval(self, list1, lower, upper, msg):
+        self.assertEqual(len(list1), len(lower), msg="List should have the same length as lower bounds")
+        self.assertEqual(len(list1), len(upper), msg="List should have the same length as upper bounds")
+
+        for item, l, u in zip(list1, lower, upper):
+            self.assertInterval(item, lower=l, upper=u, msg=msg)
+
 
 class TestGenerationGlobal(TestGenerationTemplate):
 
@@ -172,9 +186,12 @@ class TestGenerationGlobal(TestGenerationTemplate):
 
     def test_global_langtags(self):
         """Test whether langtags across the dataset matches expected frequencies .
-        """
 
-        tolerance = 0.03
+        z-test for proportion:
+        H0: the proportion for <langtag> is as <expected>
+        H1: the proportion for <langtag> is other than <expected>
+
+        """
 
         queryfile = f"{WORKDIR}/global/test_global_langtags.sparql"
         result = query(queryfile)
@@ -182,25 +199,17 @@ class TestGenerationGlobal(TestGenerationTemplate):
 
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
-        data = np.arange(CONFIG["schema"]["vendor"]["params"]["vendor_n"])
-        _, edges = np.histogram(data, CONFIG["n_batch"])
-        edges = edges[1:].astype(int)
-        
-        result["batchId"] = result["batchId"].apply(lambda x: np.argwhere((x <= edges)).min().item())
+        frequencies = result["lang"].value_counts(normalize=True).sort_index()
+        expected_prop = pd.Series(LANGTAGS_EXPECTED_WEIGHT).loc[frequencies.index.values]
+        nbStringLiterals = frequencies.sum()
 
-        proportions = result.groupby(["batchId"])["lang"].value_counts(normalize=True).to_frame("proportion") 
+        _, pvalue, _ = proportions_chisquare(frequencies, nbStringLiterals, expected_prop)
 
-        expected_proportion = pd.DataFrame.from_dict(LANGTAGS_EXPECTED_WEIGHT, orient="index", columns=["expected_proportion"])
-        expected_proportion.index.name = "lang"
-
-        test = proportions.join(expected_proportion, on=["lang"]).round(2)
-        test.to_csv(f"{Path(queryfile).parent}/test_global_langtags_final.csv")
-        
-        self.assertListAlmostEqual(
-            test["proportion"].to_list(), test["expected_proportion"].to_list(),
-            delta=tolerance,
-            msg="The frequency for language tags should match config's."
+        self.assertGreaterEqual(
+            pvalue, STATS_SIGNIFICANCE_LEVEL, 
+            msg=f"The proportion for language tags should match {LANGTAGS_EXPECTED_WEIGHT}. Either (1) increase sample size, (2) decrease confidence level or (3) change alternative hypothesis"
         )
+            
 
     def test_global_countries(self):
         """Test whether countroes across the dataset matches expected frequencies .
@@ -212,27 +221,17 @@ class TestGenerationGlobal(TestGenerationTemplate):
         result = query(queryfile)
         self.assertFalse(result.empty, "The test query should return results...")
 
-        result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
         result.replace("http://downlode.org/rdf/iso-3166/countries#", "", regex=True, inplace=True)
 
-        data = np.arange(CONFIG["schema"]["vendor"]["params"]["vendor_n"])
-        _, edges = np.histogram(data, CONFIG["n_batch"])
-        edges = edges[1:].astype(int)
-        
-        result["batchId"] = result["batchId"].apply(lambda x: np.argwhere((x <= edges)).min().item())
+        frequencies = result["country"].value_counts(normalize=True).sort_index()
+        expected_proportion = pd.Series(COUNTRIES_EXPECTED_WEIGHT).loc[frequencies.index.values]
+        nbCountries = frequencies.sum()
 
-        proportions = result.groupby(["batchId"])["country"].value_counts(normalize=True).to_frame("proportion") 
+        _, pvalue, _ = proportions_chisquare(frequencies, nbCountries, expected_proportion)
 
-        expected_proportion = pd.DataFrame.from_dict(COUNTRIES_EXPECTED_WEIGHT, orient="index", columns=["expected_proportion"])
-        expected_proportion.index.name = "country"
-
-        test = proportions.join(expected_proportion, on=["country"]).round(2)
-        test.to_csv(f"{Path(queryfile).parent}/test_global_countries_final.csv")
-        
-        self.assertListAlmostEqual(
-            test["proportion"].to_list(), test["expected_proportion"].to_list(),
-            delta=tolerance,
-            msg="The frequency for bsbm:country should match config's."
+        self.assertGreaterEqual(
+            pvalue, STATS_SIGNIFICANCE_LEVEL, 
+            msg=f"The proportion for countries should match {COUNTRIES_EXPECTED_WEIGHT}. Either (1) increase sample size, (2) decrease confidence level or (3) change alternative hypothesis"
         )
 
 class TestGenerationProduct(TestGenerationTemplate):
@@ -401,13 +400,9 @@ class TestGenerationProduct(TestGenerationTemplate):
         queryfile = f"{WORKDIR}/product/test_product_numeric_props.sparql"
         result = query(queryfile)
         self.assertFalse(result.empty, "The test query should return results...")
-
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
-        nbProducts = result["localProduct"].nunique()
-        frequencies = result.groupby("prop")["propVal"].nunique()
-
-        expected_prop = pd.Series({
+        expected_proportion = pd.Series({
             "productPropertyNumeric1": 1.0,
             "productPropertyNumeric2": 1.0,
             "productPropertyNumeric3": 1.0,
@@ -415,11 +410,16 @@ class TestGenerationProduct(TestGenerationTemplate):
             "productPropertyNumeric5": CONFIG["schema"]["product"]["params"]["productPropertyNumeric5_p"]
         })
 
-        for expected_p, freq in zip(expected_prop, frequencies):
+        frequencies = result["prop"].value_counts().loc[expected_proportion.index.values]
+        nbProps = result["localProduct"].nunique()
+        
+        print(frequencies/nbProps)
+                
+        for expected_p, freq in zip(expected_proportion, frequencies):
             _, pvalue = proportions_ztest(
-                count=int(expected_p * nbProducts),
-                nobs=nbProducts,
-                value=(freq / nbProducts),
+                count=int(expected_p * nbProps),
+                nobs=nbProps,
+                value=(freq / nbProps),
                 alternative="larger" # two-sided, smaller, larger
             )
             
@@ -463,9 +463,6 @@ class TestGenerationProduct(TestGenerationTemplate):
 
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
 
-        nbProducts = result["localProduct"].nunique()
-        frequencies = result.groupby("prop")["propVal"].nunique()
-
         expected_prop = pd.Series({
             "productPropertyTextual1": 1.0,
             "productPropertyTextual2": 1.0,
@@ -474,6 +471,9 @@ class TestGenerationProduct(TestGenerationTemplate):
             "productPropertyTextual5": CONFIG["schema"]["product"]["params"]["productPropertyTextual5_p"]
         })
 
+        frequencies = result["prop"].value_counts().loc[expected_prop.index.values]
+        nbProducts = result["localProduct"].nunique()
+            
         for expected_p, freq in zip(expected_prop, frequencies):
             _, pvalue = proportions_ztest(
                 count=int(expected_p * nbProducts),
@@ -481,6 +481,10 @@ class TestGenerationProduct(TestGenerationTemplate):
                 value=(freq / nbProducts),
                 alternative="larger" # two-sided, smaller, larger
             )
+            print(pvalue)
+            
+            _, pvalue, _ = proportions_chisquare(freq, nbProducts, expected_p)
+            print(pvalue)
             
             self.assertGreaterEqual(
                 pvalue, STATS_SIGNIFICANCE_LEVEL,

@@ -9,7 +9,7 @@ import subprocess
 
 import sys
 smk_directory = os.path.abspath(workflow.basedir)
-sys.path.append(os.path.join(Path(smk_directory).parent, "rsfb"))
+sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
 from utils import load_config
 
@@ -59,7 +59,10 @@ def wait_for_container(endpoint, outfile, wait=1):
         f.write("OK")
         f.close()
 
-def restart_virtuoso(status_file):
+def deploy_virtuoso(status_file, restart=False):
+    if restart:
+        shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans --volumes")
+        time.sleep(2)
     shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} up -d {SPARQL_CONTAINER_NAME}")
     wait_for_container(SPARQL_ENDPOINT, status_file, wait=1)
     return status_file
@@ -112,14 +115,12 @@ rule compute_metrics:
     threads: 1
     input: 
         expand(
-            "{{benchDir}}/{query}/{instance_id}/batch_{{batch_id}}/provenance.csv",
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if "_" not in f],
+            "{{benchDir}}/{query}/instance_{instance_id}/batch_{{batch_id}}/provenance.csv",
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR)],
             instance_id=range(N_QUERY_INSTANCES)
         )
     output: "{benchDir}/metrics_batch{batch_id}.csv"
-    params:
-        fedcount=FEDERATION_COUNT
-    shell: "python rsfb/metrics.py compute-metrics {input} {params.fedcount} {output}"
+    shell: "python rsfb/metrics.py compute-metrics {WORK_DIR}/config.yaml {output} {input}"
 
 rule exec_provenance_query:
     priority: 3
@@ -127,7 +128,7 @@ rule exec_provenance_query:
     input: 
         provenance_query="{benchDir}/{query}/{instance_id}/provenance.sparql",
         loaded_virtuoso="{benchDir}/virtuoso-batch{batch_id}-ok.txt"
-    output: "{benchDir}/{query}/{instance_id}/batch_{batch_id}/provenance.csv"
+    output: "{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv"
     params:
         endpoint=SPARQL_ENDPOINT
     shell: 
@@ -139,16 +140,12 @@ rule exec_provenance_query:
 def check_file_presence(status_file):
     proc = subprocess.run(f'docker exec {SPARQL_CONTAINER_NAME} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | wc -l"', shell=True, capture_output=True)
     nFiles = int(proc.stdout.decode())
-    expected_files = glob.glob(f"{MODEL_DIR}/exported/*.nq")
+    expected_files = glob.glob(f"{MODEL_DIR}/dataset/*.nq")
     expected_nFiles = len(expected_files)
     while nFiles != expected_nFiles: 
         print(f"Expecting {expected_nFiles} *.nq files in virtuoso container, got {nFiles}!") 
-        shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans")
-        time.sleep(2)
-        restart_virtuoso(status_file)
-        # for expected_file in expected_files:
-        #     shell(f'docker cp {expected_file} {SPARQL_CONTAINER_NAME}:/usr/local/virtuoso-opensource/share/virtuoso/vad/')
-
+        deploy_virtuoso(status_file, restart=True)
+       
         proc = subprocess.run(f'docker exec {SPARQL_CONTAINER_NAME} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | wc -l"', shell=True, capture_output=True)
         nFiles = int(proc.stdout.decode())
 
@@ -156,7 +153,7 @@ def check_file_stats():
     cmd = 'stat -c "%Y" '
     proc = subprocess.run(f'docker exec {SPARQL_CONTAINER_NAME} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | sort"', shell=True, capture_output=True)
     container_files = str(proc.stdout.decode()).split("\n")
-    local_files = sorted(glob.glob(f"{MODEL_DIR}/exported/*.nq"))
+    local_files = sorted(glob.glob(f"{MODEL_DIR}/dataset/*.nq"))
 
     for local_file, container_file in zip(local_files, container_files):
         
@@ -177,33 +174,34 @@ rule ingest_virtuoso_next_batches:
     input: 
         vendor=expand("{modelDir}/virtuoso/ingest_vendor_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
         ratingsite=expand("{modelDir}/virtuoso/ingest_ratingsite_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
-        virtuoso_status="{benchDir}/virtuoso-up.txt"
+        virtuoso_status="{benchDir}/virtuoso-batch{batch_id}-up.txt"
     output: "{benchDir}/virtuoso-batch{batch_id}-ok.txt"
     run: 
         check_file_presence(input.virtuoso_status)
+        deploy_virtuoso(input.virtuoso_status, restart=True)
         check_file_stats()
         shell(f'sh {input.vendor} bsbm && sh {input.ratingsite} && echo "OK" > {output}')
 
-rule restart_virtuoso:
+rule deploy_virtuoso:
     priority: 5
     threads: 1
     input:
-        vendor=expand("{modelDir}/exported/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR),
-        ratingsite=expand("{modelDir}/exported/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR)
-    output: "{benchDir}/virtuoso-up.txt"
-    run: restart_virtuoso(output)
+        vendor=expand("{modelDir}/dataset/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR),
+        ratingsite=expand("{modelDir}/dataset/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR)
+    output: "{benchDir}/virtuoso-batch{batch_id}-up.txt"
+    run: deploy_virtuoso(output)
 
 rule make_virtuoso_ingest_command_for_vendor:
     priority: 5
     threads: 1
-    input: expand("{modelDir}/exported/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR)
+    input: expand("{modelDir}/dataset/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR)
     output: "{modelDir}/virtuoso/ingest_vendor_batch{batch_id}.sh"
     run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), N_VENDOR)
 
 rule make_virtuoso_ingest_command_for_ratingsite:
     priority: 5
     threads: 1
-    input: expand("{modelDir}/exported/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR)
+    input: expand("{modelDir}/dataset/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR)
     output: "{modelDir}/virtuoso/ingest_ratingsite_batch{batch_id}.sh"
     run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), N_RATINGSITE)
 
@@ -258,7 +256,7 @@ rule build_value_selection_query:
 # rule all:
 #     input: 
 #         expand(
-#             "{modelDir}/exported/vendor{vendor_id}.nq", 
+#             "{modelDir}/dataset/vendor{vendor_id}.nq", 
 #             modelDir=MODEL_DIR,
 #             vendor_id=range(N_VENDOR)
 #         )
@@ -269,7 +267,7 @@ rule generate_ratingsites:
     input: 
         status=expand("{workDir}/generator-ok.txt", workDir=WORK_DIR),
         product=ancient(CONFIG["schema"]["product"]["export_output_dir"])
-    output: "{modelDir}/exported/ratingsite{ratingsite_id}.nq"
+    output: "{modelDir}/dataset/ratingsite{ratingsite_id}.nq"
     shell: "python rsfb/generate.py generate {WORK_DIR}/config.yaml ratingsite {output} --id {wildcards.ratingsite_id}"
 
 rule generate_vendors:
@@ -277,7 +275,7 @@ rule generate_vendors:
     input: 
         status=expand("{workDir}/generator-ok.txt", workDir=WORK_DIR),
         product=ancient(CONFIG["schema"]["product"]["export_output_dir"])
-    output: "{modelDir}/exported/vendor{vendor_id}.nq"
+    output: "{modelDir}/dataset/vendor{vendor_id}.nq"
     shell: "python rsfb/generate.py generate {WORK_DIR}/config.yaml vendor {output} --id {wildcards.vendor_id}"
 
 # rule all:

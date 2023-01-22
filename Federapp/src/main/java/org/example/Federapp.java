@@ -185,7 +185,7 @@ public class Federapp {
         // resultPath: .../{engine}/{query}/{instance_id}/batch_{batch_id}/default/results
         // research in reverse order
 
-        Pattern pattern = Pattern.compile(".*/(\\w+)/(q\\d+)/(\\d+)/batch_(\\d+)/(\\w+)/results");
+        Pattern pattern = Pattern.compile(".*/(\\w+)/(q\\d+)/instance_(\\d+)/batch_(\\d+)/(\\w+)/results");
         Matcher basicInfos = pattern.matcher(resultPath);
         basicInfos.find();
         String engine = basicInfos.group(1);

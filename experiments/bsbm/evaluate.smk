@@ -116,8 +116,8 @@ rule measure_ideal_source_selection_stats:
 rule generate_federation_declaration:
     output: "{benchDir}/{engine}/config/{batch_id}/{engine}.conf"
     run: 
-        ratingsite_data_files = [ f"{MODEL_DIR}/exported/ratingsite{i}.nq" for i in range(N_RATINGSITE) ]
-        vendor_data_files = [ f"{MODEL_DIR}/exported/vendor{i}.nq" for i in range(N_VENDOR) ]
+        ratingsite_data_files = [ f"{MODEL_DIR}/dataset/ratingsite{i}.nq" for i in range(N_RATINGSITE) ]
+        vendor_data_files = [ f"{MODEL_DIR}/dataset/vendor{i}.nq" for i in range(N_VENDOR) ]
 
         batchId = int(wildcards.batch_id)
         ratingsiteSliceId = np.histogram(np.arange(N_RATINGSITE), N_BATCH)[1][1:].astype(int)[batchId]
@@ -136,7 +136,7 @@ rule ingest_virtuoso:
     run: 
         proc = subprocess.run(f"docker exec {SPARQL_CONTAINER_NAME} ls /usr/local/virtuoso-opensource/share/virtuoso/vad | wc -l", shell=True, capture_output=True)
         nFiles = int(proc.stdout.decode())
-        expected_nFiles = len(glob.glob(f"{MODEL_DIR}/exported/*.nq"))
+        expected_nFiles = len(glob.glob(f"{MODEL_DIR}/dataset/*.nq"))
         if nFiles != expected_nFiles: raise RuntimeError(f"Expecting {expected_nFiles} *.nq files in virtuoso container, got {nFiles}!") 
         os.system(f'sh {input.vendor} bsbm && sh {input.ratingsite} && echo "OK" > {output}')
 

@@ -1,27 +1,18 @@
-import glob
-import os
-from pathlib import Path
 import re
 import click
-import subprocess
-from io import StringIO
-import seaborn as sns
 import pandas as pd
-import ast
-from fitter import Fitter, get_common_distributions, get_distributions
-import pylab
 import numpy as np
-import matplotlib.pyplot as plt
+from utils import load_config
 
 @click.group
 def cli():
     pass
 
 @cli.command()
-@click.argument("workload", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
-@click.argument("fedcount", type=click.INT)
+@click.argument("configfile", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 @click.argument("outfile", type=click.Path(exists=False, dir_okay=False, file_okay=True))
-def compute_metrics(workload, fedcount, outfile):
+@click.argument("workload", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
+def compute_metrics(configfile, outfile, workload):
     """Compute the metrics to evaluate source selection engines.
 
     TODO:
@@ -30,14 +21,16 @@ def compute_metrics(workload, fedcount, outfile):
         [] xfed_join_restricted_source_level_tp_selectivity
 
     Args:
-        fedcount (_type_): Total number of federation members
         workload (_type_): List of all results obtained by executing provenance queries.
     """
 
-    def get_relevant_sources_selectivity(df: pd.DataFrame, fedcount):
-        return np.unique(df.dropna().values.ravel()).size /fedcount
+    CONFIG = load_config(configfile)
+    N_FED_MEMBERS = CONFIG["generation"]["n_federation_members"]
 
-    def get_tp_specific_relevant_sources(df: pd.DataFrame, fedcount) -> float:
+    def get_relevant_sources_selectivity(df: pd.DataFrame):
+        return pd.Series(df.values.flatten()).nunique() / N_FED_MEMBERS
+
+    def get_tp_specific_relevant_sources(df: pd.DataFrame) -> float:
         """Union set of all contacted federation member over total number of federation members there is.
 
         TODO:
@@ -45,13 +38,7 @@ def compute_metrics(workload, fedcount, outfile):
         Args:
             df (_type_): the source selection result
         """
-
-        union_set = set().union(*df.apply(lambda x: x.dropna().unique()).values.tolist()) # make a set for each column, then set union all
-        if np.nan in union_set:
-            print(df[df.isna().any(axis=1)])
-            raise RuntimeError(f"Something wrong")
-        result = len(union_set)/fedcount
-        return result
+        pass
 
     def get_bgp_restricted_source_level_tp_selectivity(df):
         """Number of sources contributing to a triple pattern given other triple patterns, 
@@ -73,10 +60,10 @@ def compute_metrics(workload, fedcount, outfile):
         """
         pass
 
-    metrics_df = pd.DataFrame(columns=["query", "instance", "batch", "tp_specific_relevant_sources_selectivity", "relevant_sources_selectivity"])
+    metrics_df = pd.DataFrame(columns=["query", "instance", "batch", "relevant_sources_selectivity"])
     for provenance_file in workload:
-        ss_df = pd.read_csv(provenance_file)
-        name_search = re.search(r".*/(q\d+)/(\d+)/batch_(\d+)/provenance.csv", provenance_file)
+        source_selection_result = pd.read_csv(provenance_file)
+        name_search = re.search(r".*/(q\d+)/instance_(\d+)/batch_(\d+)/provenance.csv", provenance_file)
         query = name_search.group(1)
         instance = int(name_search.group(2))
         batch = int(name_search.group(3))
@@ -85,10 +72,10 @@ def compute_metrics(workload, fedcount, outfile):
             "query": query,
             "instance": instance,
             "batch": batch,
-            "tp_specific_relevant_sources_selectivity": get_tp_specific_relevant_sources(ss_df, fedcount),
-            "relevant_sources_selectivity": get_relevant_sources_selectivity(ss_df, fedcount)
-            #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(ss_df),
-            #"xfed_join_restricted_source_level_tp_selectivity": get_xfed_join_restricted_source_level_tp_selectivity(ss_df)
+            "relevant_sources_selectivity": get_relevant_sources_selectivity(source_selection_result)
+            #"tp_specific_relevant_sources_selectivity": get_tp_specific_relevant_sources(source_selection_result),
+            #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(source_selection_result),
+            #"xfed_join_restricted_source_level_tp_selectivity": get_xfed_join_restricted_source_level_tp_selectivity(source_selection_result)
         }
 
         metrics_df.loc[len(metrics_df)] = list(new_row.values())

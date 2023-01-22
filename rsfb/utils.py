@@ -43,6 +43,7 @@ def divide(*args):
     return int(args[0] / args[1])
 
 OmegaConf.register_new_resolver("multiply", lambda *args: np.prod(args).item())
+OmegaConf.register_new_resolver("sum", lambda *args: np.sum(args).item())
 OmegaConf.register_new_resolver("divide", divide)
 OmegaConf.register_new_resolver("product_type_per_product", lambda nbProd: int(4**np.log10(nbProd).item()))
 OmegaConf.register_new_resolver("normal_dist", lambda *args: NormalDistrGenerator(*args).getValue())
@@ -62,12 +63,8 @@ def load_config(filename, saveAs=None):
     config = OmegaConf.load(filename)
     if saveAs is not None:
         config = OmegaConf.to_object(config)
-        if not os.path.exists(saveAs):
-            with open(saveAs, "w+") as tmpfile:
-                OmegaConf.save(config, tmpfile)
-        else:
-            with open(saveAs, "r") as tmpfile:
-                config = OmegaConf.load(tmpfile)
+        with open(saveAs, "w+") as tmpfile:
+            OmegaConf.save(config, tmpfile)
 
     return config
 

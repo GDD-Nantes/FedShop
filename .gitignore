@@ -138,7 +138,7 @@ virtuoso-ok.txt
 **/model/virtuoso/
 **/model/tmp/
 **/benchmark/
-**/model/exported/
+**/model/dataset/
 
 .m2
 .DS_Store
