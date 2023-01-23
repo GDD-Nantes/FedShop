@@ -180,7 +180,10 @@ rule ingest_virtuoso_next_batches:
         check_file_presence(input.virtuoso_status)
         deploy_virtuoso(input.virtuoso_status, restart=True)
         check_file_stats()
-        shell(f'sh {input.vendor} bsbm && sh {input.ratingsite} && echo "OK" > {output}')
+        shell(f'sh {input.vendor} bsbm && sh {input.ratingsite}')
+        shell(f"python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationVendor.test_vendor_nb_sources")
+        shell(f"python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationRatingSite.test_ratingsite_nb_sources")
+        shell(f'echo "OK" > {output}')
 
 rule deploy_virtuoso:
     priority: 5
