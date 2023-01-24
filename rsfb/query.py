@@ -15,6 +15,8 @@ from io import BytesIO, StringIO
 from rdflib import Literal, URIRef, XSD
 import click
 
+from utils import load_config
+
 import nltk
 nltk.download('stopwords', quiet=True)
 nltk.download('punkt', quiet=True)
@@ -39,9 +41,30 @@ def lang_detect(txt):
     result = Counter(map(lambda x: Lang(detect(text=x, low_memory=False)["lang"]).name.lower(), lines)).most_common(1)[0]
     return result
 
-def exec_query(query, endpoint, error_when_timeout=False):
+def exec_query(configfile, query, batch_id=None, error_when_timeout=False):
+    
+    config = load_config(configfile)["generation"]
+    endpoint = config["sparql"]["endpoint"]
     sparql_endpoint = SPARQLWrapper(endpoint)
     if error_when_timeout: sparql_endpoint.addParameter("timeout", "300000") # in ms
+        
+    if batch_id is not None:
+        from_clause = []
+        from_keyword = "FROM" if re.search(r"GRAPH\s+(\?\w+\s*)+\{", query) is None else "FROM NAMED"
+                
+        for schema_name, schema_props in config["schema"].items():
+            if schema_props["is_source"]:
+                n_items = schema_props["params"][f"{schema_name}_n"]
+                
+                _, edges = np.histogram(np.arange(n_items), config["n_batch"])
+                edges = edges[1:].astype(int) + 1
+                for id in range(edges[batch_id]):
+                    provenance =  re.sub(re.escape(f"{{%{schema_name}_id}}"), f"{schema_name}{id}", schema_props["provenance"])
+                    from_clause.append(f"{from_keyword} <{provenance}>")
+    
+        query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 \3 \n{' '.join(from_clause)}\nWHERE", query)
+    
+    sparql_endpoint.setMethod("POST")
     sparql_endpoint.setReturnFormat(CSV)        
     sparql_endpoint.setQuery(query)
     response = sparql_endpoint.query()
@@ -99,12 +122,13 @@ def __get_uninjected_placeholders(queryfile):
     
 
 @cli.command()
+@click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.option("--sample", type=click.INT)
 @click.option("--ignore-errors", is_flag=True, default=False)
-@click.option("--endpoint", type=str, default="http://localhost:8890/sparql", help="URL to a SPARQL endpoint")
-def execute_query(queryfile, outfile, sample, ignore_errors, endpoint):
+@click.option("--batch-id", type=click.INT)
+def execute_query(configfile, queryfile, outfile, sample, ignore_errors, batch_id):
     """Execute query, export to an output file and return number of rows .
 
     Args:
@@ -121,7 +145,7 @@ def execute_query(queryfile, outfile, sample, ignore_errors, endpoint):
         [type]: the number of rows
     """
     query_text = open(queryfile, mode="r").read()
-    _, result = exec_query(query_text, endpoint, error_when_timeout=True)  
+    _, result = exec_query(configfile=configfile, query=query_text, batch_id=batch_id, error_when_timeout=True)  
 
     header = BytesIO(result).readline().decode().strip().replace('"', '').split(",")
     csvOut = pd.read_csv(BytesIO(result), parse_dates=[h for h in header if "date" in h])
@@ -298,13 +322,14 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
     return query
 
 @cli.command()
+@click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("value-selection", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("instance-id", type=click.INT)
-@click.option("--endpoint", type=str, default="http://localhost:8890/sparql", help="URL to a SPARQL endpoint")
+@click.argument("batch-id", type=click.INT)
 @click.pass_context
-def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile, instance_id, endpoint):
+def instanciate_workload(ctx: click.Context, configfile, queryfile, value_selection, outfile, instance_id, batch_id):
     """From a query template, instanciate the {instance_id}-th instance.
 
     1. - Until all placeholders are replaced:
@@ -322,7 +347,6 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
 
     query = open(queryfile, "r").read()
     initial_queryfile = queryfile
-    initial_query = query
     consts = __get_uninjected_placeholders(initial_queryfile)
     select = re.search(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", query).group(3)     
 
@@ -344,14 +368,14 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
         
         # Execute the partially injected query to find the rest of constants
         else:
-            query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {' '.join(consts)} WHERE", query)
+            query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {' '.join(consts)}\nWHERE", query)
             
             # Option 1: Exclude the partialy injected query to refill
             if solution_option == 1:
                 try:
                     print("Option 1: Exclude the partialy injected query to refill")
                     next_value_selection = f"{qroot}/{qname}.csv"
-                    ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
+                    ctx.invoke(execute_query, configfile=configfile, queryfile=next_queryfile, outfile=next_value_selection, batch_id=batch_id)
                     query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=False)
                 except RuntimeError:
                     solution_option = 2  
@@ -379,7 +403,7 @@ def instanciate_workload(ctx: click.Context, queryfile, value_selection, outfile
                         f.close()
 
                     next_value_selection = f"{qroot}/{qname}.csv"
-                    ctx.invoke(execute_query, queryfile=next_queryfile, outfile=next_value_selection, endpoint=endpoint)
+                    ctx.invoke(execute_query, configfile=configfile, queryfile=next_queryfile, outfile=next_value_selection, batch_id=batch_id)
                     relaxed_query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=False)
                     print("Restoring query...")
                     query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>)) ", r"\2", relaxed_query)

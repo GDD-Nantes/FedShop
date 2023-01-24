@@ -19,6 +19,8 @@ generation:
   schema:
     # Configuration for ONE batch
     product:
+      is_source: false
+      provenance: http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/
       # Products are generated once, independant from vendor and person
       template: "${generation.workdir}/model/watdiv/bsbm-product.template"
       scale_factor: 1
@@ -36,6 +38,8 @@ generation:
         productPropertyNumeric5_p: 0.8
 
     vendor:
+      is_source: true
+      provenance: http://www.{%vendor_id}.fr/
       template: "${generation.workdir}/model/watdiv/bsbm-vendor.template"
       export_output_dir: "${generation.workdir}/model/dataset"
       export_dep_output_dir: "${generation.schema.product.export_output_dir}"
@@ -46,6 +50,8 @@ generation:
         product_n: "${generation.schema.product.params.product_n}"
 
     ratingsite:
+      is_source: true
+      provenance: http://www.{%ratingsite_id}.fr/
       template: "${generation.workdir}/model/watdiv/bsbm-ratingsite.template"
       export_output_dir: "${generation.workdir}/model/dataset"
       export_dep_output_dir: "${generation.schema.product.export_output_dir}"

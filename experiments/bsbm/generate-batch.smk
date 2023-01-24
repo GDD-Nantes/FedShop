@@ -13,8 +13,10 @@ sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
 from utils import load_config
 
+CONFIGFILE = config["configfile"]
+
 WORK_DIR = "experiments/bsbm"
-CONFIG = load_config(f"{WORK_DIR}/config.yaml")["generation"]
+CONFIG = load_config(CONFIGFILE)["generation"]
 
 SPARQL_ENDPOINT = CONFIG["sparql"]["endpoint"]
 GENERATOR_ENDPOINT = CONFIG["generator"]["endpoint"]
@@ -85,57 +87,13 @@ def generate_virtuoso_scripts(nqfiles, shfiles, batch_id, n_items):
     edges = edges[1:].astype(int) + 1
     batch = edges[batch_id]
     with open(f"{shfiles}", "w+") as f:
-        f.write(f"echo \"Writing ingest script for {batch_id}, slicing at {batch}-th source...\"\n")
+        f.write(f"echo \"Writing ingest script for batch {batch_id}, slicing at {batch}-th source...\"\n")
         for nq_file in nq_files[:batch]:
             f.write(f"docker exec {SPARQL_CONTAINER_NAME} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=ld_dir('/usr/local/virtuoso-opensource/share/virtuoso/vad/', '{nq_file}', 'http://example.com/datasets/default');\"&&\n")
         f.write(f"docker exec {SPARQL_CONTAINER_NAME} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=rdf_loader_run(log_enable=>2);\" &&\n")
         f.write(f"docker exec {SPARQL_CONTAINER_NAME} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=checkpoint;\"&&\n")
         f.write("exit 0\n")
         f.close()
-
-#=================
-# PIPELINE
-#=================
-
-rule all:
-    input: 
-        expand(
-            "{benchDir}/metrics.csv",
-            benchDir=BENCH_DIR
-        )
-
-rule merge_metrics:
-    priority: 1
-    input: expand("{{benchDir}}/metrics_batch{batch_id}.csv", batch_id=range(N_BATCH))
-    output: "{benchDir}/metrics.csv"
-    run: pd.concat((pd.read_csv(f) for f in input)).to_csv(f"{output}", index=False)
-
-rule compute_metrics:
-    priority: 2
-    threads: 1
-    input: 
-        expand(
-            "{{benchDir}}/{query}/instance_{instance_id}/batch_{{batch_id}}/provenance.csv",
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR)],
-            instance_id=range(N_QUERY_INSTANCES)
-        )
-    output: "{benchDir}/metrics_batch{batch_id}.csv"
-    shell: "python rsfb/metrics.py compute-metrics {WORK_DIR}/config.yaml {output} {input}"
-
-rule exec_provenance_query:
-    priority: 3
-    threads: 1
-    input: 
-        provenance_query="{benchDir}/{query}/{instance_id}/provenance.sparql",
-        loaded_virtuoso="{benchDir}/virtuoso-batch{batch_id}-ok.txt"
-    output: "{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv"
-    params:
-        endpoint=SPARQL_ENDPOINT
-    shell: 
-        'python rsfb/query.py execute-query {input.provenance_query} {output} --endpoint {params.endpoint}'
-
-# rule test_generation_next_batches:
-#     TODO
 
 def check_file_presence(status_file):
     proc = subprocess.run(f'docker exec {SPARQL_CONTAINER_NAME} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | wc -l"', shell=True, capture_output=True)
@@ -168,17 +126,55 @@ def check_file_stats():
             # shell(f"docker exec {SPARQL_CONTAINER_NAME} rm /usr/local/virtuoso-opensource/share/virtuoso/vad/{container_file}")
             # shell(f'docker cp {local_file} {SPARQL_CONTAINER_NAME}:/usr/local/virtuoso-opensource/share/virtuoso/vad/')
 
-rule ingest_virtuoso_next_batches:
+#=================
+# PIPELINE
+#=================
+
+rule all:
+    input: 
+        expand(
+            "{benchDir}/metrics.csv",
+            benchDir=BENCH_DIR
+        )
+
+rule merge_metrics:
+    priority: 1
+    input: expand("{{benchDir}}/metrics_batch{batch_id}.csv", batch_id=range(N_BATCH))
+    output: "{benchDir}/metrics.csv"
+    run: pd.concat((pd.read_csv(f) for f in input)).to_csv(f"{output}", index=False)
+
+rule compute_metrics:
+    priority: 2
+    threads: 1
+    input: 
+        expand(
+            "{{benchDir}}/{query}/instance_{instance_id}/batch_{{batch_id}}/provenance.csv",
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR)],
+            instance_id=range(N_QUERY_INSTANCES)
+        )
+    output: "{benchDir}/metrics_batch{batch_id}.csv"
+    shell: "python rsfb/metrics.py compute-metrics {CONFIGFILE} {output} {input}"
+
+rule exec_provenance_query:
+    priority: 3
+    threads: 1
+    input: 
+        provenance_query="{benchDir}/{query}/instance_{instance_id}/provenance.sparql",
+        loaded_virtuoso="{benchDir}/virtuoso-ok.txt"
+    output: "{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv"
+    shell: 
+        'python rsfb/query.py execute-query {CONFIGFILE} {input.provenance_query} {output} --batch-id {wildcards.batch_id}'
+
+rule ingest_virtuoso:
     priority: 4
     threads: 1
     input: 
-        vendor=expand("{modelDir}/virtuoso/ingest_vendor_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
-        ratingsite=expand("{modelDir}/virtuoso/ingest_ratingsite_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
-        virtuoso_status="{benchDir}/virtuoso-batch{batch_id}-up.txt"
-    output: "{benchDir}/virtuoso-batch{batch_id}-ok.txt"
+        vendor=expand("{modelDir}/virtuoso/ingest_vendor.sh", modelDir=MODEL_DIR),
+        ratingsite=expand("{modelDir}/virtuoso/ingest_ratingsite.sh", modelDir=MODEL_DIR),
+        virtuoso_status="{benchDir}/virtuoso-up.txt"
+    output: "{benchDir}/virtuoso-ok.txt"
     run: 
         check_file_presence(input.virtuoso_status)
-        deploy_virtuoso(input.virtuoso_status, restart=True)
         check_file_stats()
         shell(f'sh {input.vendor} bsbm && sh {input.ratingsite}')
         shell(f"python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationVendor.test_vendor_nb_sources")
@@ -191,22 +187,22 @@ rule deploy_virtuoso:
     input:
         vendor=expand("{modelDir}/dataset/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR),
         ratingsite=expand("{modelDir}/dataset/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR)
-    output: "{benchDir}/virtuoso-batch{batch_id}-up.txt"
+    output: "{benchDir}/virtuoso-up.txt"
     run: deploy_virtuoso(output)
 
 rule make_virtuoso_ingest_command_for_vendor:
     priority: 5
     threads: 1
     input: expand("{modelDir}/dataset/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR)
-    output: "{modelDir}/virtuoso/ingest_vendor_batch{batch_id}.sh"
-    run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), N_VENDOR)
+    output: "{modelDir}/virtuoso/ingest_vendor.sh"
+    run: generate_virtuoso_scripts(input, output, N_BATCH-1, N_VENDOR)
 
 rule make_virtuoso_ingest_command_for_ratingsite:
     priority: 5
     threads: 1
     input: expand("{modelDir}/dataset/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR)
-    output: "{modelDir}/virtuoso/ingest_ratingsite_batch{batch_id}.sh"
-    run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), N_RATINGSITE)
+    output: "{modelDir}/virtuoso/ingest_ratingsite.sh"
+    run: generate_virtuoso_scripts(input, output, N_BATCH-1, N_RATINGSITE)
 
 rule build_provenance_query: 
     """
@@ -215,8 +211,8 @@ rule build_provenance_query:
     we select 10 random values for the placeholders in the BSBM query templates.
     """
     priority: 6
-    input: "{benchDir}/{query}/{instance_id}/injected.sparql",
-    output: "{benchDir}/{query}/{instance_id}/provenance.sparql"
+    input: "{benchDir}/{query}/instance_{instance_id}/injected.sparql",
+    output: "{benchDir}/{query}/instance_{instance_id}/provenance.sparql"
     shell: "python rsfb/query.py build-provenance-query {input} {output}"
 
 rule instanciate_workload:
@@ -226,9 +222,9 @@ rule instanciate_workload:
         queryfile=expand("{queryDir}/{{query}}.sparql", queryDir=QUERY_DIR),
         workload_value_selection="{benchDir}/{query}/workload_value_selection.csv"
     output:
-        value_selection_query="{benchDir}/{query}/{instance_id}/injected.sparql",
+        value_selection_query="{benchDir}/{query}/instance_{instance_id}/injected.sparql",
     shell:
-        "python rsfb/query.py instanciate-workload {input.queryfile} {input.workload_value_selection} {output.value_selection_query} {wildcards.instance_id}"
+        "python rsfb/query.py instanciate-workload {CONFIGFILE} {input.queryfile} {input.workload_value_selection} {output.value_selection_query} {wildcards.instance_id} {wildcards.batch_id}"
 
 rule create_workload_value_selection:
     priority: 8
@@ -244,15 +240,13 @@ rule exec_value_selection_query:
     threads: 1
     input: "{benchDir}/{query}/value_selection.sparql"
     output: "{benchDir}/{query}/value_selection.csv"
-    params:
-        endpoint=SPARQL_ENDPOINT
-    shell: "python rsfb/query.py execute-query {input} {output} --endpoint {params.endpoint}"
+    shell: "python rsfb/query.py execute-query {CONFIGFILE} {input} {output} --batch-id 0"
 
 rule build_value_selection_query:
     priority: 10
     input: 
         queryfile=expand("{queryDir}/{{query}}.sparql", queryDir=QUERY_DIR),
-        virtuoso_status="{benchDir}/virtuoso-batch0-ok.txt"
+        virtuoso_status="{benchDir}/virtuoso-ok.txt"
     output: "{benchDir}/{query}/value_selection.sparql"
     shell: "python rsfb/query.py build-value-selection-query {input.queryfile} {output}"
 
@@ -264,14 +258,13 @@ rule build_value_selection_query:
 #             vendor_id=range(N_VENDOR)
 #         )
 
-
 rule generate_ratingsites:
     priority: 12
     input: 
         status=expand("{workDir}/generator-ok.txt", workDir=WORK_DIR),
         product=ancient(CONFIG["schema"]["product"]["export_output_dir"])
     output: "{modelDir}/dataset/ratingsite{ratingsite_id}.nq"
-    shell: "python rsfb/generate.py generate {WORK_DIR}/config.yaml ratingsite {output} --id {wildcards.ratingsite_id}"
+    shell: "python rsfb/generate.py generate {CONFIGFILE} ratingsite {output} --id {wildcards.ratingsite_id}"
 
 rule generate_vendors:
     priority: 13
@@ -279,7 +272,7 @@ rule generate_vendors:
         status=expand("{workDir}/generator-ok.txt", workDir=WORK_DIR),
         product=ancient(CONFIG["schema"]["product"]["export_output_dir"])
     output: "{modelDir}/dataset/vendor{vendor_id}.nq"
-    shell: "python rsfb/generate.py generate {WORK_DIR}/config.yaml vendor {output} --id {wildcards.vendor_id}"
+    shell: "python rsfb/generate.py generate {CONFIGFILE} vendor {output} --id {wildcards.vendor_id}"
 
 # rule all:
 #     input: expand("{modelDir}/tmp/product/", modelDir=MODEL_DIR)
@@ -288,7 +281,7 @@ rule generate_products:
     priority: 14
     input: expand("{workDir}/generator-ok.txt", workDir=WORK_DIR)
     output: directory(CONFIG["schema"]["product"]["export_output_dir"]), 
-    shell: 'python rsfb/generate.py generate {WORK_DIR}/config.yaml product {output}'
+    shell: 'python rsfb/generate.py generate {CONFIGFILE} product {output}'
 
 rule start_generator_container:
     output: "{workDir}/generator-ok.txt"

@@ -33,7 +33,8 @@ def generate(configfile, section, output, id):
     model_file = f"{output_base}.txt.tmp"
     Path(model_file).parent.mkdir(parents=True, exist_ok=True)
     with open(model_file, "w") as outWriter:
-        out = re.sub(re.escape(f"{{%{section}_id}}"), f"{section}{id}", template)
+        out = re.sub(re.escape("{%provenance}"), schema_config[section]["provenance"], template)
+        out = re.sub(re.escape(f"{{%{section}_id}}"), f"{section}{id}", out)
         out = re.sub(re.escape("{%export_output_dir}"), schema_config[section]["export_output_dir"], out)
         if schema_config[section].get("export_dep_output_dir") is not None:
             out = re.sub(re.escape("{%export_dep_output_dir}"), schema_config[section]["export_dep_output_dir"], out)
