@@ -68,7 +68,7 @@ def evaluate(ctx: click.Context, configfile, debug, clean, rerun_incomplete):
     EVAL_CONFIG = load_config(configfile)["evaluation"]
     WORK_DIR = GEN_CONFIG["workdir"]
 
-    SPARQL_COMPOSE_FILE = GEN_CONFIG["sparql"]["compose-file"]
+    SPARQL_COMPOSE_FILE = GEN_CONFIG["sparql"]["compose_file"]
     EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate.smk"
     N_ENGINES = len(EVAL_CONFIG["evaluation"]["engines"])
 
@@ -110,8 +110,8 @@ def wipe(configfile, level: str):
     CONFIG = load_config(configfile)["generation"]
     WORK_DIR = CONFIG["workdir"]
     
-    SPARQL_COMPOSE_FILE = CONFIG["sparql"]["compose-file"]
-    GENERATOR_COMPOSE_FILE = CONFIG["generator"]["compose-file"]
+    SPARQL_COMPOSE_FILE = CONFIG["sparql"]["compose_file"]
+    GENERATOR_COMPOSE_FILE = CONFIG["generator"]["compose_file"]
 
     def remove_model():
         shutil.rmtree(f"{WORK_DIR}/model/dataset", ignore_errors=True)
@@ -139,7 +139,7 @@ def wipe(configfile, level: str):
         remove_benchmark()
         
     elif "benchmark" in args:
-        remove_benchmark(including_db=(level=="benchmark+db"))
+        remove_benchmark()
 
 
 if __name__ == "__main__":

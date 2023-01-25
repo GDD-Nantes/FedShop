@@ -33,8 +33,11 @@ def cli():
 from utils import load_config
 from query import exec_query
 
+BATCH_ID = int(os.environ["RSFB__BATCHID"])
+CONFIGFILE = os.environ["RSFB__CONFIGFILE"]
+
 WORKDIR = Path(__file__).parent
-CONFIG = load_config("experiments/bsbm/config.yaml")["generation"]
+CONFIG = load_config(CONFIGFILE)["generation"]
 SPARQL_ENDPOINT = CONFIG["sparql"]["endpoint"]
 STATS_SIGNIFICANCE_LEVEL = 1 - CONFIG["stats"]["confidence_level"]
 
@@ -44,23 +47,24 @@ LANGTAGS_EXPECTED_WEIGHT = {"en": 0.50, "ja": 0.10, "zh": 0.10, "de": 0.05, "fr"
 WATDIV_BOOST_MU = 0.5
 WATDIV_BOOST_SIGMA = 0.5/3.0 
 
-def query(queryfile):
-    saveAs = f"{Path(queryfile).parent}/{Path(queryfile).stem}.csv"
+def query(queryfile, cache=True):
+    result = None
+    if cache:
+        saveAs = f"{Path(queryfile).parent}/{Path(queryfile).stem}.csv"
+        if os.path.exists(saveAs):
+            with open(saveAs, "r") as fp:
+                header = fp.readline().strip().replace('"', '').split(",")
+                result = pd.read_csv(saveAs, parse_dates=[h for h in header if "date" in h])
+                return result
+    
+    with open(queryfile, "r") as fp:
+        query_text = fp.read()
+        _, result = exec_query(configfile=CONFIGFILE, query=query_text, error_when_timeout=True, batch_id=BATCH_ID)
+        header = BytesIO(result).readline().decode().strip().replace('"', '').split(",")
+        result = pd.read_csv(BytesIO(result), parse_dates=[h for h in header if "date" in h])
+        if cache: result.to_csv(saveAs, index=False)
+    return result
 
-    if os.path.exists(saveAs):
-        with open(saveAs, "r") as fp:
-            header = fp.readline().strip().replace('"', '').split(",")
-            result = pd.read_csv(saveAs, parse_dates=[h for h in header if "date" in h])
-            return result
-    else:
-        with open(queryfile, "r") as fp:
-            query_text = fp.read()
-            _, result = exec_query(query_text, SPARQL_ENDPOINT, error_when_timeout=True)
-            header = BytesIO(result).readline().decode().strip().replace('"', '').split(",")
-            result = pd.read_csv(BytesIO(result), parse_dates=[h for h in header if "date" in h])
-            result.to_csv(saveAs, index=False)
-
-        return result
 
 def dist_test(data: pd.Series, dist: str, figname=None, **kwargs):
     """Test whether the a sample follows normal distribution
@@ -441,9 +445,7 @@ class TestGenerationProduct(TestGenerationTemplate):
 
         frequencies = result["prop"].value_counts().loc[expected_proportion.index.values]
         nbProps = result["localProduct"].nunique()
-        
-        print(frequencies/nbProps)
-                
+                        
         for expected_p, freq in zip(expected_proportion, frequencies):
             _, pvalue = proportions_ztest(
                 count=int(expected_p * nbProps),
@@ -510,10 +512,8 @@ class TestGenerationProduct(TestGenerationTemplate):
                 value=(freq / nbProducts),
                 alternative="smaller" # two-sided, smaller, larger
             )
-            print(pvalue)
             
             _, pvalue, _ = proportions_chisquare(freq, nbProducts, expected_p)
-            print(pvalue)
             
             self.assertGreaterEqual(
                 pvalue, STATS_SIGNIFICANCE_LEVEL,
@@ -554,8 +554,8 @@ class TestGenerationVendor(TestGenerationTemplate):
         os.system(f"rm {WORKDIR}/vendor/*.csv")
     
     def test_vendor_nb_sources(self):
-        queryfile = f"{WORKDIR}/global/test_global_nb_sources.sparql"
-        result = query(queryfile)
+        queryfile = f"{WORKDIR}/vendor/test_vendor_nb_sources.sparql"
+        result = query(queryfile, cache=False)
         self.assertFalse(result.empty, "The test query should return results...")
         
         data = np.arange(CONFIG["schema"]["vendor"]["params"]["vendor_n"])
@@ -717,8 +717,8 @@ class TestGenerationRatingSite(TestGenerationTemplate):
         os.system(f"rm {WORKDIR}/ratingsite/*.csv")    
 
     def test_ratingsite_nb_sources(self):
-        queryfile = f"{WORKDIR}/global/test_global_nb_sources.sparql"
-        result = query(queryfile)
+        queryfile = f"{WORKDIR}/ratingsite/test_ratingsite_nb_sources.sparql"
+        result = query(queryfile, cache=False)
         self.assertFalse(result.empty, "The test query should return results...")
         
         data = np.arange(CONFIG["schema"]["ratingsite"]["params"]["ratingsite_n"])
@@ -731,10 +731,7 @@ class TestGenerationRatingSite(TestGenerationTemplate):
         nbSources = result.groupby("batchId")["g"].count().cumsum()
         
         expected_nbSources = edges[:nbSources.size] + 1
-        
-        print(nbSources)
-        print(expected_nbSources)
-        
+            
         self.assertListEqual(
             nbSources.to_list(), expected_nbSources.tolist(),
             msg="The number of ratingsite currently present in the DB should match expectation. Relaunch the workflow with option '--clean benchmark'"

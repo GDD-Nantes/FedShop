@@ -28,7 +28,7 @@ WHERE {
         # const ?ProductFeature1
         ?product bsbm:productFeature ?localProductFeature1 .
         ?localProductFeature1 owl:sameAs ?ProductFeature1 .
-        # const ?ProductFeature3
+        # const ?ProductFeature3 $! ?ProductFeature2
         ?product bsbm:productFeature ?localProductFeature3 .
         ?localProductFeature3 owl:sameAs ?ProductFeature3 .
         ?product bsbm:productPropertyTextual1 ?propertyTextual .

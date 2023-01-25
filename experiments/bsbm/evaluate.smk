@@ -19,8 +19,8 @@ CONFIG_EVAL = CONFIG["evaluation"]
 
 SPARQL_ENDPOINT = CONFIG_GEN["sparql"]["endpoint"]
 
-SPARQL_COMPOSE_FILE = CONFIG_GEN["sparql"]["compose-file"]
-SPARQL_CONTAINER_NAME = CONFIG_GEN["sparql"]["container-name"]
+SPARQL_COMPOSE_FILE = CONFIG_GEN["sparql"]["compose_file"]
+SPARQL_CONTAINER_NAME = CONFIG_GEN["sparql"]["container_name"]
 
 N_QUERY_INSTANCES = CONFIG_GEN["n_query_instances"]
 N_BATCH = CONFIG_GEN["n_batch"]

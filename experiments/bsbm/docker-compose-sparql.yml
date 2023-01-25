@@ -1,7 +1,7 @@
-version: "3"
+version: "4"
 services:
   bsbm-virtuoso:
-    container_name: "bsbm-virtuoso"
+    #container_name: "bsbm-virtuoso"
     #image: openlink/virtuoso-opensource-7:7.2.8
     image: tenforce/virtuoso:virtuoso7.2.5
     #user: "1000:1000"
@@ -17,5 +17,5 @@ services:
     volumes:
       - "./model/dataset:/usr/local/virtuoso-opensource/share/virtuoso/vad"
     ports:
-      - "1111:1111"
-      - "8890:8890"
+      - 1111
+      - 8890

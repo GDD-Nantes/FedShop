@@ -41,29 +41,29 @@ def lang_detect(txt):
     result = Counter(map(lambda x: Lang(detect(text=x, low_memory=False)["lang"]).name.lower(), lines)).most_common(1)[0]
     return result
 
-def exec_query(configfile, query, batch_id=None, error_when_timeout=False):
+def exec_query(configfile, query, batch_id, error_when_timeout=False):
     
     config = load_config(configfile)["generation"]
-    endpoint = config["sparql"]["endpoint"]
+    endpoint = config["sparql"]["endpoint"][batch_id]
     sparql_endpoint = SPARQLWrapper(endpoint)
     if error_when_timeout: sparql_endpoint.addParameter("timeout", "300000") # in ms
         
-    if batch_id is not None:
-        from_clause = []
-        from_keyword = "FROM" if re.search(r"GRAPH\s+(\?\w+\s*)+\{", query) is None else "FROM NAMED"
+    # if batch_id is not None:
+    #     from_clause = []
+    #     from_keyword = "FROM" if re.search(r"GRAPH\s+(\?\w+\s*)+\{", query) is None else "FROM NAMED"
                 
-        for schema_name, schema_props in config["schema"].items():
-            if schema_props["is_source"]:
-                n_items = schema_props["params"][f"{schema_name}_n"]
+    #     for schema_name, schema_props in config["schema"].items():
+    #         if schema_props["is_source"]:
+    #             n_items = schema_props["params"][f"{schema_name}_n"]
                 
-                _, edges = np.histogram(np.arange(n_items), config["n_batch"])
-                edges = edges[1:].astype(int) + 1
-                for id in range(edges[batch_id]):
-                    provenance =  re.sub(re.escape(f"{{%{schema_name}_id}}"), f"{schema_name}{id}", schema_props["provenance"])
-                    from_clause.append(f"{from_keyword} <{provenance}>")
+    #             _, edges = np.histogram(np.arange(n_items), config["n_batch"])
+    #             edges = edges[1:].astype(int) + 1
+    #             for id in range(edges[batch_id]):
+    #                 provenance =  re.sub(re.escape(f"{{%{schema_name}_id}}"), f"{schema_name}{id}", schema_props["provenance"])
+    #                 from_clause.append(f"{from_keyword} <{provenance}>")
     
-        query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 \3 \n{' '.join(from_clause)}\nWHERE", query)
-    
+    #     query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 \3 \n{' '.join(from_clause)}\nWHERE", query)
+        
     sparql_endpoint.setMethod("POST")
     sparql_endpoint.setReturnFormat(CSV)        
     sparql_endpoint.setQuery(query)
@@ -89,7 +89,7 @@ def __parse_query(queryfile):
         toks = np.array(re.split(r"\s+", line))
         if "#" in toks:
             if "const" in toks:
-                if (comp := re.search(r"const\s+(\?\w+)\s+(\W|\w+)\s+(\?\w+)", line)) is not None:
+                if (comp := re.search(r"const\s+(\?\w+)\s+(\W+|\w+)\s+(\?\w+)", line)) is not None:
                     op = comp.group(2)
                     const = comp.group(1)
                     constSrc = comp.group(3)
@@ -115,20 +115,20 @@ def __parse_query(queryfile):
 
 def __get_uninjected_placeholders(queryfile):
     _, parse_result = __parse_query(queryfile)
-    return [
+    return set([
         const if (resource is None or resource.get("src") is None ) else resource["src"]
         for const, resource in parse_result.items()
-    ]
+    ])
     
 
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
+@click.argument("batch-id", type=click.INT)
 @click.option("--sample", type=click.INT)
 @click.option("--ignore-errors", is_flag=True, default=False)
-@click.option("--batch-id", type=click.INT)
-def execute_query(configfile, queryfile, outfile, sample, ignore_errors, batch_id):
+def execute_query(configfile, queryfile, outfile, batch_id, sample, ignore_errors):
     """Execute query, export to an output file and return number of rows .
 
     Args:
@@ -176,6 +176,7 @@ def build_value_selection_query(queryfile, outfile):
         _type_: a csv file at outfile containing values for placeholders
     """
     consts = __get_uninjected_placeholders(queryfile)
+    print(consts)
 
     query = open(queryfile).read()
     query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {' '.join(consts)} WHERE", query)
@@ -267,6 +268,10 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
                 repl_val = value_selection_values[column].dropna().max() + epsilon
             elif "<" in resource["op"]:
                 repl_val = value_selection_values[column].dropna().min() - epsilon
+            elif resource["op"] == "$":
+                repl_val = value_selection_values[column].dropna().sample(1)
+            elif resource["op"] == "$!":
+                repl_val = value_selection_values[column].dropna().where(value_selection_values[column] != injection_cache[column]).sample(1)
             
             # Special treatment for REGEX
             #   Extract randomly 1 from 10 most common words in the result list
@@ -327,9 +332,8 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
 @click.argument("value-selection", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("instance-id", type=click.INT)
-@click.argument("batch-id", type=click.INT)
 @click.pass_context
-def instanciate_workload(ctx: click.Context, configfile, queryfile, value_selection, outfile, instance_id, batch_id):
+def instanciate_workload(ctx: click.Context, configfile, queryfile, value_selection, outfile, instance_id):
     """From a query template, instanciate the {instance_id}-th instance.
 
     1. - Until all placeholders are replaced:
@@ -375,7 +379,7 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
                 try:
                     print("Option 1: Exclude the partialy injected query to refill")
                     next_value_selection = f"{qroot}/{qname}.csv"
-                    ctx.invoke(execute_query, configfile=configfile, queryfile=next_queryfile, outfile=next_value_selection, batch_id=batch_id)
+                    ctx.invoke(execute_query, configfile=configfile, queryfile=next_queryfile, outfile=next_value_selection, batch_id=0)
                     query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=False)
                 except RuntimeError:
                     solution_option = 2  
@@ -396,14 +400,14 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
                 try:
                     print("Option 3: Relax the query knowing we are in an optional clause")
                     print("Relaxing query...")
-                    relaxed_query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>)) ", r"##\2", query)
+                    relaxed_query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>))", r"##\2", query)
                     next_queryfile = f"{qroot}/{qname}_relaxed.sparql"
                     with open(next_queryfile, "w+") as f:
                         f.write(relaxed_query)
                         f.close()
 
                     next_value_selection = f"{qroot}/{qname}.csv"
-                    ctx.invoke(execute_query, configfile=configfile, queryfile=next_queryfile, outfile=next_value_selection, batch_id=batch_id)
+                    ctx.invoke(execute_query, configfile=configfile, queryfile=next_queryfile, outfile=next_value_selection, batch_id=0)
                     relaxed_query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=False)
                     print("Restoring query...")
                     query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>)) ", r"\2", relaxed_query)
@@ -526,11 +530,11 @@ def create_workload_value_selection(value_selection, workload_value_selection, n
     workload = value_selection_values
     if not numerical.empty:
         query = " or ".join([
-            f"( `{col}` >= {repr(numerical[col].quantile(0.25))} and `{col}` <= {repr(numerical[col].quantile(0.75))} )" 
+            #f"( `{col}` >= {repr(numerical[col].quantile(0.25))} and `{col}` <= {repr(numerical[col].quantile(0.75))} )"
+            f"( `{col}` > {repr(numerical[col].min())} and `{col}` < {repr(numerical[col].max())} )" 
             for col in numerical.columns
         ])
 
-        print(query)
         workload = value_selection_values.query(query)
    
     workload.sample(n_instances).to_csv(workload_value_selection, index=False)

@@ -10,12 +10,12 @@ generation:
     #exec: "docker exec watdiv watdiv"
     exec: "watdiv"
     endpoint: "http://localhost:8000"
-    compose-file: "${generation.workdir}/docker-compose-generator.yml"
-    container-name: "bsbm-watdiv"
+    compose_file: "${generation.workdir}/docker-compose-generator.yml"
+    container_name: "bsbm-watdiv"
   sparql:
-    endpoint: "http://localhost:8890/sparql"
-    compose-file: "${generation.workdir}/docker-compose-sparql.yml"
-    container-name: "bsbm-virtuoso"
+    compose_file: "${generation.workdir}/docker-compose-sparql.yml"
+    endpoint: "${get_virtuoso_endpoints: ${generation.sparql.compose_file}}" 
+    container_name: "${get_virtuoso_containers: ${generation.sparql.compose_file}}" 
   schema:
     # Configuration for ONE batch
     product:
