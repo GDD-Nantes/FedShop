@@ -84,9 +84,12 @@ def load_config(filename, saveAs=None):
     """
     config = OmegaConf.load(filename)
     if saveAs is not None:
-        config = OmegaConf.to_object(config)
+        cache_config = None
+        try: cache_config = OmegaConf.to_object(config)
+        except: cache_config = { k: v for k, v in config.items() if k not in ["sparql"]}
+        
         with open(saveAs, "w+") as tmpfile:
-            OmegaConf.save(config, tmpfile)
+            OmegaConf.save(cache_config, tmpfile)
 
     return config
 
