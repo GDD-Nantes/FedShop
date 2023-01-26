@@ -19,7 +19,7 @@ WHERE {
         ?offer bsbm:price ?price .
         ?offer bsbm:vendor ?vendor .
         ?vendor rdfs:label ?vendorTitle .
-        ?vendor bsbm:country <http://downlode.org/rdf/iso-3166/countries#DE> . # it was a constant
+        ?vendor bsbm:country <http://downlode.org/rdf/iso-3166/countries#DE> .
         ?offer bsbm:validTo ?date .
 
         # const ?currentDate < ?date 

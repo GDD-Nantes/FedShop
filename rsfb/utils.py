@@ -48,18 +48,40 @@ def get_compose_service_name(compose_file):
     with open(compose_file, "r") as f:
         return next(iter(yaml.load(f, SafeLoader)["services"]))
 
-def get_virtuoso_endpoints(compose_file):        
+def __get_publisher_info(x):
+        if x is None: return -1
+        else: 
+            return pd.DataFrame.from_records(x) \
+                .query('`URL` == "0.0.0.0" and `TargetPort` == 8890')["PublishedPort"] \
+                .astype(int).item()
+
+def get_virtuoso_endpoints(compose_file):
     service_name = get_compose_service_name(compose_file)
-    json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --format json {service_name}", capture_output=True, shell=True).stdout
+    json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
     result = pd.read_json(BytesIO(json_bytes))["Publishers"] \
-        .apply(lambda x: pd.DataFrame.from_records(x).query('`URL` == "0.0.0.0" and `TargetPort` == 8890')["PublishedPort"].item()) \
+        .apply(__get_publisher_info) \
         .apply(lambda x: f"http://localhost:{x}/sparql") \
         .to_list()
+    return result
+
+def get_virtuoso_endpoint_by_container_name(compose_file, container_name):        
+    service_name = get_compose_service_name(compose_file)
+    json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
+    result = pd.read_json(BytesIO(json_bytes)).query(f"`Name` == {repr(container_name)}")["Publishers"] \
+        .apply(__get_publisher_info) \
+        .apply(lambda x: f"http://localhost:{int(x)}/sparql") \
+        .item()
+    return result
+
+def check_container_status(compose_file, container_name):
+    service_name = get_compose_service_name(compose_file)
+    json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
+    result = pd.read_json(BytesIO(json_bytes)).query(f"`Name` == {repr(container_name)}")["State"].item()
     return result
     
 def get_virtuoso_containers(compose_file):    
     service_name = get_compose_service_name(compose_file)    
-    json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --format json {service_name}", capture_output=True, shell=True).stdout
+    json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
     result = pd.read_json(BytesIO(json_bytes))["Name"].to_list()
     return result
     

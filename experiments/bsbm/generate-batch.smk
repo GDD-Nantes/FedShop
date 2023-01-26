@@ -6,12 +6,13 @@ import glob
 import time
 import requests
 import subprocess
+import json
 
 import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import load_config, get_compose_service_name
+from utils import load_config, get_compose_service_name, get_virtuoso_endpoint_by_container_name, check_container_status
 
 CONFIGFILE = config["configfile"]
 
@@ -66,13 +67,18 @@ def wait_for_container(endpoints, outfile, wait=1):
         f.write("OK")
         f.close()
 
-def deploy_virtuoso(status_file, restart=False):
+def deploy_virtuoso(container_infos_file, restart=False):
     if restart:
         shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans --volumes")
         time.sleep(2)
     shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} up -d --scale {SPARQL_SERVICE_NAME}={N_BATCH}")
-    wait_for_container(CONFIG["sparql"]["endpoint"], status_file, wait=1)
-    return status_file
+    wait_for_container(CONFIG["sparql"]["endpoint"], f"{BENCH_DIR}/virtuoso-up.txt", wait=1)
+    
+    SPARQL_CONTAINER_NAMES = CONFIG["sparql"]["container_name"]
+    pd.DataFrame(SPARQL_CONTAINER_NAMES, columns=["Name"]).to_csv(str(container_infos_file), index=False)
+
+    shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} stop {SPARQL_SERVICE_NAME}")
+    return container_infos_file
 
 def start_generator(status_file):
     exec_cmd = CONFIG["generator"]["exec"]
@@ -86,8 +92,10 @@ def start_generator(status_file):
 
     return status_file
 
-def generate_virtuoso_scripts(nqfiles, shfiles, batch_id, n_items):
-    SPARQL_CONTAINER_NAME = CONFIG["sparql"]["container_name"]
+def generate_virtuoso_scripts(container_infos_file, nqfiles, shfiles, batch_id, n_items):
+    batch_id = int(batch_id)
+    container_infos_file = str(container_infos_file)
+    container_name = pd.read_csv(container_infos_file).loc[batch_id, "Name"]
 
     nq_files = [ os.path.basename(f) for f in nqfiles ]
     _, edges = np.histogram(np.arange(n_items), N_BATCH)
@@ -96,31 +104,35 @@ def generate_virtuoso_scripts(nqfiles, shfiles, batch_id, n_items):
     with open(f"{shfiles}", "w+") as f:
         f.write(f"echo \"Writing ingest script for batch {batch_id}, slicing at {batch}-th source...\"\n")
         for nq_file in nq_files[:batch]:
-            f.write(f"docker exec {SPARQL_CONTAINER_NAME[batch_id]} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=ld_dir('/usr/local/virtuoso-opensource/share/virtuoso/vad/', '{nq_file}', 'http://example.com/datasets/default');\"&&\n")
-        f.write(f"docker exec {SPARQL_CONTAINER_NAME[batch_id]} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=rdf_loader_run(log_enable=>2);\" &&\n")
-        f.write(f"docker exec {SPARQL_CONTAINER_NAME[batch_id]} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=checkpoint;\"&&\n")
+            f.write(f"docker exec {container_name} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=ld_dir('/usr/local/virtuoso-opensource/share/virtuoso/vad/', '{nq_file}', 'http://example.com/datasets/default');\"&&\n")
+        f.write(f"docker exec {container_name} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=rdf_loader_run(log_enable=>2);\" &&\n")
+        f.write(f"docker exec {container_name} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=checkpoint;\"&&\n")
         f.write("exit 0\n")
         f.close()
 
-def check_file_presence(status_file, batch_id):
-    SPARQL_CONTAINER_NAME = CONFIG["sparql"]["container_name"]
+def check_file_presence(container_infos_file, batch_id):
+    batch_id = int(batch_id)
+    container_infos_file = str(container_infos_file)
+    container_name = pd.read_csv(container_infos_file).loc[batch_id, "Name"]
 
-    proc = subprocess.run(f'docker exec {SPARQL_CONTAINER_NAME[batch_id]} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | wc -l"', shell=True, capture_output=True)
+    proc = subprocess.run(f'docker exec {container_name} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | wc -l"', shell=True, capture_output=True)
     nFiles = int(proc.stdout.decode())
     expected_files = glob.glob(f"{MODEL_DIR}/dataset/*.nq")
     expected_nFiles = len(expected_files)
     while nFiles != expected_nFiles: 
         print(f"Expecting {expected_nFiles} *.nq files in virtuoso container, got {nFiles}!") 
-        deploy_virtuoso(status_file, restart=True)
+        activate_one_container(container_infos_file, batch_id)
        
-        proc = subprocess.run(f'docker exec {SPARQL_CONTAINER_NAME[batch_id]} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | wc -l"', shell=True, capture_output=True)
+        proc = subprocess.run(f'docker exec {container_name} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | wc -l"', shell=True, capture_output=True)
         nFiles = int(proc.stdout.decode())
 
-def check_file_stats(batch_id):
-    SPARQL_CONTAINER_NAME = CONFIG["sparql"]["container_name"]
+def check_file_stats(container_infos_file, batch_id):
+    batch_id = int(batch_id)
+    container_infos_file = str(container_infos_file)
+    container_name = pd.read_csv(container_infos_file).loc[batch_id, "Name"]
 
     cmd = 'stat -c "%Y" '
-    proc = subprocess.run(f'docker exec {SPARQL_CONTAINER_NAME[batch_id]} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | sort"', shell=True, capture_output=True)
+    proc = subprocess.run(f'docker exec {container_name} sh -c "ls /usr/local/virtuoso-opensource/share/virtuoso/vad/*.nq | sort"', shell=True, capture_output=True)
     container_files = str(proc.stdout.decode()).split("\n")
     local_files = sorted(glob.glob(f"{MODEL_DIR}/dataset/*.nq"))
 
@@ -129,13 +141,34 @@ def check_file_stats(batch_id):
         if Path(local_file).stem != Path(container_file).stem:
             raise RuntimeError(f"Mismatch between local file {Path(local_file).stem} and container file {Path(container_file).stem}")
 
-        ctn_mod_time = int(subprocess.run(f'docker exec {SPARQL_CONTAINER_NAME[batch_id]} {cmd} {container_file}', shell=True, capture_output=True).stdout.decode())
+        ctn_mod_time = int(subprocess.run(f'docker exec {container_name} {cmd} {container_file}', shell=True, capture_output=True).stdout.decode())
         local_mod_time = int(subprocess.run(f"{cmd} {local_file}", shell=True, capture_output=True).stdout.decode())
 
         if ctn_mod_time < local_mod_time:
             raise RuntimeError(f"Container file {container_file} is older than local file {local_file}")
-            # shell(f"docker exec {SPARQL_CONTAINER_NAME[batch_id]} rm /usr/local/virtuoso-opensource/share/virtuoso/vad/{container_file}")
-            # shell(f'docker cp {local_file} {SPARQL_CONTAINER_NAME[batch_id]}:/usr/local/virtuoso-opensource/share/virtuoso/vad/')
+            # shell(f"docker exec {container_name} rm /usr/local/virtuoso-opensource/share/virtuoso/vad/{container_file}")
+            # shell(f'docker cp {local_file} {container_name}:/usr/local/virtuoso-opensource/share/virtuoso/vad/')
+
+def activate_one_container(container_infos_file, batch_id):
+    """ Activate one container while stopping all others
+    """
+
+    if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} ps {SPARQL_SERVICE_NAME}") != 0:
+        deploy_virtuoso(container_infos_file, restart=True)
+
+    container_infos_file = str(container_infos_file)
+    container_infos = pd.read_csv(container_infos_file)
+    batch_id = int(batch_id)
+    container_name = container_infos.loc[batch_id, "Name"]
+
+    if check_container_status(SPARQL_COMPOSE_FILE, container_name) != "running":
+        print("Stopping all containers...")
+        shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} stop {SPARQL_SERVICE_NAME}")
+            
+        print(f"Starting container {container_name}...")
+        shell(f"docker start {container_name}")
+        container_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, container_name)
+        wait_for_container(container_endpoint, f"{BENCH_DIR}/virtuoso-ok.txt", wait=1)
 
 #=================
 # PIPELINE
@@ -171,11 +204,10 @@ rule exec_provenance_query:
     threads: 1
     input: 
         provenance_query="{benchDir}/{query}/instance_{instance_id}/provenance.sparql",
-        loaded_virtuoso="{benchDir}/virtuoso_batch{batch_id}-ok.txt"
+        loaded_virtuoso="{benchDir}/virtuoso_batch{batch_id}-ok.txt",
     output: "{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv"
     run: 
-        SPARQL_CONTAINER_ENDPOINTS = CONFIG["sparql"]["endpoint"]
-        wait_for_container(SPARQL_CONTAINER_ENDPOINTS[int(wildcards.batch_id)], input.loaded_virtuoso, wait=1)
+        activate_one_container(f"{BENCH_DIR}/container_infos.csv", wildcards.batch_id)
         shell('python rsfb/query.py execute-query {CONFIGFILE} {input.provenance_query} {output} {wildcards.batch_id}')
 
 rule ingest_virtuoso:
@@ -184,11 +216,12 @@ rule ingest_virtuoso:
     input: 
         vendor=expand("{modelDir}/virtuoso/ingest_vendor_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
         ratingsite=expand("{modelDir}/virtuoso/ingest_ratingsite_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
-        virtuoso_status="{benchDir}/virtuoso-up.txt"
     output: "{benchDir}/virtuoso_batch{batch_id}-ok.txt"
     run: 
-        check_file_presence(input.virtuoso_status, int(wildcards.batch_id))
-        check_file_stats(int(wildcards.batch_id))
+        container_infos = f"{BENCH_DIR}/container_infos.csv"
+        activate_one_container(container_infos, wildcards.batch_id)
+        check_file_presence(container_infos, wildcards.batch_id)
+        check_file_stats(container_infos, wildcards.batch_id)
         shell(f'sh {input.vendor} bsbm && sh {input.ratingsite}')
         shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationVendor.test_vendor_nb_sources")
         shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationRatingSite.test_ratingsite_nb_sources")
@@ -199,23 +232,27 @@ rule deploy_virtuoso:
     threads: 1
     input:
         vendor=expand("{modelDir}/dataset/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR),
-        ratingsite=expand("{modelDir}/dataset/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR)
-    output: "{benchDir}/virtuoso-up.txt"
+        ratingsite=expand("{modelDir}/dataset/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR),
+    output: "{benchDir}/container_infos.csv"
     run: deploy_virtuoso(output)
 
 rule make_virtuoso_ingest_command_for_vendor:
     priority: 5
     threads: 1
-    input: expand("{modelDir}/dataset/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR)
+    input: 
+        vendor_data = expand("{modelDir}/dataset/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR),
+        container_infos = expand("{benchDir}/container_infos.csv", benchDir=BENCH_DIR)
     output: "{modelDir}/virtuoso/ingest_vendor_batch{batch_id}.sh"
-    run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), N_VENDOR)
+    run: generate_virtuoso_scripts(input.container_infos, input.vendor_data, output, wildcards.batch_id, N_VENDOR)
 
 rule make_virtuoso_ingest_command_for_ratingsite:
     priority: 5
     threads: 1
-    input: expand("{modelDir}/dataset/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR)
+    input: 
+        ratingsite_data = expand("{modelDir}/dataset/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR),
+        container_infos = expand("{benchDir}/container_infos.csv", benchDir=BENCH_DIR)
     output: "{modelDir}/virtuoso/ingest_ratingsite_batch{batch_id}.sh"
-    run: generate_virtuoso_scripts(input, output, int(wildcards.batch_id), N_RATINGSITE)
+    run: generate_virtuoso_scripts(input.container_infos, input.ratingsite_data, output, wildcards.batch_id, N_RATINGSITE)
 
 rule build_provenance_query: 
     """
@@ -258,8 +295,7 @@ rule exec_value_selection_query:
     params:
         batch_id=0
     run: 
-        SPARQL_CONTAINER_ENDPOINTS = CONFIG["sparql"]["endpoint"]
-        wait_for_container(SPARQL_CONTAINER_ENDPOINTS[int(params.batch_id)], input.virtuoso_status, wait=1)
+        activate_one_container(f"{BENCH_DIR}/container_infos.csv", params.batch_id)
         shell("python rsfb/query.py execute-query {CONFIGFILE} {input.value_selection_query} {output} {params.batch_id}")
 
 rule build_value_selection_query:

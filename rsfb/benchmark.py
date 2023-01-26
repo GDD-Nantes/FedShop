@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import click
@@ -12,7 +13,7 @@ def cli():
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.option("--debug", is_flag=True, default=False)
-@click.option("--clean", type=click.STRING, help="[all, model, benchmark] + db")
+@click.option("--clean", type=click.STRING, help="[all, model, benchmark] + db + [metrics|metrics_batchk]")
 @click.option("--cores", type=click.INT, default=1, help="The number of cores used allocated. -1 if use all cores.")
 @click.option("--rerun-incomplete", is_flag=True, default=False)
 @click.pass_context
@@ -126,7 +127,21 @@ def wipe(configfile, level: str):
         
     if "db" in args:
         if os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)
-        if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)       
+        if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)  
+        os.system(f"{WORK_DIR}/benchmark/generation/virtuoso_batch*.csv")
+        
+    if "metrics" in args:
+        Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
+        os.system(f"rm {WORK_DIR}/benchmark/generation/metrics_batch*.csv")
+        os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/**/batch_*/")
+    elif "metrics_" in level:
+        Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
+        matched = re.search(r"_batch((\\d+%)*(\\d+))", level)
+        if matched is not None:
+            batches = matched.group(1).split("%")
+            for batch in batches:
+                os.system(f"rm {WORK_DIR}/benchmark/generation/metrics_batch{batch}.csv")
+                os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/**/batch_{batch}/")
 
     if "all" in args:
         Path(f"{WORK_DIR}/generator-ok.txt").unlink(missing_ok=True)

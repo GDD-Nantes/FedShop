@@ -176,7 +176,6 @@ def build_value_selection_query(queryfile, outfile):
         _type_: a csv file at outfile containing values for placeholders
     """
     consts = __get_uninjected_placeholders(queryfile)
-    print(consts)
 
     query = open(queryfile).read()
     query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {' '.join(consts)} WHERE", query)
@@ -271,7 +270,7 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
             elif resource["op"] == "$":
                 repl_val = value_selection_values[column].dropna().sample(1)
             elif resource["op"] == "$!":
-                repl_val = value_selection_values[column].dropna().where(value_selection_values[column] != injection_cache[column]).sample(1)
+                repl_val = value_selection_values.query(f"`{column}` != {repr(injection_cache[column])}")[column].sample(1)
             
             # Special treatment for REGEX
             #   Extract randomly 1 from 10 most common words in the result list
@@ -321,10 +320,17 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
                     query = f"PREFIX {prefixName}: <{prefixSub}>" + "\n" + query
         
         injection_cache[column] = repl_val
-        query = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", query)
+        
+        # Replace the const by the value in every line except the comment
+        result = ""
+        for line in StringIO(query).readlines():
+            if line.strip().startswith("#"):
+                result += line
+            else:
+                result += re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", line)
     
     json.dump(injection_cache, open(cache_filename, "w"))
-    return query
+    return result
 
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
@@ -452,7 +458,7 @@ def build_provenance_query(queryfile, outfile):
 
     query = open(queryfile).read()
     prefix_full_to_alias, _ = __parse_query(queryfile)
-    ss_cache = dict()
+    ss_cache = []
 
     # Wrap each tp with GRAPH clause
     ntp = 0
@@ -468,13 +474,17 @@ def build_provenance_query(queryfile, outfile):
                 queryHeader += line
             continue
         
+        #print("read:", line.strip())
         subline_search = re.search(r"^(\s|(\w+\s*\{)|\{)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\?\w+|\w+:\w+|<\S+>))(\s|\}|\.)*\s*$", line)
         if subline_search is not None:
             subline = subline_search.group(3)
             subject = subline_search.group(4)
             predicate = subline_search.group(5)
             object = subline_search.group(6)
-            if subline not in ss_cache.keys():
+            # print("parsed: ", subject, predicate, object)
+            if subline not in ss_cache:
+                # print("not cached")
+                ss_cache.append(subline)
                 ntp += 1
                 predicate_search = re.search(r"(\?\w+|a|(\w+):(\w+)|<\S+>)", predicate)
                 predicate_full = predicate_search.group(1)
@@ -482,6 +492,8 @@ def build_provenance_query(queryfile, outfile):
                     predicate_full = f"{prefix_alias_to_full[predicate_search.group(2)]}{predicate_search.group(3)}"
                 composition[f"tp{ntp}"] = [subject, predicate_full, object]
                 queryBody += re.sub(re.escape(subline), f"GRAPH ?tp{ntp} {{ {subline} }}", line)
+            # else:
+            #     print("cached")
         else:
             queryBody += line
             if "WHERE" in line:
@@ -489,6 +501,7 @@ def build_provenance_query(queryfile, outfile):
     
     graph_proj = ' '.join([ f"?tp{i}" for i in np.arange(1, ntp+1) ])
     # Deferring the task of eliminate duplicate downstream if needed.
+    # raise RuntimeError("LOL")
     with open(outfile, mode="w+") as out:
         query = queryHeader + queryBody
         query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {graph_proj} WHERE", query)
@@ -526,15 +539,15 @@ def create_workload_value_selection(value_selection, workload_value_selection, n
                 numerical_cols.append(col)
 
     numerical = value_selection_values[numerical_cols]
-
     workload = value_selection_values
+
     if not numerical.empty:
         query = " or ".join([
-            #f"( `{col}` >= {repr(numerical[col].quantile(0.25))} and `{col}` <= {repr(numerical[col].quantile(0.75))} )"
-            f"( `{col}` > {repr(numerical[col].min())} and `{col}` < {repr(numerical[col].max())} )" 
+            f"( `{col}` >= {repr(numerical[col].quantile(0.10))} and `{col}` <= {repr(numerical[col].quantile(0.90))} )"
+            #f"( `{col}` > {repr(numerical[col].min())} and `{col}` < {repr(numerical[col].max())} )" 
             for col in numerical.columns
         ])
-
+        
         workload = value_selection_values.query(query)
    
     workload.sample(n_instances).to_csv(workload_value_selection, index=False)

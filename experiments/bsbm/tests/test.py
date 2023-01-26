@@ -8,7 +8,7 @@ from click.testing import CliRunner
 
 import pandas as pd
 import numpy as np
-from scipy.stats import norm, kstest
+from scipy.stats import norm, kstest, uniform
 from scipy.stats.contingency import expected_freq
 import seaborn as sns
 

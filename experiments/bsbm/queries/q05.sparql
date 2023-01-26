@@ -14,13 +14,13 @@ WHERE {
 	?localProduct owl:sameAs ?product .
 	?localProdFeature owl:sameAs ?prodFeature .
 
-	?localProductXYZ bsbm:productFeature ?localProdFeatureXYZ . # forced to rename
+	?localProductXYZ bsbm:productFeature ?localProdFeatureXYZ .
 	?localProductXYZ bsbm:productPropertyNumeric1 ?origProperty1 .
 	?localProductXYZ bsbm:productPropertyNumeric2 ?origProperty2 .
 
 	# const ?ProductXYZ
 	?localProductXYZ owl:sameAs ?ProductXYZ .
-	?localProdFeatureXYZ owl:sameAs ?prodFeature . # same prodFeature
+	?localProdFeatureXYZ owl:sameAs ?prodFeature .
 
 	FILTER (?ProductXYZ != ?product)
 	# Values are pre-determined because we knew the boundaries from the normal distribution
