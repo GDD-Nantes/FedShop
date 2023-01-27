@@ -234,7 +234,8 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
 
     for const, resource in parse_result.items():                
         # Replace all tokens in subDict
-        column = const[1:] if (resource is None or resource.get("src") is None) else resource["src"][1:]
+        isOpUnary = (resource is None or resource.get("src") is None)
+        column =  const[1:] if isOpUnary else resource.get("src")[1:]
 
         # When not using workload value_selection_query, i.e, filling partially injected queries
         if "workload_" not in value_selection:
@@ -249,7 +250,7 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
         repl_val = placeholder_chosen_values[column].item() if instance_id is None else placeholder_chosen_values.loc[instance_id, column]
         if pd.isnull(repl_val): 
             if accept_random:
-                repl_val = value_selection_values[column].dropna().sample(1).item()
+                repl_val = value_selection_values[column].dropna().sample(1)
             elif ignore_errors: continue
             else: raise RuntimeError(f"There is no value for {column}")
 
@@ -263,18 +264,22 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
             elif np.issubdtype(dtype, np.datetime64):
                 epsilon = pd.Timedelta(1, unit="day")
 
-            if ">" in resource["op"]:
+            # Implement more operators here
+            op = resource["op"]
+            if ">" in op:
                 repl_val = value_selection_values[column].dropna().max() + epsilon
-            elif "<" in resource["op"]:
+            elif "<" in op:
                 repl_val = value_selection_values[column].dropna().min() - epsilon
-            elif resource["op"] == "$":
+            elif op == "$":
                 repl_val = value_selection_values[column].dropna().sample(1)
-            elif resource["op"] == "$!":
-                repl_val = value_selection_values.query(f"`{column}` != {repr(injection_cache[column])}")[column].sample(1)
-            
+            elif op == "$!":
+                repl_val = value_selection_values[
+                    value_selection_values[column].apply(str) != injection_cache[column]
+                ][column].sample(1)
+                        
             # Special treatment for REGEX
             #   Extract randomly 1 from 10 most common words in the result list
-            elif resource["op"] == "in":
+            elif op == "in":
                 langs = value_selection_values[column].dropna().apply(lambda x: lang_detect(x))
                 for lang in set(langs):
                     try: stopwords.extend(nltk_stopwords.words(lang))
@@ -297,20 +302,29 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
             
             # Special treatment for exclusion
             # Query with every other placeholder set
-            elif resource["op"] == "not":
+            elif op == "not":
                 # From q03: user asks for products having several features but not having a specific other feature. 
                 exclusion_query = " and ".join([f"`{column}` != {repr(repl_val)}"] + [ f"`{k}` != {repr(v)}" for k, v in injection_cache.items() ])
                 repl_val = value_selection_values.query(exclusion_query)[column].sample(1)
             
-        # Convert Pandas numpy object to Python object
+            print(f"op: {op}; column: {column}; val: {repl_val}")
+            
         try: repl_val = repl_val.item()
         except: pass
 
+        # Save injection
+        print(type(repl_val), value_selection_values[column].dtype)
+        if np.issubdtype(value_selection_values[column].dtype, np.datetime64):
+            injection_cache[column] = str(repl_val)
+        else:
+            injection_cache[column] = repl_val
+
+        # Convert to n3 representation
         if str(repl_val).startswith("http") or str(repl_val).startswith("nodeID"): 
             repl_val = URIRef(repl_val).n3()
         else:
             repl_val = Literal(repl_val).n3()
-
+            
         # Shorten string representations with detected and common prefixes
         for prefixSub, prefixName in prefix_full_to_alias.items():
             if prefixSub in repl_val:
@@ -319,18 +333,10 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
                 if re.search(re.escape(missing_prefix), query) is None:
                     query = f"PREFIX {prefixName}: <{prefixSub}>" + "\n" + query
         
-        injection_cache[column] = repl_val
-        
-        # Replace the const by the value in every line except the comment
-        result = ""
-        for line in StringIO(query).readlines():
-            if line.strip().startswith("#"):
-                result += line
-            else:
-                result += re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", line)
+        query = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", query)
     
     json.dump(injection_cache, open(cache_filename, "w"))
-    return result
+    return query
 
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))

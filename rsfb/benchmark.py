@@ -136,12 +136,23 @@ def wipe(configfile, level: str):
         os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/**/batch_*/")
     elif "metrics_" in level:
         Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
-        matched = re.search(r"_batch((\\d+%)*(\\d+))", level)
+        matched = re.search(r"metrics_batch((\\d+%)*(\\d+))", level)
         if matched is not None:
             batches = matched.group(1).split("%")
             for batch in batches:
                 os.system(f"rm {WORK_DIR}/benchmark/generation/metrics_batch{batch}.csv")
                 os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/**/batch_{batch}/")
+                
+    if "instance" in args:
+        Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
+        os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/instance_*/")
+    elif "instance_" in level:
+        Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
+        matched = re.search(r"instance_((\\d+%)*(\\d+))", level)
+        if matched is not None:
+            instances = matched.group(1).split("%")
+            for instance in instances:
+                os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/instance_{instance}/")
 
     if "all" in args:
         Path(f"{WORK_DIR}/generator-ok.txt").unlink(missing_ok=True)
