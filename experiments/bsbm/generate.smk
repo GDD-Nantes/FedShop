@@ -94,19 +94,22 @@ def start_generator(status_file):
 
     return status_file
 
-def generate_virtuoso_scripts(container_infos_file, nqfiles, shfiles, batch_id, n_items):
+def generate_virtuoso_scripts(container_infos_file, prefix, shfiles, batch_id, n_items):
     batch_id = int(batch_id)
     container_infos_file = str(container_infos_file)
     container_name = pd.read_csv(container_infos_file).loc[batch_id, "Name"]
 
-    nq_files = [ os.path.basename(f) for f in nqfiles ]
     _, edges = np.histogram(np.arange(n_items), N_BATCH)
     edges = edges[1:].astype(int) + 1
     batch = edges[batch_id]
     with open(f"{shfiles}", "w+") as f:
         f.write(f"echo \"Writing ingest script for batch {batch_id}, slicing at {batch}-th source...\"\n")
-        for nq_file in nq_files[:batch]:
-            f.write(f"docker exec {container_name} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=ld_dir('/usr/local/virtuoso-opensource/share/virtuoso/vad/', '{nq_file}', 'http://example.com/datasets/default');\"&&\n")
+        
+        f.write(f"for id in $(seq 0 {batch-1}); do\n")
+        f.write(f"  docker exec {container_name} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=ld_dir('/usr/local/virtuoso-opensource/share/virtuoso/vad/', '{prefix}$id.nq', 'http://example.com/datasets/default');\" >> /dev/null\n")
+        f.write(f"  echo $id\n")
+        f.write(f"done | tqdm --total {batch} --unit files >> /dev/null\n")
+
         f.write(f"docker exec {container_name} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=rdf_loader_run(log_enable=>2);\" &&\n")
         f.write(f"docker exec {container_name} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=checkpoint;\"&&\n")
         f.write("exit 0\n")
@@ -268,19 +271,17 @@ rule make_virtuoso_ingest_command_for_vendor:
     priority: 5
     threads: 1
     input: 
-        vendor_data = expand("{modelDir}/dataset/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR),
         container_infos = expand("{benchDir}/container_infos.csv", benchDir=BENCH_DIR)
     output: "{modelDir}/virtuoso/ingest_vendor_batch{batch_id}.sh"
-    run: generate_virtuoso_scripts(input.container_infos, input.vendor_data, output, wildcards.batch_id, N_VENDOR)
+    run: generate_virtuoso_scripts(input.container_infos, "vendor", output, wildcards.batch_id, N_VENDOR)
 
 rule make_virtuoso_ingest_command_for_ratingsite:
     priority: 5
     threads: 1
     input: 
-        ratingsite_data = expand("{modelDir}/dataset/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR),
         container_infos = expand("{benchDir}/container_infos.csv", benchDir=BENCH_DIR)
     output: "{modelDir}/virtuoso/ingest_ratingsite_batch{batch_id}.sh"
-    run: generate_virtuoso_scripts(input.container_infos, input.ratingsite_data, output, wildcards.batch_id, N_RATINGSITE)
+    run: generate_virtuoso_scripts(input.container_infos, "ratingsite", output, wildcards.batch_id, N_RATINGSITE)
 
 rule build_provenance_query: 
     """
