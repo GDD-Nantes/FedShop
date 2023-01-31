@@ -4,9 +4,7 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
-SELECT ?vendorId ?localOffer ?offerId
+SELECT ?g (COUNT(*) as ?nbTriples)
 WHERE {
-    ?localOffer bsbm:vendor ?localVendor .
-    BIND (REPLACE(STR(?localVendor), ".*(vendor)(\\d+).*", "$1$2") as ?vendorId ) .
-    ?localOffer owl:sameAs ?offerId .
+    GRAPH ?g { ?s ?p ?o }
 }
