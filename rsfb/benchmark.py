@@ -32,7 +32,7 @@ def generate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
 
     N_BATCH=CONFIG["n_batch"]
 
-    GENERATION_SNAKEFILE=f"{WORK_DIR}/generate-batch.smk"
+    GENERATION_SNAKEFILE=f"{WORK_DIR}/generate.smk"
 
     WORKFLOW_DIR = f"{WORK_DIR}/rulegraph"
     os.makedirs(name=WORKFLOW_DIR, exist_ok=True)
@@ -69,7 +69,7 @@ def evaluate(ctx: click.Context, configfile, debug, clean, rerun_incomplete):
     EVAL_CONFIG = load_config(configfile)["evaluation"]
     WORK_DIR = GEN_CONFIG["workdir"]
 
-    SPARQL_COMPOSE_FILE = GEN_CONFIG["sparql"]["compose_file"]
+    SPARQL_COMPOSE_FILE = GEN_CONFIG["virtuoso"]["compose_file"]
     EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate.smk"
     N_ENGINES = len(EVAL_CONFIG["evaluation"]["engines"])
 
@@ -111,7 +111,7 @@ def wipe(configfile, level: str):
     CONFIG = load_config(configfile)["generation"]
     WORK_DIR = CONFIG["workdir"]
     
-    SPARQL_COMPOSE_FILE = CONFIG["sparql"]["compose_file"]
+    SPARQL_COMPOSE_FILE = CONFIG["virtuoso"]["compose_file"]
     GENERATOR_COMPOSE_FILE = CONFIG["generator"]["compose_file"]
 
     def remove_model():
@@ -126,11 +126,14 @@ def wipe(configfile, level: str):
         shutil.rmtree(f"{WORK_DIR}/rulegraph", ignore_errors=True)
         
     if "db" in args:
+        print("Cleaning all databases...")
         if os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)
         if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)  
         os.system(f"{WORK_DIR}/benchmark/generation/virtuoso_batch*.csv")
+        os.system(f"{WORK_DIR}/benchmark/generation/virtuoso-*.csv")
         
     if "metrics" in args:
+        print("Cleaning all metrics...")
         Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
         os.system(f"rm {WORK_DIR}/benchmark/generation/metrics_batch*.csv")
         os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/**/batch_*/")
@@ -140,10 +143,12 @@ def wipe(configfile, level: str):
         if matched is not None:
             batches = matched.group(1).split("%")
             for batch in batches:
+                print(f"Cleaning metrics for batch {batch}")
                 os.system(f"rm {WORK_DIR}/benchmark/generation/metrics_batch{batch}.csv")
                 os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/**/batch_{batch}/")
                 
     if "instance" in args:
+        print("Cleaning all instances...")
         Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
         os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/instance_*/")
     elif "instance_" in level:
@@ -152,6 +157,7 @@ def wipe(configfile, level: str):
         if matched is not None:
             instances = matched.group(1).split("%")
             for instance in instances:
+                print(f"Cleaning instance {instance}")
                 os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/instance_{instance}/")
 
     if "all" in args:

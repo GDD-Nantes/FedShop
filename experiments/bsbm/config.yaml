@@ -5,17 +5,17 @@ generation:
   n_federation_members: "${sum: ${generation.schema.vendor.params.vendor_n}, ${generation.schema.ratingsite.params.ratingsite_n}}" 
   verbose: true
   stats:
-    confidence_level: 0.90
+    confidence_level: 0.95
   generator: 
     #exec: "docker exec watdiv watdiv"
     exec: "watdiv"
     endpoint: "http://localhost:8000"
-    compose_file: "${generation.workdir}/docker-compose-generator.yml"
+    compose_file: "${generation.workdir}/docker/generator.yml"
     container_name: "bsbm-watdiv"
-  sparql:
-    compose_file: "${generation.workdir}/docker-compose-sparql.yml"
-    endpoint: "${get_virtuoso_endpoints: ${generation.sparql.compose_file}}" 
-    container_name: "${get_virtuoso_containers: ${generation.sparql.compose_file}}" 
+  virtuoso:
+    compose_file: "${generation.workdir}/docker/virtuoso.yml"
+    endpoints: "${get_virtuoso_endpoints: ${generation.virtuoso.compose_file}}" 
+    container_names: "${get_virtuoso_containers: ${generation.virtuoso.compose_file}}" 
   schema:
     # Configuration for ONE batch
     product:

@@ -44,7 +44,7 @@ def lang_detect(txt):
 def exec_query(configfile, query, batch_id, error_when_timeout=False):
     
     config = load_config(configfile)["generation"]
-    endpoint = config["sparql"]["endpoint"][batch_id]
+    endpoint = config["virtuoso"]["endpoints"][batch_id]
     sparql_endpoint = SPARQLWrapper(endpoint)
     if error_when_timeout: sparql_endpoint.addParameter("timeout", "300000") # in ms
         
@@ -235,7 +235,10 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
     for const, resource in parse_result.items():                
         # Replace all tokens in subDict
         isOpUnary = (resource is None or resource.get("src") is None)
-        column =  const[1:] if isOpUnary else resource.get("src")[1:]
+        left = right = const[1:] if isOpUnary else resource.get("src")[1:]
+        if not isOpUnary:
+            left = const[1:]
+            right = resource.get("src")[1:]
 
         # When not using workload value_selection_query, i.e, filling partially injected queries
         if "workload_" not in value_selection:
@@ -247,17 +250,17 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
             # value_selection_values = value_selection_values.query(dedup_query).sample(1)
             placeholder_chosen_values = value_selection_values.sample(1)
 
-        repl_val = placeholder_chosen_values[column].item() if instance_id is None else placeholder_chosen_values.loc[instance_id, column]
+        repl_val = placeholder_chosen_values[right].item() if instance_id is None else placeholder_chosen_values.loc[instance_id, right]
         if pd.isnull(repl_val): 
             if accept_random:
-                repl_val = value_selection_values[column].dropna().sample(1)
+                repl_val = value_selection_values[right].dropna().sample(1)
             elif ignore_errors: continue
-            else: raise RuntimeError(f"There is no value for {column}")
+            else: raise RuntimeError(f"There is no value for {right}")
 
         # Replace for FILTER clauses
         if resource is not None:
 
-            dtype = value_selection_values[column].dtype
+            dtype = value_selection_values[right].dtype
             epsilon = None
             if np.issubdtype(dtype, np.number):
                 epsilon = 0
@@ -267,27 +270,27 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
             # Implement more operators here
             op = resource["op"]
             if ">" in op:
-                repl_val = value_selection_values[column].dropna().max() + epsilon
+                repl_val = value_selection_values[right].dropna().max() + epsilon
             elif "<" in op:
-                repl_val = value_selection_values[column].dropna().min() - epsilon
+                repl_val = value_selection_values[right].dropna().min() - epsilon
             elif op == "$":
-                repl_val = value_selection_values[column].dropna().sample(1)
+                repl_val = value_selection_values[right].dropna().sample(1)
             elif op == "$!":
                 repl_val = value_selection_values[
-                    value_selection_values[column].apply(str) != injection_cache[column]
-                ][column].sample(1)
+                    value_selection_values[right].apply(str) != injection_cache[left]
+                ][right].sample(1)
                         
             # Special treatment for REGEX
             #   Extract randomly 1 from 10 most common words in the result list
             elif op == "in":
-                langs = value_selection_values[column].dropna().apply(lambda x: lang_detect(x))
+                langs = value_selection_values[right].dropna().apply(lambda x: lang_detect(x))
                 for lang in set(langs):
                     try: stopwords.extend(nltk_stopwords.words(lang))
                     except: continue
                 
                 words = [
                     token for token in
-                    tokenizer.tokenize(str(value_selection_values[column].str.cat(sep=" ")).lower())
+                    tokenizer.tokenize(str(value_selection_values[right].str.cat(sep=" ")).lower())
                     if token not in stopwords
                 ]
                     
@@ -304,20 +307,20 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
             # Query with every other placeholder set
             elif op == "not":
                 # From q03: user asks for products having several features but not having a specific other feature. 
-                exclusion_query = " and ".join([f"`{column}` != {repr(repl_val)}"] + [ f"`{k}` != {repr(v)}" for k, v in injection_cache.items() ])
-                repl_val = value_selection_values.query(exclusion_query)[column].sample(1)
+                exclusion_query = " and ".join([f"`{right}` != {repr(repl_val)}"] + [ f"`{k}` != {repr(v)}" for k, v in injection_cache.items() ])
+                repl_val = value_selection_values.query(exclusion_query)[right].sample(1)
             
-            print(f"op: {op}; column: {column}; val: {repl_val}")
+            print(f"op: {op}; isOpUnary: {isOpUnary}; left: {left}; right: {right}; val: {repl_val}")
             
         try: repl_val = repl_val.item()
         except: pass
 
         # Save injection
-        print(type(repl_val), value_selection_values[column].dtype)
-        if np.issubdtype(value_selection_values[column].dtype, np.datetime64):
-            injection_cache[column] = str(repl_val)
+        print(type(repl_val), value_selection_values[right].dtype)
+        if np.issubdtype(value_selection_values[right].dtype, np.datetime64):
+            injection_cache[left] = str(repl_val)
         else:
-            injection_cache[column] = repl_val
+            injection_cache[left] = repl_val
 
         # Convert to n3 representation
         if str(repl_val).startswith("http") or str(repl_val).startswith("nodeID"): 

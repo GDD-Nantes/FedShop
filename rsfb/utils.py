@@ -69,7 +69,7 @@ def get_virtuoso_endpoint_by_container_name(compose_file, container_name):
     json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
     result = pd.read_json(BytesIO(json_bytes)).query(f"`Name` == {repr(container_name)}")["Publishers"] \
         .apply(__get_publisher_info) \
-        .apply(lambda x: f"http://localhost:{int(x)}/sparql") \
+        .apply(lambda x: f"http://localhost:{x}/sparql") \
         .item()
     return result
 
@@ -108,7 +108,7 @@ def load_config(filename, saveAs=None):
     if saveAs is not None:
         cache_config = None
         try: cache_config = OmegaConf.to_object(config)
-        except: cache_config = { k: v for k, v in config.items() if k not in ["sparql"]}
+        except: cache_config = { k: v for k, v in config.items() if k not in ["virtuoso"]}
         
         with open(saveAs, "w+") as tmpfile:
             OmegaConf.save(cache_config, tmpfile)

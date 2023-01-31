@@ -17,10 +17,10 @@ CONFIG = load_config(f"{WORK_DIR}/config.yaml")
 CONFIG_GEN = CONFIG["generation"]
 CONFIG_EVAL = CONFIG["evaluation"]
 
-SPARQL_ENDPOINT = CONFIG_GEN["sparql"]["endpoint"]
+SPARQL_ENDPOINT = CONFIG_GEN["virtuoso"]["endpoints"]
 
-SPARQL_COMPOSE_FILE = CONFIG_GEN["sparql"]["compose_file"]
-SPARQL_CONTAINER_NAME = CONFIG_GEN["sparql"]["container_name"]
+SPARQL_COMPOSE_FILE = CONFIG_GEN["virtuoso"]["compose_file"]
+SPARQL_CONTAINER_NAME = CONFIG_GEN["virtuoso"]["container_names"]
 
 N_QUERY_INSTANCES = CONFIG_GEN["n_query_instances"]
 N_BATCH = CONFIG_GEN["n_batch"]

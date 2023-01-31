@@ -19,7 +19,7 @@ CONFIGFILE = config["configfile"]
 WORK_DIR = "experiments/bsbm"
 CONFIG = load_config(CONFIGFILE)["generation"]
 
-SPARQL_COMPOSE_FILE = CONFIG["sparql"]["compose_file"]
+SPARQL_COMPOSE_FILE = CONFIG["virtuoso"]["compose_file"]
 SPARQL_SERVICE_NAME = get_compose_service_name(SPARQL_COMPOSE_FILE)
 
 GENERATOR_ENDPOINT = CONFIG["generator"]["endpoint"]
@@ -69,12 +69,14 @@ def wait_for_container(endpoints, outfile, wait=1):
 
 def deploy_virtuoso(container_infos_file, restart=False):
     if restart:
-        shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans --volumes")
+        shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans")
         time.sleep(2)
-    shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} up -d --scale {SPARQL_SERVICE_NAME}={N_BATCH}")
-    wait_for_container(CONFIG["sparql"]["endpoint"], f"{BENCH_DIR}/virtuoso-up.txt", wait=1)
+    # shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} up -d --scale {SPARQL_SERVICE_NAME}={N_BATCH}")
+    # wait_for_container(CONFIG["virtuoso"]["endpoints"], f"{BENCH_DIR}/virtuoso-up.txt", wait=1)
     
-    SPARQL_CONTAINER_NAMES = CONFIG["sparql"]["container_name"]
+    shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} create --no-recreate --scale {SPARQL_SERVICE_NAME}={N_BATCH}") # For docker-compose version > 2.15.1
+    
+    SPARQL_CONTAINER_NAMES = CONFIG["virtuoso"]["container_names"]
     pd.DataFrame(SPARQL_CONTAINER_NAMES, columns=["Name"]).to_csv(str(container_infos_file), index=False)
 
     shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} stop {SPARQL_SERVICE_NAME}")
@@ -193,7 +195,7 @@ rule compute_metrics:
     input: 
         expand(
             "{{benchDir}}/{query}/instance_{instance_id}/batch_{{batch_id}}/provenance.csv",
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR)],
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
             instance_id=range(N_QUERY_INSTANCES)
         )
     output: "{benchDir}/metrics_batch{batch_id}.csv"
@@ -223,9 +225,24 @@ rule ingest_virtuoso:
         check_file_presence(container_infos, wildcards.batch_id)
         check_file_stats(container_infos, wildcards.batch_id)
         shell(f'sh {input.vendor} bsbm && sh {input.ratingsite}')
-        shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationVendor.test_vendor_nb_sources")
-        shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationRatingSite.test_ratingsite_nb_sources")
+        
+        # Mini tests for sources number per batch
+        shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationVendor")
+        shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationRatingSite")
         shell(f'echo "OK" > {output}')
+
+        # test_proc = subprocess.run(
+        #     f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v", 
+        #     capture_output=True, shell=True
+        # )
+
+        # if test_proc.returncode == 0:
+        #     with open(str(output), "w+") as f:
+        #         f.write(test_proc.stdout.decode())
+        #         f.close()
+        # else: 
+        #     raise RuntimeError("The ingested data did not pass the tests. Check the output file for more information.")
+
 
 rule deploy_virtuoso:
     priority: 5
