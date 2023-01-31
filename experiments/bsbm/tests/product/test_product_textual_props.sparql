@@ -6,7 +6,7 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
 SELECT DISTINCT ?localProduct ?prop ?propVal
 WHERE {
+    VALUES ?prop { bsbm:productPropertyTextual1 bsbm:productPropertyTextual2 bsbm:productPropertyTextual3 bsbm:productPropertyTextual4 bsbm:productPropertyTextual5 }
     ?localOfferOrReview bsbm:product|bsbm:reviewFor ?localProduct .
     ?localProduct ?prop ?propVal .
-    FILTER(REGEX(?prop, "productPropertyTextual\\d+")) .
 }

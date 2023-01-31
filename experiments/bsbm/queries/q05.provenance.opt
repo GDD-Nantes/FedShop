@@ -1,0 +1,35 @@
+DEFINE sql:select-option "order"
+
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+
+SELECT DISTINCT ?bgp1 ?bgp2 WHERE { 
+
+    GRAPH ?bgp2 {
+        # const ?ProductXYZ
+        ?localProductXYZ owl:sameAs ?ProductXYZ  .
+        ?localProductXYZ bsbm:productFeature ?localProdFeatureXYZ . 
+        ?localProductXYZ bsbm:productPropertyNumeric1 ?origProperty1  .
+        ?localProductXYZ bsbm:productPropertyNumeric2 ?origProperty2  .
+        ?localProdFeatureXYZ owl:sameAs ?prodFeature .
+    } .
+
+	GRAPH ?bgp1 { 
+        ?localProdFeature owl:sameAs ?prodFeature .
+        ?localProduct owl:sameAs ?product  .
+        FILTER (?ProductXYZ != ?product)
+        ?localProduct rdfs:label ?localProductLabel  .
+        ?localProduct bsbm:productFeature ?localProdFeature  .
+        ?localProduct bsbm:productPropertyNumeric1 ?simProperty1  .
+        ?localProduct bsbm:productPropertyNumeric2 ?simProperty2  .	
+	} .
+
+	# Values are pre-determined because we knew the boundaries from the normal distribution
+	FILTER(?simProperty1 < (?origProperty1 + 120) && ?simProperty1 > (?origProperty1 - 120))
+	FILTER(?simProperty2 < (?origProperty2 + 170) && ?simProperty2 > (?origProperty2 - 170))
+
+}
+##ORDER BY ?localProductLabel
+##LIMIT 5

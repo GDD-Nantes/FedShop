@@ -6,7 +6,7 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
 SELECT ?localReview ?prop ?propVal 
 WHERE {
+    VALUES ?prop { bsbm:rating1 bsbm:rating2 bsbm:rating3 bsbm:rating4 } .
     ?localReview bsbm:reviewFor ?localProduct .
     ?localReview ?prop ?propVal .
-    FILTER(REGEX(?prop, "rating\\d+")) .
 }
