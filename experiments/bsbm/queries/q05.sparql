@@ -18,7 +18,7 @@ WHERE {
 	?localProductXYZ bsbm:productPropertyNumeric1 ?origProperty1 .
 	?localProductXYZ bsbm:productPropertyNumeric2 ?origProperty2 .
 
-	# const ?ProductXYZ $! ?product
+	# const ?ProductXYZ
 	?localProductXYZ owl:sameAs ?ProductXYZ .
 	?localProdFeatureXYZ owl:sameAs ?prodFeature .
 

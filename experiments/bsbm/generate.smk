@@ -210,7 +210,18 @@ rule exec_provenance_query:
     output: "{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv"
     run: 
         activate_one_container(f"{BENCH_DIR}/container_infos.csv", wildcards.batch_id)
-        shell('python rsfb/query.py execute-query {CONFIGFILE} {input.provenance_query} {output} {wildcards.batch_id}')
+
+        in_provenance_opt_query = f"{input.provenance_query}.opt"
+        in_provenance_opt_composition = f"{in_provenance_opt_query}.comp"
+
+        in_provenance_def_query = f"{input.provenance_query}"
+        in_provenance_def_composition = f"{in_provenance_def_query}.comp"
+
+        if os.path.exists(in_provenance_opt_query):
+            shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_provenance_opt_query} {output} {wildcards.batch_id}")
+            shell(f"python rsfb/query.py unwrap {output} {in_provenance_opt_composition} {in_provenance_def_composition}")
+        else: 
+            shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_provenance_def_query} {output} {wildcards.batch_id}")
 
 rule ingest_virtuoso:
     priority: 4
@@ -278,9 +289,22 @@ rule build_provenance_query:
     we select 10 random values for the placeholders in the BSBM query templates.
     """
     priority: 6
-    input: "{benchDir}/{query}/instance_{instance_id}/injected.sparql",
-    output: "{benchDir}/{query}/instance_{instance_id}/provenance.sparql"
-    shell: "python rsfb/query.py build-provenance-query {input} {output}"
+    input: 
+        injected="{benchDir}/{query}/instance_{instance_id}/injected.sparql",
+        injection_cache="{benchDir}/{query}/instance_{instance_id}/injection_cache.json"
+    output: 
+        provenance_query="{benchDir}/{query}/instance_{instance_id}/provenance.sparql",
+        provenance_composition="{benchDir}/{query}/instance_{instance_id}/provenance.sparql.comp"
+    run: 
+        shell("python rsfb/query.py build-provenance-query {input.injected} {output.provenance_query}")
+        in_provenance_opt_query = f"{QUERY_DIR}/{wildcards.query}.provenance.opt"
+        in_provenance_opt_composition = f"{in_provenance_opt_query}.comp"
+
+        out_provenance_opt_query = f"{output.provenance_query}.opt"
+        out_provenance_opt_composition = f"{out_provenance_opt_query}.comp"
+        if os.path.exists(in_provenance_opt_query):
+            shell(f"python rsfb/query.py inject-from-cache {in_provenance_opt_query} {input.injection_cache} {out_provenance_opt_query}")
+            shell(f"python rsfb/query.py inject-from-cache {in_provenance_opt_composition} {input.injection_cache} {out_provenance_opt_composition}")
 
 rule instanciate_workload:
     priority: 7
@@ -290,6 +314,7 @@ rule instanciate_workload:
         workload_value_selection="{benchDir}/{query}/workload_value_selection.csv",
     output:
         value_selection_query="{benchDir}/{query}/instance_{instance_id}/injected.sparql",
+        injection_cache="{benchDir}/{query}/instance_{instance_id}/injection_cache.json"
     shell:
         "python rsfb/query.py instanciate-workload {CONFIGFILE} {input.queryfile} {input.workload_value_selection} {output.value_selection_query} {wildcards.instance_id}"
 

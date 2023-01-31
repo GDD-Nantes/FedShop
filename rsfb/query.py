@@ -190,13 +190,31 @@ def build_value_selection_query(queryfile, outfile):
 
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
-@click.argument("injection_cache", type=click.Path(exists=True, file_okay=True, dir_okay=False))
-def inject_from_cache(queryfile, cache_file):
-    
+@click.argument("cache-file", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("outputfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
+def inject_from_cache(queryfile, cache_file, outputfile):
     query = open(queryfile, "r").read()
     injection_cache = json.load(open(cache_file, "r"))
     for variable, value in injection_cache.items():
-        query = re.sub(rf"{re.escape(variable)}(\W)", rf"{value}\1", query)
+        # Convert to n3 representation
+        if str(value).startswith("http") or str(value).startswith("nodeID"): 
+            value = URIRef(value).n3()
+        else:
+            value = Literal(value).n3()
+        
+        prefix_full_to_alias = json.load(open(f"{Path(cache_file).parent}/prefix_cache.json", 'r'))
+        for prefixSub, prefixName in prefix_full_to_alias.items():
+            if prefixSub in value:
+                value = re.sub(rf"<{prefixSub}(\w+)>", rf"{prefixName}:\1", value)
+                # missing_prefix = f"PREFIX {prefixName}: <{prefixSub}>"
+                # if re.search(re.escape(missing_prefix), query) is None:
+                #     query = f"PREFIX {prefixName}: <{prefixSub}>" + "\n" + query
+        
+        query = re.sub(rf"{re.escape('?'+variable)}(\W)", rf"{value}\1", query)
+        
+    with open(outputfile, "w+") as f:
+        f.write(query)
+        f.close()
 
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
@@ -223,8 +241,9 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
     qroot = Path(queryfile).parent
     query = open(queryfile, "r").read()
 
-    cache_filename = f"{qroot}/injection_cache.json"
-    injection_cache: dict = json.load(open(cache_filename, "r")) if os.path.exists(cache_filename) else dict()
+    prefix_cache_filename = f"{qroot}/prefix_cache.json"
+    injection_cache_filename = f"{qroot}/injection_cache.json"
+    injection_cache: dict = json.load(open(injection_cache_filename, "r")) if os.path.exists(injection_cache_filename) else dict()
 
     header = open(value_selection, "r").readline().strip().replace('"', '').split(",")
     value_selection_values = pd.read_csv(value_selection, parse_dates=[h for h in header if "date" in h])
@@ -276,9 +295,14 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
             elif op == "$":
                 repl_val = value_selection_values[right].dropna().sample(1)
             elif op == "$!":
-                repl_val = value_selection_values[
-                    value_selection_values[right].apply(str) != injection_cache[left]
-                ][right].sample(1)
+                targetCol = left 
+                if bool(injection_cache) and left not in injection_cache and right in injection_cache:
+                    targetCol = right
+                
+                if bool(injection_cache): 
+                    mask = value_selection_values[right].apply(str) != injection_cache[targetCol]
+                    repl_val = value_selection_values[mask][right].sample(1)
+                    
                         
             # Special treatment for REGEX
             #   Extract randomly 1 from 10 most common words in the result list
@@ -316,7 +340,6 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
         except: pass
 
         # Save injection
-        print(type(repl_val), value_selection_values[right].dtype)
         if np.issubdtype(value_selection_values[right].dtype, np.datetime64):
             injection_cache[left] = str(repl_val)
         else:
@@ -338,7 +361,8 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
         
         query = re.sub(rf"{re.escape(const)}(\W)", rf"{repl_val}\1", query)
     
-    json.dump(injection_cache, open(cache_filename, "w"))
+    json.dump(injection_cache, open(injection_cache_filename, "w"))
+    json.dump(prefix_full_to_alias, open(prefix_cache_filename, "w"))
     return query
 
 @cli.command()
@@ -446,6 +470,51 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
         f.write(query)
         f.close()
 
+@cli.command
+@click.argument("provenance", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("opt-comp", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("def-comp", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+def unwrap(provenance, opt_comp, def_comp):
+    """ Distribute sources for the bgp to all of its triple patterns, then reconsitute the provenance csv
+    In:
+    |bgp1|bgp2|
+    | x  | y  |
+    
+    Out
+    |tp1|tp2|...|tpn|
+    | x | x |...| y |
+
+    Args:
+        provenance (pd.DataFrame): _description_
+        opt_comp (dict): _description_
+        def_comp (dict): _description_
+    """
+    
+    provenance_df = pd.read_csv(provenance)
+    opt_comp_dict = json.load(open(opt_comp, 'r'))
+    def_comp_dict = json.load(open(def_comp, 'r'))
+    
+    provenance_df.to_csv(f"{provenance}.opt", index=False)
+    
+    reversed_def_comp = {" ".join(v): k for k, v in def_comp_dict.items()}
+    result = dict()
+    
+    for bgp in provenance_df.columns:
+        tps = opt_comp_dict[bgp] 
+        sources = provenance_df[bgp]
+        for tp in tps:
+            tpid = reversed_def_comp[tp]
+            result[tpid] = sources.to_list()
+    
+    result_df = pd.DataFrame.from_dict(result)
+    sorted_columns = "tp" + result_df.columns \
+        .str.replace("tp", "", regex=False) \
+        .astype(int).sort_values() \
+        .astype(str)
+    
+    result_df = result_df.reindex(sorted_columns, axis=1)
+    result_df.to_csv(provenance, index=False)
+
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("outfile", type=click.Path(dir_okay=False, file_okay=True))
@@ -495,11 +564,12 @@ def build_provenance_query(queryfile, outfile):
                 # print("not cached")
                 ss_cache.append(subline)
                 ntp += 1
-                predicate_search = re.search(r"(\?\w+|a|(\w+):(\w+)|<\S+>)", predicate)
-                predicate_full = predicate_search.group(1)
-                if predicate_search.group(2) is not None and predicate_search.group(3) is not None:
-                    predicate_full = f"{prefix_alias_to_full[predicate_search.group(2)]}{predicate_search.group(3)}"
-                composition[f"tp{ntp}"] = [subject, predicate_full, object]
+                # predicate_search = re.search(r"(\?\w+|a|(\w+):(\w+)|<\S+>)", predicate)
+                # predicate_full = predicate_search.group(1)
+                # prefix, suffix = predicate_search.group(2),  predicate_search.group(3)
+                # if prefix is not None and suffix is not None:
+                #     predicate_full = f"{prefix_alias_to_full[prefix]}{suffix}"
+                composition[f"tp{ntp}"] = [subject, predicate, object]
                 queryBody += re.sub(re.escape(subline), f"GRAPH ?tp{ntp} {{ {subline} }}", line)
             # else:
             #     print("cached")
