@@ -24,11 +24,8 @@ def compute_metrics(configfile, outfile, workload):
         workload (_type_): List of all results obtained by executing provenance queries.
     """
 
-    CONFIG = load_config(configfile)
-    N_FED_MEMBERS = CONFIG["generation"]["n_federation_members"]
-
-    def get_relevant_sources_selectivity(df: pd.DataFrame):
-        return pd.Series(df.values.flatten()).nunique() / N_FED_MEMBERS
+    def get_relevant_sources_selectivity(df: pd.DataFrame, total_number_sources):
+        return pd.Series(df.values.flatten()).nunique() / total_number_sources
 
     def get_tp_specific_relevant_sources(df: pd.DataFrame) -> float:
         """Union set of all contacted federation member over total number of federation members there is.
@@ -59,7 +56,15 @@ def compute_metrics(configfile, outfile, workload):
             df (_type_): the source selection result
         """
         pass
-
+    
+    CONFIG = load_config(configfile)["generation"]
+    vendor_data = np.arange(CONFIG["schema"]["vendor"]["params"]["vendor_n"])
+    ratingsite_data = np.arange(CONFIG["schema"]["ratingsite"]["params"]["ratingsite_n"])
+    _, vendor_edges = np.histogram(vendor_data, CONFIG["n_batch"])
+    _, ratingsite_edges = np.histogram(ratingsite_data, CONFIG["n_batch"])
+    vendor_edges = vendor_edges[1:].astype(int) + 1
+    ratingsite_edges = ratingsite_edges[1:].astype(int) + 1
+        
     metrics_df = pd.DataFrame(columns=["query", "instance", "batch", "relevant_sources_selectivity"])
     for provenance_file in workload:
         source_selection_result = pd.read_csv(provenance_file)
@@ -68,11 +73,13 @@ def compute_metrics(configfile, outfile, workload):
         instance = int(name_search.group(2))
         batch = int(name_search.group(3))
 
+        total_nb_sources = vendor_edges[batch] + ratingsite_edges[batch]
+
         new_row = {
             "query": query,
             "instance": instance,
             "batch": batch,
-            "relevant_sources_selectivity": get_relevant_sources_selectivity(source_selection_result)
+            "relevant_sources_selectivity": get_relevant_sources_selectivity(source_selection_result, total_nb_sources)
             #"tp_specific_relevant_sources_selectivity": get_tp_specific_relevant_sources(source_selection_result),
             #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(source_selection_result),
             #"xfed_join_restricted_source_level_tp_selectivity": get_xfed_join_restricted_source_level_tp_selectivity(source_selection_result)
