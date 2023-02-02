@@ -1,4 +1,24 @@
 services:
+  bsbm-product-only:
+    container_name: "bsbm-product-only"
+    #image: openlink/virtuoso-opensource-7:7.2.8
+    image: tenforce/virtuoso:virtuoso7.2.5
+    #user: "1000:1000"
+    environment:
+      SPARQL_UPDATE: "false"
+      DBA_PASSWORD: "dba"
+      VIRT_SPARQL_MaxQueryCostEstimationTime: 0
+      VIRT_SPARQL_ResultSetMaxRows: 0
+      VIRT_SPARQL_MaxQueryExecutionTime: 0
+      #VIRT_SPARQL_MaxQueryExecutionTime: 300
+      VIRT_Parameters_NumberOfBuffers: 1360000
+      VIRT_Parameters_MaxDirtyBuffers: 1000000
+    volumes:
+      - "../model/tmp/product:/usr/local/virtuoso-opensource/share/virtuoso/vad"
+    ports:
+      - 1111:1111
+      - 8890:8890
+
   bsbm-virtuoso:
     #container_name: "bsbm-virtuoso"
     #image: openlink/virtuoso-opensource-7:7.2.8
