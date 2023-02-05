@@ -13,7 +13,7 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import load_config, get_compose_service_name, get_virtuoso_endpoint_by_container_name, check_container_status
+from utils import load_config, get_virtuoso_endpoint_by_container_name, check_container_status
 
 WORK_DIR = "experiments/bsbm"
 CONFIG = load_config(f"{WORK_DIR}/config.yaml")
@@ -24,7 +24,8 @@ CONFIG_EVAL = CONFIG["evaluation"]
 SPARQL_ENDPOINT = CONFIG_GEN["virtuoso"]["endpoints"]
 
 SPARQL_COMPOSE_FILE = CONFIG_GEN["virtuoso"]["compose_file"]
-SPARQL_CONTAINER_NAME = CONFIG_GEN["virtuoso"]["container_names"]
+SPARQL_SERVICE_NAME = CONFIG_GEN["virtuoso"]["service_name"]
+SPARQL_CONTAINER_NAMES = CONFIG_GEN["virtuoso"]["container_names"]
 
 N_QUERY_INSTANCES = CONFIG_GEN["n_query_instances"]
 N_BATCH = CONFIG_GEN["n_batch"]
@@ -71,13 +72,13 @@ def activate_one_container(container_infos_file, batch_id):
     batch_id = int(batch_id)
     container_name = container_infos.loc[batch_id, "Name"]
 
-    if check_container_status(SPARQL_COMPOSE_FILE, container_name) != "running":
+    if check_container_status(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name) != "running":
         print("Stopping all containers...")
         shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} stop {SPARQL_SERVICE_NAME}")
             
         print(f"Starting container {container_name}...")
         shell(f"docker start {container_name}")
-        container_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, container_name)
+        container_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
         wait_for_container(container_endpoint, f"{WORK_DIR}/benchmark/generation/virtuoso-ok.txt", wait=1)
 
 #=================
@@ -99,47 +100,56 @@ rule merge_batch_metrics:
         expand(
             "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/{mode}/stats.csv", 
             engine=CONFIG_EVAL["engines"],
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if "_" not in f],
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
             instance_id=range(N_QUERY_INSTANCES),
-            #batch_id=0,
-            mode=["ideal"]
-            #mode=["default", "ideal"]
+            #mode=["ideal"]
+            mode=["default", "ideal"]
         )
     output: "{benchDir}/metrics_batch{batch_id}.csv"
     run: pd.concat((pd.read_csv(f, sep = ';') for f in input)).to_csv(f"{output}", index=False, sep = ';')
 
-#rule measure_default_stats:
-#    threads: 1
-#    retries: 3
-#    input: 
-#        query=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/injected.sparql", workDir=WORK_DIR),
-#        engine_config=expand("{workDir}/benchmark/evaluation/{{engine}}/config/batch_{{batch_id}}/{{engine}}.conf", workDir=WORK_DIR),
-#        prerequisite=prerequisite_for_engine,
-#        container_infos=expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR)
-#    output: 
-#        results="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/default/results",
-#        stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/default/stats.csv"
-#    params:
-#        eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
-#    run:
-#        activate_one_container(input.container_infos, wildcards.batch_id)
-#        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats}")
+rule measure_default_stats:
+   threads: 1
+   #retries: 3
+   input: 
+        query=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/injected.sparql", workDir=WORK_DIR),
+        engine_config=expand("{workDir}/benchmark/evaluation/{{engine}}/config/batch_{{batch_id}}/{{engine}}.conf", workDir=WORK_DIR),
+        virtuoso_last_batch=expand("{workDir}/benchmark/generation/virtuoso_batch{batch_n}-ok.txt", workDir=WORK_DIR, batch_n=N_BATCH-1),
+        engine_status="{benchDir}/{engine}/{engine}-ok.txt",
+        container_infos=expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR)
+   output: 
+       results="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/default/results",
+       stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/default/stats.csv"
+   params:
+       eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
+   run:
+        activate_one_container(input.container_infos, wildcards.batch_id)
+        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats}")
  
 rule measure_ideal_source_selection_stats:
     threads: 1
-    retries: 3
+    #retries: 3
     input: 
         query=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/injected.sparql", workDir=WORK_DIR),
         ideal_ss=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/batch_{{batch_id}}/provenance.csv", workDir=WORK_DIR),
         engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
-        prerequisite=prerequisite_for_engine
+        virtuoso_last_batch=expand("{workDir}/benchmark/generation/virtuoso_batch{batch_n}-ok.txt", workDir=WORK_DIR, batch_n=N_BATCH-1),
+        engine_status="{benchDir}/{engine}/{engine}-ok.txt",
+        container_infos=expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR)
     output: 
         results="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/ideal/results",
         stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/ideal/stats.csv",
     params:
         eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
-    shell: 
-        "python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats} --ideal-ss {input.ideal_ss}"
+    run: 
+        activate_one_container(input.container_infos, wildcards.batch_id)
+        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats} --ideal-ss {input.ideal_ss}")
+
+rule engines_prerequisites:
+    output: "{benchDir}/{engine}/{engine}-ok.txt"
+    params:
+        eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
+    shell: "python rsfb/engines/{wildcards.engine}.py prerequisites {params.eval_config} && echo 'OK' > {output}"
 
 rule generate_federation_declaration:
     output: "{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf"
@@ -152,9 +162,7 @@ rule generate_federation_declaration:
         vendorSliceId = np.histogram(np.arange(N_VENDOR), N_BATCH)[1][1:].astype(int)[batchId]
         batch_files = ratingsite_data_files[:ratingsiteSliceId+1] + vendor_data_files[:vendorSliceId+1]
 
-        activate_one_container(f"{WORK_DIR}/benchmark/generation/container_infos.csv",batchId)
-
-        SPARQL_ENDPOINT = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE,SPARQL_CONTAINER_NAME[batchId])
+        SPARQL_ENDPOINT = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[batchId])
 
         if str(wildcards.engine) == "splendid":
             SPLENDID_PROPERTIES = CONFIG_EVAL["engines"]["splendid"]["properties"]

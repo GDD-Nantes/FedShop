@@ -59,19 +59,21 @@ def generate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.option("--debug", is_flag=True, default=False)
-@click.option("--clean", type=click.STRING, default="benchmark", help="[all, model, benchmark] + db")
+@click.option("--clean", type=click.STRING, help="[all, model, benchmark] + db")
 @click.option("--cores", type=click.INT, default=1, help="The number of cores used allocated. -1 if use all cores.")
 @click.option("--rerun-incomplete", is_flag=True, default=False)
 @click.pass_context
-def evaluate(ctx: click.Context, configfile, debug, clean, rerun_incomplete):
+def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomplete):
 
-    GEN_CONFIG = load_config(configfile)["generation"]
-    EVAL_CONFIG = load_config(configfile)["evaluation"]
+    CONFIG = load_config(configfile)
+    GEN_CONFIG = CONFIG["generation"]
+    EVAL_CONFIG = CONFIG["evaluation"]
     WORK_DIR = GEN_CONFIG["workdir"]
 
     SPARQL_COMPOSE_FILE = GEN_CONFIG["virtuoso"]["compose_file"]
     EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate.smk"
-    N_ENGINES = len(EVAL_CONFIG["evaluation"]["engines"])
+    N_ENGINES = len(["engines"])
+    N_BATCH = GEN_CONFIG["n_batch"]
 
     WORKFLOW_DIR = f"{WORK_DIR}/rulegraph"
     os.makedirs(name=WORKFLOW_DIR, exist_ok=True)
@@ -82,19 +84,19 @@ def evaluate(ctx: click.Context, configfile, debug, clean, rerun_incomplete):
     # if in evaluate mode
     if clean is not None :
         print("Cleaning...")
-        shutil.rmtree(f"{WORK_DIR}/benchmark/evaluation")
+        shutil.rmtree(f"{WORK_DIR}/benchmark/evaluation", ignore_errors=True)
 
-    for batch in range(1, N_ENGINES+1):
+    for batch in range(1, N_BATCH+1):
         if debug:
             print("Producing rulegraph...")
             RULEGRAPH_FILE = f"{WORKFLOW_DIR}/rulegraph_generate_batch{batch}"
-            if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --debug-dag --batch merge_metrics={batch}/{N_ENGINES}") != 0 : exit(1)
+            if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --debug-dag --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
             if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --rulegraph > {RULEGRAPH_FILE}.dot") != 0 : exit(1)
             if os.system(f"dot -Tpng {RULEGRAPH_FILE}.dot > {RULEGRAPH_FILE}.png") != 0 : exit(1)
         else:
-            print(f"Producing metrics for batch {batch}/{N_ENGINES}...")
-            if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --batch merge_metrics={batch}/{N_ENGINES}") != 0 : exit(1)
-
+            print(f"Producing metrics for batch {batch}/{N_BATCH}...")
+            if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
+            
 @cli.command()
 @click.argument("level", type=click.Choice(["all", "model", "benchmark"]))
 def save(level):

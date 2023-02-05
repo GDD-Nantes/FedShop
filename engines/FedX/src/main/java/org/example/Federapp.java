@@ -121,7 +121,7 @@ public class Federapp {
     }
 
     public static void main(String[] args) throws Exception {
-        //System.out.println(Arrays.toString(args));
+        System.out.println("Numbers of arguments: " + args.length);
         // init
         CONTAINER.put(COUNT_HTTP_REQ_KEY, new AtomicInteger());
         CONTAINER.put(LIST_HTTP_REQ_KEY, new ConcurrentLinkedQueue<>());
@@ -129,15 +129,21 @@ public class Federapp {
         String queryPath = args[1];
         String resultPath = args[2];
         String statPath = args[3];
-        String sourceSelectionPath = args[4];
+        String sourceSelectionPath = "";
 
-        if (args.length > 5) {
-            String ssPath = args[5];
-            parseSS(ssPath);
+        if (args.length == 5) {
+            sourceSelectionPath = args[4];
+            parseSS(sourceSelectionPath);
         }
 
+        File statFile = new File(statPath);
+        if (statFile.getParentFile() != null) {
+            statFile.getParentFile().mkdirs();
+        }
+        statFile.createNewFile();
+
         CSVWriter statWriter = new CSVWriter(
-            new FileWriter(statPath), ';', 
+            new FileWriter(statFile), ';', 
             CSVWriter.NO_QUOTE_CHARACTER, 
             CSVWriter.DEFAULT_ESCAPE_CHARACTER, 
             CSVWriter.DEFAULT_LINE_END
@@ -206,11 +212,11 @@ public class Federapp {
         String[] header = {"query","engine","instance","batch","mode","exec_time","distinct_ss"};
         statWriter.writeNext(header);
 
-        String[] content = {query, engine, instance, batch, mode, Long.toString(durationTime), distinct_ss_list.toString()};
+        String[] content = {query, engine, instance, batch, mode, Long.toString(durationTime), String.join("|", distinct_ss_list)};
         statWriter.writeNext(content);
         statWriter.close();
 
-        createSourceSelectionFile(sourceSelectionPath);
+        createSourceSelectionFile(resultPath + ".ss");
 
         repo.shutDown();
 

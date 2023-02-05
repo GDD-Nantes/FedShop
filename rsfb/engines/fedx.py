@@ -24,6 +24,20 @@ def cli():
 
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+def prerequisites(eval_config):
+    app_config = load_config(eval_config)["evaluation"]["engines"]["fedx"]
+    app = app_config["dir"]
+    jar = os.path.join(app, "Federapp-1.0-SNAPSHOT.jar")
+    lib = os.path.join(app, "lib/*")
+    
+    if not os.path.exists(app) or not os.path.exists(jar) or os.path.exists(lib):
+        oldcwd = os.getcwd()
+        os.chdir(Path(app).parent)
+        os.system("mvn clean && mvn install dependency:copy-dependencies package")
+        os.chdir(oldcwd)
+
+@cli.command()
+@click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("fedx-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("query", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("result", type=click.Path(exists=False, file_okay=True, dir_okay=True))
@@ -63,32 +77,33 @@ def run_benchmark(eval_config, fedx_config, query, result, stats, ideal_ss):
         with open(result, "w+") as fout:
             fout.write(msg)
             fout.close()
-
-    if "q05" in query:
-        print(f"{query} ignored")
+    print("=== FedX ===")
+    print(cmd)
+    print("============")
+    
+    fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    try: 
+        #output, error = fedx_proc.communicate(timeout=timeout)
+        # with open(result + ".log", "w+") as watdivWriter:
+        #     for line in iter(fedx_proc.stderr.readline, b''):
+        #         watdivWriter.write(line.decode())
+        #     watdivWriter.close()  
+        
+        fedx_proc.wait(timeout=timeout)
+        #fedx_proc = subprocess.run(cmd, shell=True, timeout=timeout, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+        if fedx_proc.returncode == 0:
+            print(f"{query} benchmarked sucessfully")  
+        else:
+            print(f"{query} reported error")      
+            # write_empty_stats()
+            # write_empty_result("error")
+            raise RuntimeError(f"{query} reported error")
+            
+    except subprocess.TimeoutExpired: 
+        print(f"{query} timed out!")
         write_empty_stats()
-        write_empty_result("ignored")
-    else:
-
-        fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-        try: 
-            #output, error = fedx_proc.communicate(timeout=timeout)
-            fedx_proc.wait(timeout=timeout)
-            #fedx_proc = subprocess.run(cmd, shell=True, timeout=timeout, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-            if fedx_proc.returncode == 0:
-                print(f"{query} benchmarked sucessfully")  
-            else:
-                print(f"{query} reported error")
-                write_empty_stats()
-                write_empty_result("error")
-                raise RuntimeError(f"{query} reported error")
-            
-        except subprocess.TimeoutExpired: 
-            print(f"{query} timed out!")
-            write_empty_stats()
-            write_empty_result("timeout")
-            
-            kill_process(fedx_proc.pid)
+        write_empty_result("timeout")            
+        kill_process(fedx_proc.pid)
 
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)

@@ -78,5 +78,5 @@ generation:
 evaluation:
   engines:
     fedx:
-      dir: "Federapp/target"
-      timeout: 10
+      dir: "engines/FedX/target"
+      timeout: 900
