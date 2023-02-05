@@ -95,7 +95,7 @@
 </type>
 
 // ----- ProductType ----- //
-<type> bsbm:ProductType {%prod_type}
+<type> bsbm:ProductType {%type_n}
 
 <pgroup> 1.0
 #predicate rdfs:label string
@@ -108,10 +108,10 @@
 </type>
 
 // Every products have serveral product type than others
-#association bsbm:Product rdf:type bsbm:ProductType 2 {%prod_type} 1.0 NORMAL
+#association bsbm:Product rdf:type bsbm:ProductType 2 {%type_c} 1.0 NORMAL
 
 // Every products have serveral product features
-#association bsbm:Product bsbm:productFeature bsbm:ProductFeature 2 {%feature_n} 1.0 NORMAL
+#association bsbm:Product bsbm:productFeature bsbm:ProductFeature 2 {%feature_c} 1.0 NORMAL
 
 // Every product has a producer
 #association bsbm:Product bsbm:producer bsbm:Producer 2 1 1.0 NORMAL

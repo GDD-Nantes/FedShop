@@ -12,7 +12,7 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import load_config, get_compose_service_name, get_virtuoso_endpoint_by_container_name, check_container_status
+from utils import load_config, get_virtuoso_endpoint_by_container_name, check_container_status
 
 CONFIGFILE = config["configfile"]
 
@@ -20,7 +20,7 @@ WORK_DIR = "experiments/bsbm"
 CONFIG = load_config(CONFIGFILE)["generation"]
 
 SPARQL_COMPOSE_FILE = CONFIG["virtuoso"]["compose_file"]
-SPARQL_SERVICE_NAME = get_compose_service_name(SPARQL_COMPOSE_FILE)
+SPARQL_SERVICE_NAME = CONFIG["virtuoso"]["service_name"]
 
 GENERATOR_ENDPOINT = CONFIG["generator"]["endpoint"]
 GENERATOR_COMPOSE_FILE = CONFIG["generator"]["compose_file"]
@@ -157,22 +157,21 @@ def check_file_stats(container_infos_file, batch_id):
 def activate_one_container(container_infos_file, batch_id):
     """ Activate one container while stopping all others
     """
-
-    if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} ps {SPARQL_SERVICE_NAME}") != 0:
-        deploy_virtuoso(container_infos_file, restart=True)
-
     container_infos_file = str(container_infos_file)
     container_infos = pd.read_csv(container_infos_file)
     batch_id = int(batch_id)
     container_name = container_infos.loc[batch_id, "Name"]
 
-    if check_container_status(SPARQL_COMPOSE_FILE, container_name) != "running":
+    if (container_status := check_container_status(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)) is None:
+        deploy_virtuoso(container_infos_file, restart=True)
+
+    if container_status != "running":
         print("Stopping all containers...")
         shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} stop {SPARQL_SERVICE_NAME}")
             
         print(f"Starting container {container_name}...")
         shell(f"docker start {container_name}")
-        container_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, container_name)
+        container_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
         wait_for_container(container_endpoint, f"{BENCH_DIR}/virtuoso-ok.txt", wait=1)
 
 #=================
@@ -241,8 +240,8 @@ rule ingest_virtuoso:
         shell(f'sh {input.vendor} bsbm && sh {input.ratingsite}')
         
         # Mini tests for sources number per batch
-        shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationVendor")
-        shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationRatingSite")
+        shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationVendor.test_vendor_nb_sources")
+        shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationRatingSite.test_ratingsite_nb_sources")
         shell(f'echo "OK" > {output}')
 
         # test_proc = subprocess.run(

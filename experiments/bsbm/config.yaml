@@ -14,8 +14,9 @@ generation:
     container_name: "bsbm-watdiv"
   virtuoso:
     compose_file: "${generation.workdir}/docker/virtuoso.yml"
-    endpoints: "${get_virtuoso_endpoints: ${generation.virtuoso.compose_file}}" 
-    container_names: "${get_virtuoso_containers: ${generation.virtuoso.compose_file}}" 
+    service_name: "bsbm-virtuoso"
+    endpoints: "${get_virtuoso_endpoints: ${generation.virtuoso.compose_file}, ${generation.virtuoso.service_name}}" 
+    container_names: "${get_virtuoso_containers: ${generation.virtuoso.compose_file}, ${generation.virtuoso.service_name}}" 
   schema:
     # Configuration for ONE batch
     product:
@@ -28,9 +29,13 @@ generation:
       params:
         # type
         product_n: 200000
-        producer_n: "${normal_dist: 3, 1, 50}"
-        feature_n: 50
-        prod_type: "${product_type_per_product: ${generation.schema.product.params.product_n}}"
+        producer_n: "${get_product_producer_n: ${generation.schema.product.params.product_n}}"
+        feature_n: "${get_product_feature_n: ${generation.schema.product.params.product_n}}"
+        #feature_c: "${get_product_feature_c: ${generation.schema.product.params.product_n}}"
+        feature_c: 9
+        type_n: "${get_product_type_n: ${generation.schema.product.params.product_n}}"
+        #type_c: "${get_product_type_c: ${generation.schema.product.params.product_n}}"
+        type_c: 9
         # pgroup
         productPropertyTextual4_p: 0.7
         productPropertyTextual5_p: 0.8
@@ -62,6 +67,7 @@ generation:
         product_n: "${generation.schema.product.params.product_n}"
         review_n: "${normal_dist: 3, 1, 10000}" # specs: 10000
         person_n: "${divide: ${generation.schema.ratingsite.params.review_n}, 20}"
+        # person_c: "${uniform_range: 2, 37}"
 
         #pgroup
         rating1_p: 0.7

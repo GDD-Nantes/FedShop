@@ -1008,16 +1008,32 @@ class TestGenerationRatingSite(TestGenerationTemplate):
         self.assertFalse(result.empty, "The test query should return results...")
 
         result.replace("http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/", "", regex=True, inplace=True)
+        
+        # data = np.arange(CONFIG["schema"]["vendor"]["params"]["vendor_n"])
+        # _, edges = np.histogram(data, CONFIG["n_batch"])
+        # edges = edges[1:].astype(int)
+
+        # result["batchId"] = result["localReview"] \
+        #     .str.replace(r".*ratingsite(\d+).*", r"\1", regex=True) \
+        #     .astype(int) \
+        #     .apply(lambda x: np.argwhere((x <= edges)).min().item())
 
         nbReviews = result["localReview"].nunique()
         frequencies = result.groupby("prop")["propVal"].count()
-
+        
         expected_prop = pd.Series({
             "rating1": CONFIG["schema"]["ratingsite"]["params"]["rating1_p"],
             "rating2": CONFIG["schema"]["ratingsite"]["params"]["rating2_p"],
             "rating3": CONFIG["schema"]["ratingsite"]["params"]["rating3_p"],
             "rating4": CONFIG["schema"]["ratingsite"]["params"]["rating4_p"],
         })
+        
+        # df = frequencies.join(nbReviews, how="inner", on=["batchId"])        
+        # df = df.join(expected_prop, how="inner", on=["prop"])
+        
+        # df["observed"] = df["frequencies"]/df["nbReviews"]
+        
+        # print(df)
         
         observed_prop = frequencies/nbReviews
         

@@ -282,7 +282,11 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
             dtype = value_selection_values[right].dtype
             epsilon = None
             if np.issubdtype(dtype, np.number):
-                epsilon = 0
+                if np.issubdtype(dtype, np.integer):
+                    epsilon = int(np.log10(value_selection_values[right].min()))
+                    if epsilon > 1: epsilon = 1
+                else:
+                    epsilon = 0
             elif np.issubdtype(dtype, np.datetime64):
                 epsilon = pd.Timedelta(1, unit="day")
 
@@ -434,10 +438,10 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
                     solution_option = 3
                     continue
 
-            # Option 3: Relaxing the query knowing we are in an optional clause
+            # Option 3: Relax the query knowing there is NO solution mapping for given combination of placeholders
             elif solution_option == 3:
                 try:
-                    print("Option 3: Relax the query knowing we are in an optional clause")
+                    print("Option 3: Relax the query knowing there is NO solution mapping for given combination of placeholders")
                     print("Relaxing query...")
                     relaxed_query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>))", r"##\2", query)
                     next_queryfile = f"{qroot}/{qname}_relaxed.sparql"

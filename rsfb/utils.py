@@ -9,7 +9,42 @@ import yaml
 from yaml.loader import SafeLoader
 import pandas as pd
 
-class NormalDistrGenerator:
+class RandomBucket:	
+    def __init__(self, size):
+        self._cumulativePercentage = [None] * size
+        self._objects = [None] * size
+        self._index=0
+        self._totalPercentage = 0.0
+	
+    def add(self, percentage, obj):
+        if self._index == len(self._objects):
+            print("No more objects can be added into Bucket!")
+            return
+        else:
+            self._objects[self._index] = obj
+            self._cumulativePercentage[self._index] = percentage
+            self._totalPercentage += percentage
+		
+        self._index += 1
+		
+        if self._index == len(self._objects):
+            cumul = 0.0
+            for i in range(len(self._objects)):
+                cumul += self._cumulativePercentage[i] / self._totalPercentage
+                self._cumulativePercentage[i] = cumul
+
+	
+    def getRandom(self):
+        randIndex = np.random.uniform()
+		
+        for i in range(len(self._objects)):
+            if randIndex <= self._cumulativePercentage[i]:
+                return self._objects[i]
+		
+        # Should never happens, but...
+        return self._objects[len(self._objects)-1]
+
+class NormalDistGenerator:
     def __init__(self, mu, sigma, avg) -> None:
         self._avg = avg
         self._mu = mu
@@ -21,9 +56,9 @@ class NormalDistrGenerator:
         while randVal < 0:
             randVal = norm.ppf(np.random.rand(), loc=self._mu, scale=self._sigma)
         
-        return int(((randVal / self._mu) * self._avg) + 1);
+        return int(((randVal / self._mu) * self._avg) + 1)
 
-class NormalDistrRangeGenerator:
+class NormalDistRangeGenerator:
     def __init__(self, mu, sigma, maxValue, normalLimit) -> None:
         self._mu = mu
         self._sigma = sigma
@@ -36,7 +71,7 @@ class NormalDistrRangeGenerator:
         while randVal > self._normalLimit or randVal < 0:
             randVal = norm.ppf(np.random.rand(), loc=self._mu, scale=self._sigma)
         
-        return int(((randVal / self._normalLimit) * self._maxValue) + 1);
+        return int(((randVal / self._normalLimit) * self._maxValue) + 1)
 
 def divide(*args):
     if len(args) != 2:
@@ -44,55 +79,211 @@ def divide(*args):
     
     return int(args[0] / args[1])
 
-def get_compose_service_name(compose_file):
-    with open(compose_file, "r") as f:
-        return next(iter(yaml.load(f, SafeLoader)["services"]))
+def get_branching_factors(nbProducts):
+    """Compute the branching factor given the number of products. Ref: bsbmtool
+
+    Args:
+        nbProducts (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    
+    logSF = np.log10(nbProducts)
+
+    # depth = log10(scale factor)/2 + 1
+    depth = round(logSF / 2) + 1
+		
+    branchingFactors = [None] * depth
+    branchingFactors[0] = 2 * round(logSF)
+
+    temp = [2, 4, 8]
+    for i in range(depth):
+        if (i+1) < depth:
+            branchingFactors[i] = 8
+        else:
+            value = temp[round(logSF*3/2+1) % 3]
+            branchingFactors[i] = value
+
+    return branchingFactors
+
+def create_product_type_hierarchy(nbProducts):
+    branchFt = get_branching_factors(nbProducts)
+    oldDepth = -1
+    depth = 0
+    nr = 1
+    
+    maxProductTypeNrPerLevel = []
+    productTypeLeaves = []
+    productTypeNodes = []
+
+    typeQueue = [depth]
+    while len(typeQueue) > 0:
+        parent_type = typeQueue.pop(0)
+        depth = parent_type
+
+        if oldDepth != depth:
+            oldDepth = depth
+            maxProductTypeNrPerLevel.append(nr)
+
+        for _ in range(branchFt[parent_type]):
+            nr += 1
+            child_type = parent_type + 1
+
+            if parent_type == len(branchFt)-1:
+                productTypeLeaves.append(child_type)
+            else:
+                productTypeNodes.append(child_type)
+                typeQueue.append(child_type)
+
+    
+    if nr != maxProductTypeNrPerLevel[len(maxProductTypeNrPerLevel)-1]:
+        maxProductTypeNrPerLevel.append(nr)
+    
+    return productTypeLeaves, productTypeNodes
+
+def get_product_features(nbProducts):
+    """Compute the number of features given the number of products, and the random number of required feature for 1 product. Ref: bsbmtool
+
+    Args:
+        nbProducts (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    productTypeLeaves, productTypeNodes = create_product_type_hierarchy(nbProducts)
+    leaves_features, nodes_features = [None] * len(productTypeLeaves), [None] * len(productTypeNodes)
+    depth = productTypeLeaves[0]
+    featureFrom = [None] * depth
+    featureTo = [None] * depth
+
+    featureFrom[0] = featureTo[0] = 5
+    depthSum = depth * (depth+1) / 2 - 1
+
+    for i in range(2, depth+1):
+        featureFrom[i-1] = int(35 * i / depthSum)
+        featureTo[i-1] = int(75 * i / depthSum)
+
+    productFeatureNr = 1
+
+    for i, node in enumerate(productTypeNodes):
+        if i == 0: continue
+        _from = featureFrom[node]
+        _to = featureTo[node] + 1
+
+        _count = np.random.randint(_from, _to)
+        productFeatureNr += _count
+        nodes_features[i] = _count
+
+    for i, node in enumerate(productTypeLeaves):
+        _from = featureFrom[node-1]
+        _to = featureTo[node-1] + 1
+
+        _count = np.random.randint(_from, _to)
+        productFeatureNr += _count
+        leaves_features[i] = _count
+
+    return productFeatureNr, np.random.choice(leaves_features).item()
+
+def generate_producer_distribution(productCount):
+    productCountGen = NormalDistGenerator(3, 1, 50)
+    productNr = 1
+    producerOfProduct = [0]
+		
+    while productNr <= productCount :
+        # Now generate Products for this Producer
+        hasNrProducts = productCountGen.getValue()
+        if productNr+hasNrProducts-1 > productCount:
+            hasNrProducts = productCount - productNr + 1
+        productNr += hasNrProducts
+        producerOfProduct.append(productNr-1)
+    return producerOfProduct
+
+def get_product_producers(nbProducts):
+    """Compute the number of producers given the number of products and the number of types per product. Ref: bsbmtool
+
+    Args:
+        nbProducts (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    productNr = 1
+    producerNr = 1
+
+    producerOfProduct = generate_producer_distribution(nbProducts)
+    nbTypes = []
+		
+    while producerNr < len(producerOfProduct):	
+        # Generate Publisher data		
+        hasNrProducts = producerOfProduct[producerNr] - producerOfProduct[producerNr-1]
+        nbTypes.append(hasNrProducts)
+        # createProductsOfProducer(producerNr, productNr, hasNrProducts, productSeedGen)
+			
+        productNr += hasNrProducts
+        producerNr += 1
+    
+    return producerNr, np.random.choice(nbTypes).item()
 
 def __get_publisher_info(x):
-        if x is None: return -1
-        else: 
-            return pd.DataFrame.from_records(x) \
-                .query('`URL` == "0.0.0.0" and `TargetPort` == 8890')["PublishedPort"] \
-                .astype(int).item()
+    return -1 if x is None else pd.DataFrame.from_records(x) \
+        .query('`URL` == "0.0.0.0" and `TargetPort` == 8890')["PublishedPort"] \
+        .astype(int).item()
 
-def get_virtuoso_endpoints(compose_file):
-    service_name = get_compose_service_name(compose_file)
+def get_virtuoso_endpoints(compose_file, service_name):
     json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
-    result = pd.read_json(BytesIO(json_bytes))["Publishers"] \
+    infos = pd.read_json(BytesIO(json_bytes))
+    infos["containerId"] = infos["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
+    infos.sort_values("containerId", inplace=True)
+        
+    result = infos["Publishers"] \
         .apply(__get_publisher_info) \
         .apply(lambda x: f"http://localhost:{x}/sparql") \
         .to_list()
     return result
 
-def get_virtuoso_endpoint_by_container_name(compose_file, container_name):        
-    service_name = get_compose_service_name(compose_file)
+def get_virtuoso_endpoint_by_container_name(compose_file, service_name, container_name):        
     json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
-    result = pd.read_json(BytesIO(json_bytes)).query(f"`Name` == {repr(container_name)}")["Publishers"] \
+    infos = pd.read_json(BytesIO(json_bytes))
+    infos["containerId"] = infos["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
+    infos.sort_values("containerId", inplace=True)
+    result = infos.query(f"`Name` == {repr(container_name)}")["Publishers"] \
         .apply(__get_publisher_info) \
         .apply(lambda x: f"http://localhost:{x}/sparql") \
         .item()
     return result
 
-def check_container_status(compose_file, container_name):
-    service_name = get_compose_service_name(compose_file)
-    json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
-    result = pd.read_json(BytesIO(json_bytes)).query(f"`Name` == {repr(container_name)}")["State"].item()
+def check_container_status(compose_file, service_name, container_name):
+    compose_proc = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True)
+    json_bytes = compose_proc.stdout
+    infos = pd.read_json(BytesIO(json_bytes))
+    
+    result = None
+    if not infos.empty:
+        result = infos.query(f"`Name` == {repr(container_name)}")["State"].item()
+        
     return result
     
-def get_virtuoso_containers(compose_file):    
-    service_name = get_compose_service_name(compose_file)    
+def get_virtuoso_containers(compose_file, service_name):    
     json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
-    result = pd.read_json(BytesIO(json_bytes))["Name"].to_list()
-    return result
+    result = pd.read_json(BytesIO(json_bytes))
+    result["containerId"] = result["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
+    result.sort_values("containerId", inplace=True)
+    return result["Name"].to_list()
     
 OmegaConf.register_new_resolver("multiply", lambda *args: np.prod(args).item())
 OmegaConf.register_new_resolver("sum", lambda *args: np.sum(args).item())
 OmegaConf.register_new_resolver("divide", divide)
 OmegaConf.register_new_resolver("get_virtuoso_endpoints", get_virtuoso_endpoints)
 OmegaConf.register_new_resolver("get_virtuoso_containers", get_virtuoso_containers)
-OmegaConf.register_new_resolver("product_type_per_product", lambda nbProd: int(4**np.log10(nbProd).item()))
-OmegaConf.register_new_resolver("normal_dist", lambda *args: NormalDistrGenerator(*args).getValue())
-OmegaConf.register_new_resolver("normal_dist_range", lambda *args: NormalDistrRangeGenerator(*args).getValue())
+OmegaConf.register_new_resolver("get_product_type_n", lambda nbProd: len(create_product_type_hierarchy(nbProd)[0]))
+OmegaConf.register_new_resolver("get_product_type_c", lambda nbProd: get_product_producers(nbProd)[1])
+OmegaConf.register_new_resolver("get_product_feature_n", lambda nbProd: get_product_features(nbProd)[0])
+OmegaConf.register_new_resolver("get_product_feature_c", lambda nbProd: get_product_features(nbProd)[1])
+OmegaConf.register_new_resolver("get_product_producer_n", lambda nbProd: get_product_producers(nbProd)[0])
+
+OmegaConf.register_new_resolver("normal_dist", lambda *args: NormalDistGenerator(*args).getValue())
+OmegaConf.register_new_resolver("normal_dist_range", lambda *args: NormalDistRangeGenerator(*args).getValue())
 
 def load_config(filename, saveAs=None):
     """Load configuration from a file. By default, attributes are interpolated at access time.

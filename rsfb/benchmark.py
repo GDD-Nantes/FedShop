@@ -136,7 +136,6 @@ def wipe(configfile, level: str):
         print("Cleaning all metrics...")
         Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
         os.system(f"rm {WORK_DIR}/benchmark/generation/metrics_batch*.csv")
-        os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/**/batch_*/")
     elif "metrics_" in level:
         Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
         matched = re.search(r"metrics_batch((\\d+%)*(\\d+))", level)
@@ -145,9 +144,8 @@ def wipe(configfile, level: str):
             for batch in batches:
                 print(f"Cleaning metrics for batch {batch}")
                 os.system(f"rm {WORK_DIR}/benchmark/generation/metrics_batch{batch}.csv")
-                os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/**/batch_{batch}/")
                 
-    if "instance" in args:
+    if "instances" in args:
         print("Cleaning all instances...")
         Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
         os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/instance_*/")

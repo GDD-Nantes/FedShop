@@ -23,9 +23,12 @@ def compute_metrics(configfile, outfile, workload):
     Args:
         workload (_type_): List of all results obtained by executing provenance queries.
     """
+    
+    def get_distinct_sources(df):
+        return pd.Series(df.values.flatten()).nunique()
 
     def get_relevant_sources_selectivity(df: pd.DataFrame, total_number_sources):
-        return pd.Series(df.values.flatten()).nunique() / total_number_sources
+        return get_distinct_sources(df) / total_number_sources
 
     def get_tp_specific_relevant_sources(df: pd.DataFrame) -> float:
         """Union set of all contacted federation member over total number of federation members there is.
@@ -65,20 +68,20 @@ def compute_metrics(configfile, outfile, workload):
     vendor_edges = vendor_edges[1:].astype(int) + 1
     ratingsite_edges = ratingsite_edges[1:].astype(int) + 1
         
-    metrics_df = pd.DataFrame(columns=["query", "instance", "batch", "relevant_sources_selectivity"])
+    metrics_df = pd.DataFrame(columns=["query", "instance", "batch", "distinct_sources", "relevant_sources_selectivity"])
     for provenance_file in workload:
         source_selection_result = pd.read_csv(provenance_file)
         name_search = re.search(r".*/(q\d+)/instance_(\d+)/batch_(\d+)/provenance.csv", provenance_file)
         query = name_search.group(1)
         instance = int(name_search.group(2))
         batch = int(name_search.group(3))
-
         total_nb_sources = vendor_edges[batch] + ratingsite_edges[batch]
-
+        
         new_row = {
             "query": query,
             "instance": instance,
             "batch": batch,
+            "distinct_sources": get_distinct_sources(source_selection_result),
             "relevant_sources_selectivity": get_relevant_sources_selectivity(source_selection_result, total_nb_sources)
             #"tp_specific_relevant_sources_selectivity": get_tp_specific_relevant_sources(source_selection_result),
             #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(source_selection_result),
