@@ -69,10 +69,10 @@ public class SourceSelection {
 
     public void doSourceSelection(List<StatementPattern> stmts) {
         if (!Federapp.CONTAINER.containsKey(Federapp.MAP_SS)) {
-            log.info("[SOURCE_SELECTION] Default");
+            //log.info("[SOURCE_SELECTION] Default");
             doSourceSelectionDefault(stmts);
         } else {
-            log.info("[SOURCE_SELECTION] Force mode");
+            //log.info("[SOURCE_SELECTION] Force mode");
             doSourceSelectionForce(stmts);
         }
     }
@@ -148,8 +148,8 @@ public class SourceSelection {
                 stmt.replaceWith(new ExclusiveStatement(stmt, sources.get(0), queryInfo));
             } else {
                 if (log.isDebugEnabled()) {
-                    log.debug("Statement " + QueryStringUtil.toString(stmt)
-                            + " does not produce any results at the provided sources, replacing node with EmptyStatementPattern.");
+                    /*log.debug("Statement " + QueryStringUtil.toString(stmt)
+                            + " does not produce any results at the provided sources, replacing node with EmptyStatementPattern.");*/
                 }
                 stmt.replaceWith(new EmptyStatementPattern(stmt));
             }
@@ -182,7 +182,7 @@ public class SourceSelection {
 
             for (String endpoint : endpoints) {
                 StatementSource s = new StatementSource(endpoint, StatementSourceType.REMOTE);
-                log.info(s.toString());
+                //log.info(s.toString());
                 stmtToSources.get(stmt).add(s);
             }
 
@@ -218,13 +218,13 @@ public class SourceSelection {
                 stmt.replaceWith(new ExclusiveStatement(stmt, sources.get(0), queryInfo));
             } else {
                 if (log.isDebugEnabled()) {
-                    log.debug("Statement " + QueryStringUtil.toString(stmt)
-                            + " does not produce any results at the provided sources, replacing node with EmptyStatementPattern.");
+                    /*log.debug("Statement " + QueryStringUtil.toString(stmt)
+                            + " does not produce any results at the provided sources, replacing node with EmptyStatementPattern.");*/
                 }
                 stmt.replaceWith(new EmptyStatementPattern(stmt));
             }
         }
-        log.info(stmtToSources.toString());
+        //log.info(stmtToSources.toString());
         Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION2_KEY, stmtToSources);
         // this.stmtToSources = new ConcurrentHashMap<>();
     }
@@ -238,11 +238,13 @@ public class SourceSelection {
         Set<Endpoint> endpoints = new HashSet<>();
         for (List<StatementSource> sourceList : stmtToSources.values()) {
             for (StatementSource source : sourceList) {
+                //log.debug("source.getEndpointID = " + source.getEndpointID());
+                //log.debug("queryInfo = " + queryInfo.getFederationContext().getEndpointManager().getEndpoint(source.getEndpointID()));
                 endpoints
                         .add(queryInfo.getFederationContext().getEndpointManager().getEndpoint(source.getEndpointID()));
             }
         }
-        log.debug("getRelevantSources = " + endpoints.toString());
+        //log.debug("getRelevantSources = " + endpoints.toString());
         Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION2_KEY, this.stmtToSources);
         return endpoints;
     }
@@ -311,7 +313,7 @@ public class SourceSelection {
                     throw new OptimizationException("Source selection has run into a timeout");
                 }
             } catch (InterruptedException e) {
-                log.debug("Error during source selection. Thread got interrupted.");
+                //log.debug("Error during source selection. Thread got interrupted.");
                 errors.add(e);
             }
 
@@ -327,7 +329,7 @@ public class SourceSelection {
                     sb.append("\n" + ExceptionUtil.getExceptionString("Error occured", e));
                 }
 
-                log.debug(sb.toString());
+                //log.debug(sb.toString());
 
                 Exception ex = errors.get(0);
                 errors.clear();

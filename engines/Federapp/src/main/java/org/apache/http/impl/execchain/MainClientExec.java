@@ -151,9 +151,9 @@ public class MainClientExec implements ClientExecChain {
 
         context.setAttribute("http.connection", managedConn);
         if (config.isStaleConnectionCheckEnabled() && managedConn.isOpen()) {
-            this.log.debug("Stale connection check");
+            //this.log.debug("Stale connection check");
             if (managedConn.isStale()) {
-                this.log.debug("Stale connection detected");
+                //this.log.debug("Stale connection detected");
                 managedConn.close();
             }
         }
@@ -178,13 +178,13 @@ public class MainClientExec implements ClientExecChain {
                 }
 
                 if (!managedConn.isOpen()) {
-                    this.log.debug("Opening connection " + route);
+                    //this.log.debug("Opening connection " + route);
 
                     try {
                         this.establishRoute(proxyAuthState, managedConn, route, request, context);
                     } catch (TunnelRefusedException var20) {
                         if (this.log.isDebugEnabled()) {
-                            this.log.debug(var20.getMessage());
+                            //this.log.debug(var20.getMessage());
                         }
 
                         response = var20.getResponse();
@@ -202,12 +202,12 @@ public class MainClientExec implements ClientExecChain {
                 }
 
                 if (this.log.isDebugEnabled()) {
-                    this.log.debug("Executing request " + request.getRequestLine());
+                    //this.log.debug("Executing request " + request.getRequestLine());
                 }
 
                 if (!request.containsHeader("Authorization")) {
                     if (this.log.isDebugEnabled()) {
-                        this.log.debug("Target auth state: " + targetAuthState.getState());
+                        //this.log.debug("Target auth state: " + targetAuthState.getState());
                     }
 
                     this.authenticator.generateAuthResponse(request, targetAuthState, context);
@@ -215,7 +215,7 @@ public class MainClientExec implements ClientExecChain {
 
                 if (!request.containsHeader("Proxy-Authorization") && !route.isTunnelled()) {
                     if (this.log.isDebugEnabled()) {
-                        this.log.debug("Proxy auth state: " + proxyAuthState.getState());
+                        //this.log.debug("Proxy auth state: " + proxyAuthState.getState());
                     }
 
                     this.authenticator.generateAuthResponse(request, proxyAuthState, context);
@@ -233,7 +233,7 @@ public class MainClientExec implements ClientExecChain {
                             s = "indefinitely";
                         }
 
-                        this.log.debug("Connection can be kept alive " + s);
+                        //this.log.debug("Connection can be kept alive " + s);
                     }
 
                     connHolder.setValidFor(duration, TimeUnit.MILLISECONDS);
@@ -252,12 +252,12 @@ public class MainClientExec implements ClientExecChain {
                 } else {
                     managedConn.close();
                     if (proxyAuthState.getState() == AuthProtocolState.SUCCESS && proxyAuthState.isConnectionBased()) {
-                        this.log.debug("Resetting proxy auth state");
+                        //this.log.debug("Resetting proxy auth state");
                         proxyAuthState.reset();
                     }
 
                     if (targetAuthState.getState() == AuthProtocolState.SUCCESS && targetAuthState.isConnectionBased()) {
-                        this.log.debug("Resetting target auth state");
+                        //this.log.debug("Resetting target auth state");
                         targetAuthState.reset();
                     }
                 }
@@ -352,13 +352,13 @@ public class MainClientExec implements ClientExecChain {
                     break;
                 case 3:
                      secure = this.createTunnelToTarget(proxyAuthState, managedConn, route, request, context);
-                    this.log.debug("Tunnel to target created.");
+                    //this.log.debug("Tunnel to target created.");
                     tracker.tunnelTarget(secure);
                     break;
                 case 4:
                     int hop = fact.getHopCount() - 1;
                     secure = this.createTunnelToProxy(route, hop, context);
-                    this.log.debug("Tunnel to proxy created.");
+                    //this.log.debug("Tunnel to proxy created.");
                     tracker.tunnelProxy(route.getHopTarget(hop), secure);
                     break;
                 case 5:
@@ -400,7 +400,7 @@ public class MainClientExec implements ClientExecChain {
 
             if (config.isAuthenticationEnabled() && this.authenticator.isAuthenticationRequested(proxy, response, this.proxyAuthStrategy, proxyAuthState, context) && this.authenticator.handleAuthChallenge(proxy, response, this.proxyAuthStrategy, proxyAuthState, context)) {
                 if (this.reuseStrategy.keepAlive(response, context)) {
-                    this.log.debug("Connection kept alive");
+                    //this.log.debug("Connection kept alive");
                     entity = response.getEntity();
                     EntityUtils.consume(entity);
                 } else {

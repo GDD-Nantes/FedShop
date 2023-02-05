@@ -1,15 +1,19 @@
 import numpy as np
 import pandas as pd
 import os
+from pathlib import Path
+import glob
 import time
 import requests
-import glob
+import subprocess
+import json
+import re
 
 import sys
 smk_directory = os.path.abspath(workflow.basedir)
-sys.path.append(os.path.join(Path(smk_directory).parent, "rsfb"))
+sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import load_config
+from utils import load_config, get_compose_service_name, get_virtuoso_endpoint_by_container_name, check_container_status
 
 WORK_DIR = "experiments/bsbm"
 CONFIG = load_config(f"{WORK_DIR}/config.yaml")
@@ -36,7 +40,9 @@ MODEL_DIR = f"{WORK_DIR}/model"
 BENCH_DIR = f"{WORK_DIR}/benchmark/evaluation"
 TEMPLATE_DIR = f"{MODEL_DIR}/watdiv"
 
-# ======== USEFUL FUNCTIONS =========
+#=================
+# USEFUL FUNCTIONS
+#=================
 
 def wait_for_container(endpoint, outfile, wait=1):
     endpoint_ok = False
@@ -53,68 +59,90 @@ def wait_for_container(endpoint, outfile, wait=1):
         f.write("OK")
         f.close()
 
-def restart_virtuoso(status_file):
-    shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} up -d {SPARQL_CONTAINER_NAME}")
-    wait_for_container(SPARQL_ENDPOINT, status_file, wait=1)
-    return status_file
-
 def prerequisite_for_engine(wildcards):
     engine = str(wildcards.engine)
-    if engine == "fedx":
-        return f"{BENCH_DIR}/fedx/virtuoso-batch{N_BATCH-1}-ok.txt"
-    return "unknown"
+    return f"{WORK_DIR}/benchmark/generation/virtuoso_batch{N_BATCH-1}-ok.txt"
 
-# ======== RULES =========
+def activate_one_container(container_infos_file, batch_id):
+    """ Activate one container while stopping all others
+    """
+    container_infos_file = str(container_infos_file)
+    container_infos = pd.read_csv(container_infos_file)
+    batch_id = int(batch_id)
+    container_name = container_infos.loc[batch_id, "Name"]
+
+    if check_container_status(SPARQL_COMPOSE_FILE, container_name) != "running":
+        print("Stopping all containers...")
+        shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} stop {SPARQL_SERVICE_NAME}")
+            
+        print(f"Starting container {container_name}...")
+        shell(f"docker start {container_name}")
+        container_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, container_name)
+        wait_for_container(container_endpoint, f"{WORK_DIR}/benchmark/generation/virtuoso-ok.txt", wait=1)
+
+#=================
+# PIPELINE
+#=================
 
 rule all:
     input: expand("{benchDir}/metrics.csv", benchDir=BENCH_DIR)
 
 rule merge_metrics:
+    priority: 1
+    input: expand("{{benchDir}}/metrics_batch{batch_id}.csv", batch_id=range(N_BATCH))
+    #input: expand("{{benchDir}}/metrics_batch{batch_id}.csv", batch_id=0)
+    output: "{benchDir}/metrics.csv"
+    run: pd.concat((pd.read_csv(f, sep = ';') for f in input)).to_csv(f"{output}", index=False, sep = ';')
+
+rule merge_batch_metrics:
     input: 
         expand(
-            "{{benchDir}}/{engine}/{query}/{instance_id}/batch_{batch_id}/{mode}/stats.csv", 
+            "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/{mode}/stats.csv", 
             engine=CONFIG_EVAL["engines"],
             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if "_" not in f],
             instance_id=range(N_QUERY_INSTANCES),
-            batch_id=range(N_BATCH),
-            mode=["default", "ideal"]
+            #batch_id=0,
+            mode=["ideal"]
+            #mode=["default", "ideal"]
         )
-    output: "{benchDir}/metrics.csv"
-    run: pd.concat((pd.read_csv(f) for f in input)).to_csv(f"{output}", index=False)
+    output: "{benchDir}/metrics_batch{batch_id}.csv"
+    run: pd.concat((pd.read_csv(f, sep = ';') for f in input)).to_csv(f"{output}", index=False, sep = ';')
 
-rule measure_default_stats:
-    threads: 1
-    retries: 3
-    input: 
-        query=expand("{workDir}/benchmark/generation/{{query}}/{{instance_id}}/injected.sparql", workDir=WORK_DIR),
-        engine_config="{benchDir}/{engine}/config/{batch_id}/{engine}.conf",
-        prerequisite=prerequisite_for_engine
-    output: 
-        results="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/default/results",
-        stats="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/default/stats.csv"
-    params:
-        eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
-    shell:
-        "python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats}"
+#rule measure_default_stats:
+#    threads: 1
+#    retries: 3
+#    input: 
+#        query=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/injected.sparql", workDir=WORK_DIR),
+#        engine_config=expand("{workDir}/benchmark/evaluation/{{engine}}/config/batch_{{batch_id}}/{{engine}}.conf", workDir=WORK_DIR),
+#        prerequisite=prerequisite_for_engine,
+#        container_infos=expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR)
+#    output: 
+#        results="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/default/results",
+#        stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/default/stats.csv"
+#    params:
+#        eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
+#    run:
+#        activate_one_container(input.container_infos, wildcards.batch_id)
+#        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats}")
  
 rule measure_ideal_source_selection_stats:
     threads: 1
     retries: 3
     input: 
-        query=expand("{workDir}/benchmark/generation/{{query}}/{{instance_id}}/injected.sparql", workDir=WORK_DIR),
-        ideal_ss=expand("{workDir}/benchmark/generation/{{query}}/{{instance_id}}/batch_{{batch_id}}/provenance.csv", workDir=WORK_DIR),
-        engine_config="{benchDir}/{engine}/config/{batch_id}/{engine}.conf",
+        query=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/injected.sparql", workDir=WORK_DIR),
+        ideal_ss=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/batch_{{batch_id}}/provenance.csv", workDir=WORK_DIR),
+        engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
         prerequisite=prerequisite_for_engine
     output: 
-        results="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/ideal/results",
-        stats="{benchDir}/{engine}/{query}/{instance_id}/batch_{batch_id}/ideal/stats.csv",
+        results="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/ideal/results",
+        stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/ideal/stats.csv",
     params:
         eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
     shell: 
         "python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.results} {output.stats} --ideal-ss {input.ideal_ss}"
 
 rule generate_federation_declaration:
-    output: "{benchDir}/{engine}/config/{batch_id}/{engine}.conf"
+    output: "{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf"
     run: 
         ratingsite_data_files = [ f"{MODEL_DIR}/dataset/ratingsite{i}.nq" for i in range(N_RATINGSITE) ]
         vendor_data_files = [ f"{MODEL_DIR}/dataset/vendor{i}.nq" for i in range(N_VENDOR) ]
@@ -122,27 +150,22 @@ rule generate_federation_declaration:
         batchId = int(wildcards.batch_id)
         ratingsiteSliceId = np.histogram(np.arange(N_RATINGSITE), N_BATCH)[1][1:].astype(int)[batchId]
         vendorSliceId = np.histogram(np.arange(N_VENDOR), N_BATCH)[1][1:].astype(int)[batchId]
-        batch_files = ratingsite_data_files[:ratingsiteSliceId] + vendor_data_files[:vendorSliceId]
+        batch_files = ratingsite_data_files[:ratingsiteSliceId+1] + vendor_data_files[:vendorSliceId+1]
+
+        activate_one_container(f"{WORK_DIR}/benchmark/generation/container_infos.csv",batchId)
+
+        SPARQL_ENDPOINT = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE,SPARQL_CONTAINER_NAME[batchId])
+
+        if str(wildcards.engine) == "splendid":
+            SPLENDID_PROPERTIES = CONFIG_EVAL["engines"]["splendid"]["properties"]
+            lines = []
+            with open(f"{SPLENDID_PROPERTIES}", "r") as properties_file:
+                lines = properties_file.readlines()
+                for i in range(len(lines)):
+                    if lines[i].startswith("sparql.endpoint"):
+                        lines[i] = re.sub(r'sparql.endpoint=.+',r'sparql.endpoint='+str(SPARQL_ENDPOINT), lines[i])
+            with open(f"{SPLENDID_PROPERTIES}", "w") as properties_file:
+                properties_file.writelines(lines)
 
         os.system(f"python rsfb/engines/{wildcards.engine}.py generate-config-file {' '.join(batch_files)} {output} --endpoint {SPARQL_ENDPOINT}")
-
-rule ingest_virtuoso:
-    threads: 1
-    input: 
-        vendor=expand("{modelDir}/virtuoso/ingest_vendor_batch{lastBatch}.sh", modelDir=MODEL_DIR, lastBatch=N_BATCH-1),
-        ratingsite=expand("{modelDir}/virtuoso/ingest_ratingsite_batch{lastBatch}.sh", modelDir=MODEL_DIR, lastBatch=N_BATCH-1),
-        virtuoso_status=expand("{benchDir}/{{engine}}/virtuoso-up.txt", benchDir=BENCH_DIR)
-    output: "{benchDir}/{engine}/virtuoso-batch{lastBatch}-ok.txt"
-    run: 
-        proc = subprocess.run(f"docker exec {SPARQL_CONTAINER_NAME} ls /usr/local/virtuoso-opensource/share/virtuoso/vad | wc -l", shell=True, capture_output=True)
-        nFiles = int(proc.stdout.decode())
-        expected_nFiles = len(glob.glob(f"{MODEL_DIR}/dataset/*.nq"))
-        if nFiles != expected_nFiles: raise RuntimeError(f"Expecting {expected_nFiles} *.nq files in virtuoso container, got {nFiles}!") 
-        os.system(f'sh {input.vendor} bsbm && sh {input.ratingsite} && echo "OK" > {output}')
-
-rule restart_virtuoso:
-    priority: 5
-    threads: 1
-    output: "{benchDir}/{engine}/virtuoso-up.txt"
-    run: restart_virtuoso(output)
 

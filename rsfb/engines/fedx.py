@@ -40,25 +40,23 @@ def run_benchmark(eval_config, fedx_config, query, result, stats, ideal_ss):
     r_root = Path(result).parent
 
     #stat = f"{r_root}/stats.csv"
-    sourceselection = f"{r_root}/provenance"
-    httpreq = f"{r_root}/httpreq"
 
-    args = [fedx_config, query, result, stats, sourceselection, httpreq, ideal_ss]
+    args = [fedx_config, query, result, stats, ideal_ss]
     args = " ".join(args)
     #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
     timeoutCmd = ""
-    cmd = f'{timeoutCmd} java -classpath "{jar}:{lib}" org.example.Federapp {args}'.strip() 
+    cmd = f'{timeoutCmd} java -classpath "{jar}:{lib}" org.example.Federapp {args}'.strip()
     
     def write_empty_stats():
         with open(stats, "w+") as fout:
-            fout.write("query,engine,instance,batch,mode,exec_time,distinct_ss,nb_http_request,total_ss\n")
-            basicInfos = re.match(r".*/(\w+)/(q\d+)/(\d+)/batch_(\d+)/(\w+)/results", result)
+            fout.write("query;engine;instance;batch;mode;exec_time;distinct_ss\n")
+            basicInfos = re.match(r".*/(\w+)/(q\d+)/instance_(\d+)/batch_(\d+)/(\w+)/results", result)
             engine = basicInfos.group(1)
             queryName = basicInfos.group(2)
             instance = basicInfos.group(3)
             batch = basicInfos.group(4)
             mode = basicInfos.group(5)
-            fout.write(",".join([queryName, engine, instance, batch, mode, "nan", "nan", "nan", "nan"])+"\n")
+            fout.write(";".join([queryName, engine, instance, batch, mode, "nan", "nan"])+"\n")
             fout.close()
     
     def write_empty_result(msg):
@@ -66,23 +64,31 @@ def run_benchmark(eval_config, fedx_config, query, result, stats, ideal_ss):
             fout.write(msg)
             fout.close()
 
-    fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    try: 
-        fedx_proc.wait(timeout=timeout)
-        if fedx_proc.returncode == 0:
-            print(f"{query} benchmarked sucessfully")  
-        else:
-            # print(f"{query} reported error")
-            # write_empty_stats()
-            # write_empty_result("error")
-            raise RuntimeError(f"{query} reported error")
-           
-    except subprocess.TimeoutExpired: 
-        print(f"{query} timed out!")
+    if "q05" in query:
+        print(f"{query} ignored")
         write_empty_stats()
-        write_empty_result("timeout")
-    
-    kill_process(fedx_proc.pid)
+        write_empty_result("ignored")
+    else:
+
+        fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+        try: 
+            #output, error = fedx_proc.communicate(timeout=timeout)
+            fedx_proc.wait(timeout=timeout)
+            #fedx_proc = subprocess.run(cmd, shell=True, timeout=timeout, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+            if fedx_proc.returncode == 0:
+                print(f"{query} benchmarked sucessfully")  
+            else:
+                print(f"{query} reported error")
+                write_empty_stats()
+                write_empty_result("error")
+                raise RuntimeError(f"{query} reported error")
+            
+        except subprocess.TimeoutExpired: 
+            print(f"{query} timed out!")
+            write_empty_stats()
+            write_empty_result("timeout")
+            
+            kill_process(fedx_proc.pid)
 
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
@@ -95,7 +101,7 @@ def generate_config_file(datafiles, outfile, endpoint):
         with open(data_file) as file:
             t_file = file.readlines()
             for line in t_file:
-                site = line.rsplit()[-1]
+                site = line.rsplit()[-2]
                 site = re.search(r"<(.*)>", site).group(1)
                 ssite.add(site)
     

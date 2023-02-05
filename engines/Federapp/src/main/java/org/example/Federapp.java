@@ -4,10 +4,12 @@ import org.eclipse.rdf4j.federated.FedXConfig;
 import org.eclipse.rdf4j.federated.FedXFactory;
 import org.eclipse.rdf4j.federated.algebra.StatementSource;
 import org.eclipse.rdf4j.federated.repository.FedXRepository;
+import org.eclipse.rdf4j.federated.monitoring.QueryPlanLog;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
+import org.eclipse.rdf4j.query.explanation.Explanation;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.RepositoryException;
@@ -38,32 +40,28 @@ public class Federapp {
 
     public static final String MAP_SS = "MAP_SS";
 
-    private static int sumDistinctSourceSelection() throws Exception {
+    private static Set<StatementSource> sumDistinctSourceSelection() throws Exception {
         Map<StatementPattern, List<StatementSource>> stmt = ((Map<StatementPattern, List<StatementSource>>) Federapp.CONTAINER
                 .get(Federapp.SOURCE_SELECTION2_KEY));
-        int counter = 0;
         Set<StatementSource> set = new HashSet<>();
         for (StatementPattern pattern : stmt.keySet()) {
             for (StatementSource source : stmt.get(pattern)) {
-                if (set.add(source)) {
-                    counter++;
-                }
-
+                set.add(source);
             }
         }
-        return counter;
+        return set;
     }
 
-    private static int sumSourceSelection() throws Exception {
+    private static List<StatementSource> sumSourceSelection() throws Exception {
         Map<StatementPattern, List<StatementSource>> stmt = ((Map<StatementPattern, List<StatementSource>>) Federapp.CONTAINER
                 .get(Federapp.SOURCE_SELECTION2_KEY));
-        int counter = 0;
+        List<StatementSource> list = new ArrayList<>();
         for (StatementPattern pattern : stmt.keySet()) {
             for (StatementSource source : stmt.get(pattern)) {
-                counter++;
+                list.add(source);
             }
         }
-        return counter;
+        return list;
     }
 
     private static void createSourceSelectionFile(String sourceSelectionPath) throws Exception {
@@ -108,10 +106,10 @@ public class Federapp {
                     if (!tpMap.containsKey(tpId)) {
                         tpMap.put(tpId, new HashSet<>());
                     }
-                    String ss = source.replace("http://", "");
+                    String ss = source.replace("http://", "").replace("/", "");
                     if (!ss.isEmpty()) {
                         // www.shop69.fr -> sparql_www.shop69.fr
-                        tpMap.get(tpId).add("sparql_" + ss);
+                        tpMap.get(tpId).add("sparql_" + ss + "_");
                     }
                     tpId++;
                 }
@@ -123,7 +121,7 @@ public class Federapp {
     }
 
     public static void main(String[] args) throws Exception {
-        System.out.println(Arrays.toString(args));
+        //System.out.println(Arrays.toString(args));
         // init
         CONTAINER.put(COUNT_HTTP_REQ_KEY, new AtomicInteger());
         CONTAINER.put(LIST_HTTP_REQ_KEY, new ConcurrentLinkedQueue<>());
@@ -132,22 +130,21 @@ public class Federapp {
         String resultPath = args[2];
         String statPath = args[3];
         String sourceSelectionPath = args[4];
-        String httpListFilePath = args[5];
 
-        if (args.length > 6) {
-            String ssPath = args[6];
+        if (args.length > 5) {
+            String ssPath = args[5];
             parseSS(ssPath);
         }
 
         CSVWriter statWriter = new CSVWriter(
-            new FileWriter(statPath), ',', 
+            new FileWriter(statPath), ';', 
             CSVWriter.NO_QUOTE_CHARACTER, 
             CSVWriter.DEFAULT_ESCAPE_CHARACTER, 
             CSVWriter.DEFAULT_LINE_END
         );
 
         String rawQuery = new String(Files.readAllBytes(Paths.get(queryPath)));
-        log.info("Query {}", rawQuery);
+        //log.info("Query {}", rawQuery);
         File dataConfig = new File(configPath);
 
         Long startTime = null;
@@ -156,19 +153,21 @@ public class Federapp {
 
         FedXRepository repo = FedXFactory.newFederation()
                 .withConfig(new FedXConfig()
-                        .withEnableMonitoring(true)
-                        .withLogQueryPlan(true)
-                        .withLogQueries(true)
-                        .withDebugQueryPlan(true)
+                        .withEnableMonitoring(false)
+                        .withLogQueryPlan(false)
+                        .withLogQueries(false)
+                        .withDebugQueryPlan(false)
                         .withEnforceMaxQueryTime(86400))
                 .withMembers(dataConfig)
                 .create();
-
+        
         startTime = System.currentTimeMillis();
 
         try (RepositoryConnection conn = repo.getConnection()) {
             TupleQuery tq = conn.prepareTupleQuery(rawQuery);
             try (TupleQueryResult res = tq.evaluate()) {
+                log.info("# Optimized Query Plan:");
+                log.info(QueryPlanLog.getQueryPlan());
                 try (BufferedWriter queryResultWriter = new BufferedWriter(new FileWriter(resultPath))){
                     while (res.hasNext()) {
                         queryResultWriter.write(res.next().toString() + "\n");
@@ -178,7 +177,7 @@ public class Federapp {
         }
 
         endTime = System.currentTimeMillis();
-        System.out.println(success.get());
+        //System.out.println(success.get());
 
         long durationTime = endTime - startTime;
 
@@ -186,6 +185,7 @@ public class Federapp {
         // research in reverse order
 
         Pattern pattern = Pattern.compile(".*/(\\w+)/(q\\d+)/instance_(\\d+)/batch_(\\d+)/(\\w+)/results");
+        
         Matcher basicInfos = pattern.matcher(resultPath);
         basicInfos.find();
         String engine = basicInfos.group(1);
@@ -194,21 +194,25 @@ public class Federapp {
         String batch = basicInfos.group(4);
         String mode = basicInfos.group(5);
 
-        String distinct_ss = "" + sumDistinctSourceSelection();
-        String total_ss = "" + sumSourceSelection();
+        Set<StatementSource> distinct_ss = sumDistinctSourceSelection();
+        List<String> distinct_ss_list = new ArrayList();
+
+        for (StatementSource ss : distinct_ss) {
+            distinct_ss_list.add(ss.getEndpointID());
+        }
 
         int httpqueries = ((AtomicInteger) CONTAINER.get(COUNT_HTTP_REQ_KEY)).get();
 
-        String[] header = {"query","engine","instance","batch","mode","exec_time","distinct_ss","nb_http_request","total_ss"};
+        String[] header = {"query","engine","instance","batch","mode","exec_time","distinct_ss"};
         statWriter.writeNext(header);
 
-        String[] content = {query, engine, instance, batch, mode, Long.toString(durationTime), distinct_ss, Integer.toString(httpqueries), total_ss};
+        String[] content = {query, engine, instance, batch, mode, Long.toString(durationTime), distinct_ss_list.toString()};
         statWriter.writeNext(content);
         statWriter.close();
 
         createSourceSelectionFile(sourceSelectionPath);
-        createHttpListFile(httpListFilePath);
 
         repo.shutDown();
+
     }
 }
