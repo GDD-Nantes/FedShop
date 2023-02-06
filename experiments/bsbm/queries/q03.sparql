@@ -8,7 +8,7 @@ WHERE {
     ?localProduct owl:sameAs ?product .
     ?localProduct rdfs:label ?label .
     # const ?ProductType
-    ?localProduct a ?localProductType .
+    ?localProduct rdf:type ?localProductType .
     ?localProductType owl:sameAs ?ProductType .
 
     # const ?ProductFeature1

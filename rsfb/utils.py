@@ -1,13 +1,17 @@
 from io import BytesIO
-import os
 import subprocess
 import numpy as np
 from scipy.stats import norm
 from omegaconf import OmegaConf
 import psutil
-import yaml
-from yaml.loader import SafeLoader
 import pandas as pd
+from rdflib import Literal, URIRef
+
+def str2n3(value):
+    if str(value).startswith("http") or str(value).startswith("nodeID"): 
+        return URIRef(value).n3()
+    else:
+        return Literal(value).n3()
 
 class RandomBucket:	
     def __init__(self, size):

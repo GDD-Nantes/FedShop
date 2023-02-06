@@ -60,24 +60,27 @@ def compute_metrics(configfile, outfile, workload):
         """
         pass
     
-    CONFIG = load_config(configfile)["generation"]
-    vendor_data = np.arange(CONFIG["schema"]["vendor"]["params"]["vendor_n"])
-    ratingsite_data = np.arange(CONFIG["schema"]["ratingsite"]["params"]["ratingsite_n"])
-    _, vendor_edges = np.histogram(vendor_data, CONFIG["n_batch"])
-    _, ratingsite_edges = np.histogram(ratingsite_data, CONFIG["n_batch"])
+    CONFIG = load_config(configfile)
+    CONFIG_GEN = CONFIG["generation"]
+    vendor_data = np.arange(CONFIG_GEN["schema"]["vendor"]["params"]["vendor_n"])
+    ratingsite_data = np.arange(CONFIG_GEN["schema"]["ratingsite"]["params"]["ratingsite_n"])
+    _, vendor_edges = np.histogram(vendor_data, CONFIG_GEN["n_batch"])
+    _, ratingsite_edges = np.histogram(ratingsite_data, CONFIG_GEN["n_batch"])
     vendor_edges = vendor_edges[1:].astype(int) + 1
     ratingsite_edges = ratingsite_edges[1:].astype(int) + 1
-        
-    metrics_df = pd.DataFrame(columns=["query", "instance", "batch", "distinct_sources", "relevant_sources_selectivity"])
+
+    records = []        
     for provenance_file in workload:
         source_selection_result = pd.read_csv(provenance_file)
-        name_search = re.search(r".*/(q\d+)/instance_(\d+)/batch_(\d+)/provenance.csv", provenance_file)
-        query = name_search.group(1)
-        instance = int(name_search.group(2))
-        batch = int(name_search.group(3))
+        name_search = re.search(r".*/(\w+)/(q\d+)/instance_(\d+)/batch_(\d+)/((default|ideal)/)?provenance.csv", provenance_file)
+        engine = name_search.group(1)
+        query = name_search.group(2)
+        instance = int(name_search.group(3))
+        batch = int(name_search.group(4))
+        mode = name_search.group(6)
         total_nb_sources = vendor_edges[batch] + ratingsite_edges[batch]
         
-        new_row = {
+        record = {
             "query": query,
             "instance": instance,
             "batch": batch,
@@ -87,10 +90,16 @@ def compute_metrics(configfile, outfile, workload):
             #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(source_selection_result),
             #"xfed_join_restricted_source_level_tp_selectivity": get_xfed_join_restricted_source_level_tp_selectivity(source_selection_result)
         }
-
-        metrics_df.loc[len(metrics_df)] = list(new_row.values())
+        
+        if engine in CONFIG["evaluation"]["engines"]:
+            record.update({"engine": engine})
+        
+        if mode is not None:
+            record.update({"mode": mode })
+        
+        records.append(record)
     
-    print(metrics_df)
+    metrics_df = pd.DataFrame.from_records(records)
     metrics_df.to_csv(outfile, index=False)
 
 if __name__ == "__main__":

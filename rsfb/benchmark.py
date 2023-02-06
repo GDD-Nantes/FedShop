@@ -78,7 +78,7 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
     WORKFLOW_DIR = f"{WORK_DIR}/rulegraph"
     os.makedirs(name=WORKFLOW_DIR, exist_ok=True)
 
-    SNAKEMAKE_OPTS = f"-p --cores 1"
+    SNAKEMAKE_OPTS = f"-p --cores {cores} --config configfile={configfile}"
     if rerun_incomplete: SNAKEMAKE_OPTS += " --rerun-incomplete"
 
     # if in evaluate mode

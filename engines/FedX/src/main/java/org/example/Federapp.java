@@ -40,7 +40,7 @@ public class Federapp {
 
     public static final String MAP_SS = "MAP_SS";
 
-    private static Set<StatementSource> sumDistinctSourceSelection() throws Exception {
+    private static Set<StatementSource> getSourceSelection() throws Exception {
         Map<StatementPattern, List<StatementSource>> stmt = ((Map<StatementPattern, List<StatementSource>>) Federapp.CONTAINER
                 .get(Federapp.SOURCE_SELECTION2_KEY));
         Set<StatementSource> set = new HashSet<>();
@@ -143,7 +143,7 @@ public class Federapp {
         statFile.createNewFile();
 
         CSVWriter statWriter = new CSVWriter(
-            new FileWriter(statFile), ';', 
+            new FileWriter(statFile), ',', 
             CSVWriter.NO_QUOTE_CHARACTER, 
             CSVWriter.DEFAULT_ESCAPE_CHARACTER, 
             CSVWriter.DEFAULT_LINE_END
@@ -174,11 +174,11 @@ public class Federapp {
             try (TupleQueryResult res = tq.evaluate()) {
                 log.info("# Optimized Query Plan:");
                 log.info(QueryPlanLog.getQueryPlan());
-                try (BufferedWriter queryResultWriter = new BufferedWriter(new FileWriter(resultPath))){
-                    while (res.hasNext()) {
-                        queryResultWriter.write(res.next().toString() + "\n");
-                    }
-                }
+                // try (BufferedWriter queryResultWriter = new BufferedWriter(new FileWriter(resultPath))){
+                //     while (res.hasNext()) {
+                //         queryResultWriter.write(res.next().toString() + "\n");
+                //     }
+                // }
             }
         }
 
@@ -190,7 +190,7 @@ public class Federapp {
         // resultPath: .../{engine}/{query}/{instance_id}/batch_{batch_id}/default/results
         // research in reverse order
 
-        Pattern pattern = Pattern.compile(".*/(\\w+)/(q\\d+)/instance_(\\d+)/batch_(\\d+)/(\\w+)/results");
+        Pattern pattern = Pattern.compile(".*/(\\w+)/(q\\d+)/instance_(\\d+)/batch_(\\d+)/(\\w+)/results.ss");
         
         Matcher basicInfos = pattern.matcher(resultPath);
         basicInfos.find();
@@ -200,23 +200,16 @@ public class Federapp {
         String batch = basicInfos.group(4);
         String mode = basicInfos.group(5);
 
-        Set<StatementSource> distinct_ss = sumDistinctSourceSelection();
-        List<String> distinct_ss_list = new ArrayList();
-
-        for (StatementSource ss : distinct_ss) {
-            distinct_ss_list.add(ss.getEndpointID());
-        }
-
         int httpqueries = ((AtomicInteger) CONTAINER.get(COUNT_HTTP_REQ_KEY)).get();
 
-        String[] header = {"query","engine","instance","batch","mode","exec_time","distinct_ss"};
+        String[] header = {"query","engine","instance","batch","mode","exec_time"};
         statWriter.writeNext(header);
 
-        String[] content = {query, engine, instance, batch, mode, Long.toString(durationTime), String.join("|", distinct_ss_list)};
+        String[] content = {query, engine, instance, batch, mode, Long.toString(durationTime)};
         statWriter.writeNext(content);
         statWriter.close();
 
-        createSourceSelectionFile(resultPath + ".ss");
+        createSourceSelectionFile(resultPath);
 
         repo.shutDown();
 

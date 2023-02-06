@@ -15,7 +15,7 @@ from io import BytesIO, StringIO
 from rdflib import Literal, URIRef, XSD
 import click
 
-from utils import load_config
+from utils import load_config, str2n3
 
 import nltk
 nltk.download('stopwords', quiet=True)
@@ -197,11 +197,7 @@ def inject_from_cache(queryfile, cache_file, outputfile):
     injection_cache = json.load(open(cache_file, "r"))
     for variable, value in injection_cache.items():
         # Convert to n3 representation
-        if str(value).startswith("http") or str(value).startswith("nodeID"): 
-            value = URIRef(value).n3()
-        else:
-            value = Literal(value).n3()
-        
+        value = str2n3(value)
         prefix_full_to_alias = json.load(open(f"{Path(cache_file).parent}/prefix_cache.json", 'r'))
         for prefixSub, prefixName in prefix_full_to_alias.items():
             if prefixSub in value:
@@ -350,10 +346,7 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
             injection_cache[left] = repl_val
 
         # Convert to n3 representation
-        if str(repl_val).startswith("http") or str(repl_val).startswith("nodeID"): 
-            repl_val = URIRef(repl_val).n3()
-        else:
-            repl_val = Literal(repl_val).n3()
+        repl_val = str2n3(repl_val)
             
         # Shorten string representations with detected and common prefixes
         for prefixSub, prefixName in prefix_full_to_alias.items():
