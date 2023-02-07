@@ -448,8 +448,8 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
                     print("Restoring query...")
                     query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>)) ", r"\2", relaxed_query)
                 except:
-                    raise RuntimeError("Something went wrong: (1) The data are not properly ingested. (2) The generated files are corrupted due to interuption.")
-
+                    raise RuntimeError("Cannot instancitate this workload. Delete workload_value_selection.csv and retry.")
+                
         with open(next_queryfile, "w+") as f:
             f.write(query)
             f.close()

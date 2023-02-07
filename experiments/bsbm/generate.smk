@@ -70,11 +70,12 @@ def wait_for_container(endpoints, outfile, wait=1):
 def deploy_virtuoso(container_infos_file, restart=False):
     if restart:
         shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans")
+        shell("docker volume prune --force")
         time.sleep(2)
     # shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} up -d --scale {SPARQL_SERVICE_NAME}={N_BATCH}")
     # wait_for_container(CONFIG["virtuoso"]["endpoints"], f"{BENCH_DIR}/virtuoso-up.txt", wait=1)
     
-    shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} create --no-recreate --scale {SPARQL_SERVICE_NAME}={N_BATCH}") # For docker-compose version > 2.15.1
+    shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} create --no-recreate --scale {SPARQL_SERVICE_NAME}={N_BATCH} {SPARQL_SERVICE_NAME}") # For docker-compose version > 2.15.1
     
     SPARQL_CONTAINER_NAMES = CONFIG["virtuoso"]["container_names"]
     pd.DataFrame(SPARQL_CONTAINER_NAMES, columns=["Name"]).to_csv(str(container_infos_file), index=False)

@@ -131,6 +131,7 @@ def wipe(configfile, level: str):
         print("Cleaning all databases...")
         if os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)
         if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)  
+        if os.system("docker volume prune --force") != 0: exit(1)
         os.system(f"{WORK_DIR}/benchmark/generation/virtuoso_batch*.csv")
         os.system(f"{WORK_DIR}/benchmark/generation/virtuoso-*.csv")
         
