@@ -30,8 +30,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class Federapp {
-    private static final Logger log = LoggerFactory.getLogger(Federapp.class);
+public class FedX {
+    private static final Logger log = LoggerFactory.getLogger(FedX.class);
     public static final Map<String, Object> CONTAINER = new ConcurrentHashMap<>();
     public static final String SOURCE_SELECTION_KEY = "SOURCE_SELECTION";
     public static final String SOURCE_SELECTION2_KEY = "SOURCE_SELECTION_DO_SOURCE_SELECTION";
@@ -41,8 +41,8 @@ public class Federapp {
     public static final String MAP_SS = "MAP_SS";
 
     private static Set<StatementSource> getSourceSelection() throws Exception {
-        Map<StatementPattern, List<StatementSource>> stmt = ((Map<StatementPattern, List<StatementSource>>) Federapp.CONTAINER
-                .get(Federapp.SOURCE_SELECTION2_KEY));
+        Map<StatementPattern, List<StatementSource>> stmt = ((Map<StatementPattern, List<StatementSource>>) FedX.CONTAINER
+                .get(FedX.SOURCE_SELECTION2_KEY));
         Set<StatementSource> set = new HashSet<>();
         for (StatementPattern pattern : stmt.keySet()) {
             for (StatementSource source : stmt.get(pattern)) {
@@ -53,8 +53,8 @@ public class Federapp {
     }
 
     private static List<StatementSource> sumSourceSelection() throws Exception {
-        Map<StatementPattern, List<StatementSource>> stmt = ((Map<StatementPattern, List<StatementSource>>) Federapp.CONTAINER
-                .get(Federapp.SOURCE_SELECTION2_KEY));
+        Map<StatementPattern, List<StatementSource>> stmt = ((Map<StatementPattern, List<StatementSource>>) FedX.CONTAINER
+                .get(FedX.SOURCE_SELECTION2_KEY));
         List<StatementSource> list = new ArrayList<>();
         for (StatementPattern pattern : stmt.keySet()) {
             for (StatementSource source : stmt.get(pattern)) {
@@ -67,8 +67,8 @@ public class Federapp {
     private static void createSourceSelectionFile(String sourceSelectionPath) throws Exception {
         BufferedWriter sourceSelectionWriter = new BufferedWriter(new FileWriter(sourceSelectionPath));
         sourceSelectionWriter.write("triple,source_selection\n");
-        Map<StatementPattern, List<StatementSource>> stmt = ((Map<StatementPattern, List<StatementSource>>) Federapp.CONTAINER
-                .get(Federapp.SOURCE_SELECTION2_KEY));
+        Map<StatementPattern, List<StatementSource>> stmt = ((Map<StatementPattern, List<StatementSource>>) FedX.CONTAINER
+                .get(FedX.SOURCE_SELECTION2_KEY));
         if (stmt != null) {
             for (StatementPattern pattern : stmt.keySet()) {
                 sourceSelectionWriter.write(

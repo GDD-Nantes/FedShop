@@ -37,7 +37,7 @@ import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
-import org.example.Federapp;
+import org.example.FedX;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +56,7 @@ public class SourceSelection {
     protected final QueryInfo queryInfo;
 
     public SourceSelection(List<Endpoint> endpoints, SourceSelectionCache cache, QueryInfo queryInfo) {
-        Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION_KEY, this);
+        FedX.CONTAINER.put(FedX.SOURCE_SELECTION_KEY, this);
         this.endpoints = endpoints;
         this.cache = cache;
         this.queryInfo = queryInfo;
@@ -68,7 +68,7 @@ public class SourceSelection {
     protected Map<StatementPattern, List<StatementSource>> stmtToSources = new ConcurrentHashMap<>();
 
     public void doSourceSelection(List<StatementPattern> stmts) {
-        if (!Federapp.CONTAINER.containsKey(Federapp.MAP_SS)) {
+        if (!FedX.CONTAINER.containsKey(FedX.MAP_SS)) {
             //log.info("[SOURCE_SELECTION] Default");
             doSourceSelectionDefault(stmts);
         } else {
@@ -155,7 +155,7 @@ public class SourceSelection {
             }
         }
 
-        Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION2_KEY, this.stmtToSources);
+        FedX.CONTAINER.put(FedX.SOURCE_SELECTION2_KEY, this.stmtToSources);
         // this.stmtToSources = new ConcurrentHashMap<>();
     }
 
@@ -175,7 +175,7 @@ public class SourceSelection {
 
             SubQuery q = new SubQuery(stmt, queryInfo.getDataset());
 
-            Set<String> endpoints = ((Set<String>) ((Map<String, Object>) Federapp.CONTAINER.get(Federapp.MAP_SS))
+            Set<String> endpoints = ((Set<String>) ((Map<String, Object>) FedX.CONTAINER.get(FedX.MAP_SS))
                     .get(stmtId));
             if (endpoints == null)
                 endpoints = new HashSet<>();
@@ -225,7 +225,7 @@ public class SourceSelection {
             }
         }
         //log.info(stmtToSources.toString());
-        Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION2_KEY, stmtToSources);
+        FedX.CONTAINER.put(FedX.SOURCE_SELECTION2_KEY, stmtToSources);
         // this.stmtToSources = new ConcurrentHashMap<>();
     }
 
@@ -245,7 +245,7 @@ public class SourceSelection {
             }
         }
         //log.debug("getRelevantSources = " + endpoints.toString());
-        Federapp.CONTAINER.put(Federapp.SOURCE_SELECTION2_KEY, this.stmtToSources);
+        FedX.CONTAINER.put(FedX.SOURCE_SELECTION2_KEY, this.stmtToSources);
         return endpoints;
     }
 

@@ -27,7 +27,7 @@ def cli():
 def prerequisites(eval_config):
     app_config = load_config(eval_config)["evaluation"]["engines"]["fedx"]
     app = app_config["dir"]
-    jar = os.path.join(app, "Federapp-1.0-SNAPSHOT.jar")
+    jar = os.path.join(app, "FedX-1.0-SNAPSHOT.jar")
     lib = os.path.join(app, "lib/*")
     
     #if not os.path.exists(app) or not os.path.exists(jar) or os.path.exists(lib):
@@ -48,7 +48,7 @@ def run_benchmark(ctx: click.Context, eval_config, fedx_config, query, result, s
 
     app_config = load_config(eval_config)["evaluation"]["engines"]["fedx"]
     app = app_config["dir"]
-    jar = os.path.join(app, "Federapp-1.0-SNAPSHOT.jar")
+    jar = os.path.join(app, "FedX-1.0-SNAPSHOT.jar")
     lib = os.path.join(app, "lib/*")
     timeout = int(app_config["timeout"])
 
@@ -60,7 +60,7 @@ def run_benchmark(ctx: click.Context, eval_config, fedx_config, query, result, s
     args = " ".join(args)
     #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
     timeoutCmd = ""
-    cmd = f'{timeoutCmd} java -classpath "{jar}:{lib}" org.example.Federapp {args}'.strip()
+    cmd = f'{timeoutCmd} java -classpath "{jar}:{lib}" org.example.FedX {args}'.strip()
     
     def write_empty_stats():
         with open(stats, "w+") as fout:

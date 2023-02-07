@@ -50,7 +50,7 @@ import org.apache.http.protocol.ImmutableHttpProcessor;
 import org.apache.http.protocol.RequestTargetHost;
 import org.apache.http.util.Args;
 import org.apache.http.util.EntityUtils;
-import org.example.Federapp;
+import org.example.FedX;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -101,8 +101,8 @@ public class MainClientExec implements ClientExecChain {
         Args.notNull(request, "HTTP request");
         Args.notNull(context, "HTTP context");
 
-        ((AtomicInteger) Federapp.CONTAINER.get(Federapp.COUNT_HTTP_REQ_KEY)).getAndIncrement();
-        ((ConcurrentLinkedQueue) Federapp.CONTAINER.get(Federapp.LIST_HTTP_REQ_KEY)).add(execAware.toString());
+        ((AtomicInteger) FedX.CONTAINER.get(FedX.COUNT_HTTP_REQ_KEY)).getAndIncrement();
+        ((ConcurrentLinkedQueue) FedX.CONTAINER.get(FedX.LIST_HTTP_REQ_KEY)).add(execAware.toString());
 
         AuthState targetAuthState = context.getTargetAuthState();
         if (targetAuthState == null) {
