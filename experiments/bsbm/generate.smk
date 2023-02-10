@@ -105,6 +105,9 @@ def generate_virtuoso_scripts(container_infos_file, prefix, shfiles, batch_id, n
     batch = edges[batch_id]
     with open(f"{shfiles}", "w+") as f:
         f.write(f"echo \"Writing ingest script for batch {batch_id}, slicing at {batch}-th source...\"\n")
+
+        f.write(f'docker exec {container_name} /usr/local/virtuoso-opensource/bin/isql-v "EXEC=grant select on \\\"DB.DBA.SPARQL_SINV_2\\\" to \\\"SPARQL\\\";"\n')
+        f.write(f'docker exec {container_name} /usr/local/virtuoso-opensource/bin/isql-v "EXEC=grant execute on \\\"DB.DBA.SPARQL_SINV_IMP\\\" to \\\"SPARQL\\\";"\n')
         
         f.write(f"for id in $(seq 0 {batch-1}); do\n")
         f.write(f"  docker exec {container_name} /usr/local/virtuoso-opensource/bin/isql-v \"EXEC=ld_dir('/usr/local/virtuoso-opensource/share/virtuoso/vad/', '{prefix}$id.nq', 'http://example.com/datasets/default');\" >> /dev/null\n")
@@ -313,11 +316,15 @@ rule instanciate_workload:
     input: 
         queryfile=expand("{queryDir}/{{query}}.sparql", queryDir=QUERY_DIR),
         workload_value_selection="{benchDir}/{query}/workload_value_selection.csv",
+        container_infos = "{benchDir}/container_infos.csv"
     output:
         value_selection_query="{benchDir}/{query}/instance_{instance_id}/injected.sparql",
         injection_cache="{benchDir}/{query}/instance_{instance_id}/injection_cache.json"
-    shell:
-        "python rsfb/query.py instanciate-workload {CONFIGFILE} {input.queryfile} {input.workload_value_selection} {output.value_selection_query} {wildcards.instance_id}"
+    params:
+        batch_id = 0
+    run:
+        activate_one_container(f"{BENCH_DIR}/container_infos.csv", params.batch_id)
+        shell("python rsfb/query.py instanciate-workload {CONFIGFILE} {input.queryfile} {input.workload_value_selection} {output.value_selection_query} {wildcards.instance_id}")
 
 rule create_workload_value_selection:
     priority: 8

@@ -5,6 +5,7 @@ from time import time
 from collections import Counter
 import os
 from pathlib import Path
+from typing import Dict, Tuple
 from tqdm import tqdm
 
 import re
@@ -71,7 +72,7 @@ def exec_query(configfile, query, batch_id, error_when_timeout=False):
     result = response.convert()
     return response, result
 
-def __parse_query(queryfile):
+def __parse_query(queryfile) -> Tuple[Dict[str, str], Dict[str, Dict]]:
     """Parse input queryfile into get placeholders
 
     Args:
@@ -89,20 +90,27 @@ def __parse_query(queryfile):
         toks = np.array(re.split(r"\s+", line))
         if "#" in toks:
             if "const" in toks:
-                if (comp := re.search(r"const\s+(\?\w+)\s+(\W+|\w+)\s+(\?\w+)", line)) is not None:
+                if (comp := re.search(r"const\s+(\?\w+)\s+(\W+|\w+)\s+((\?\w+)(,\s*\?\w+)*)", line)) is not None:
                     op = comp.group(2)
-                    const = comp.group(1)
-                    constSrc = comp.group(3)
-                    parse_result[const] = {"type": "comparison", "src": constSrc, "op": op}
+                    left = comp.group(1)
+                    deps = re.split(r",\s*", comp.group(3))
+                    
+                    right = deps[0]
+                    if op == "$!":
+                        right = deps.pop(0)
+                    elif op == "!=":
+                        right = left
+                    parse_result[left] = {"type": "comparison", "src": right, "op": op, "op_kind": "binary", "extras": deps}
+                    
                 elif(assertion := re.search(r"const\s+(not)\s+(\?\w+)", line)) is not None:
                     op = assertion.group(1)
-                    const = assertion.group(2)
-                    parse_result[const] = {"type": "assertion", "op": op}
+                    left = assertion.group(2)
+                    parse_result[left] = {"type": "assertion", "op": op, "op_kind": "unary"}
                 else:
                     const_search = re.search(r"const\s+(\?\w+)", line)
                     if const_search is not None:
-                        const = const_search.group(1)
-                        parse_result[const] = None
+                        left = const_search.group(1)
+                        parse_result[left] = None
                 continue
 
         elif "PREFIX" in toks:
@@ -128,7 +136,8 @@ def __get_uninjected_placeholders(queryfile):
 @click.argument("batch-id", type=click.INT)
 @click.option("--sample", type=click.INT)
 @click.option("--ignore-errors", is_flag=True, default=False)
-def execute_query(configfile, queryfile, outfile, batch_id, sample, ignore_errors):
+@click.option("--dropna", is_flag=True, default=False)
+def execute_query(configfile, queryfile, outfile, batch_id, sample, ignore_errors, dropna):
     """Execute query, export to an output file and return number of rows .
 
     Args:
@@ -149,10 +158,13 @@ def execute_query(configfile, queryfile, outfile, batch_id, sample, ignore_error
 
     header = BytesIO(result).readline().decode().strip().replace('"', '').split(",")
     csvOut = pd.read_csv(BytesIO(result), parse_dates=[h for h in header if "date" in h])
-
+    
     if csvOut.empty and not ignore_errors:
         print(query_text)
         raise RuntimeError(f"{queryfile} returns no result...")
+    
+    if dropna:
+        csvOut.dropna(inplace=True)
 
     if sample is None:
         csvOut.to_csv(outfile, index=False)
@@ -250,7 +262,7 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
     for const, resource in parse_result.items():                
         # Replace all tokens in subDict
         isOpUnary = (resource is None or resource.get("src") is None)
-        left = right = const[1:] if isOpUnary else resource.get("src")[1:]
+        left = right = const[1:] if isOpUnary else resource.get("src")[1:]        
         if not isOpUnary:
             left = const[1:]
             right = resource.get("src")[1:]
@@ -278,30 +290,64 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
             dtype = value_selection_values[right].dtype
             epsilon = None
             if np.issubdtype(dtype, np.number):
+                print(dtype)
                 if np.issubdtype(dtype, np.integer):
                     epsilon = int(np.log10(value_selection_values[right].min()))
                     if epsilon > 1: epsilon = 1
+                elif np.issubdtype(dtype, np.floating):
+                    epsilon = round(np.log10(value_selection_values[right].min()), 1)
+                    if epsilon > 1: epsilon = 1
                 else:
                     epsilon = 0
+                    raise ValueError("LOL")
             elif np.issubdtype(dtype, np.datetime64):
                 epsilon = pd.Timedelta(1, unit="day")
 
             # Implement more operators here
             op = resource["op"]
             if ">" in op:
-                repl_val = value_selection_values[right].dropna().max() + epsilon
+                if instance_id is None: repl_val = value_selection_values[right].dropna().max() + epsilon
+                else: repl_val += epsilon
             elif "<" in op:
-                repl_val = value_selection_values[right].dropna().min() - epsilon
+                if instance_id is None: repl_val = value_selection_values[right].dropna().min() - epsilon
+                else: repl_val -= epsilon
             elif op == "$":
-                repl_val = value_selection_values[right].dropna().sample(1)
+                if instance_id is None: repl_val = value_selection_values[right].dropna().sample(1)
+            elif op == "!=":
+                constraints = []
+                for extra in resource.get("extras"):
+                    r_extra = extra[1:]
+                    if instance_id is not None:
+                        left_value = value_selection_values.loc[instance_id, left]
+                        right_value = value_selection_values.loc[instance_id, r_extra]
+                        if left_value == right_value:
+                            constraints.append(f"`{left}` != {repr(injection_cache[r_extra])}")
+                    else:
+                        constraints.append(f"`{left}` != {repr(injection_cache[r_extra])}")
+                if len(constraints) > 0:
+                    repl_val = value_selection_values.query(" and ".join(constraints))[right].sample(1)
+                
             elif op == "$!":
                 targetCol = left 
                 if bool(injection_cache) and left not in injection_cache and right in injection_cache:
                     targetCol = right
                 
                 if bool(injection_cache): 
-                    mask = value_selection_values[right].apply(str) != injection_cache[targetCol]
-                    repl_val = value_selection_values[mask][right].sample(1)
+                    constraints = []
+                    if targetCol in injection_cache:
+                        constraints.append(f"`{targetCol}` != {repr(injection_cache[targetCol])}")
+                    for extra in resource.get("extras"):
+                        r_extra = extra[1:]
+                        if instance_id is not None:
+                            left_value = value_selection_values.loc[instance_id, targetCol]
+                            right_value = value_selection_values.loc[instance_id, r_extra]
+                            if left_value == right_value:
+                                constraints.append(f"`{left}` != {repr(injection_cache[r_extra])}")
+                        else:
+                            constraints.append(f"`{left}` != {repr(injection_cache[r_extra])}")
+                    
+                    if len(constraints) > 0:
+                        repl_val = value_selection_values.query(" and ".join(constraints))[right].sample(1)  
                     
                         
             # Special treatment for REGEX
@@ -319,13 +365,12 @@ def inject_constant(queryfile, value_selection, ignore_errors, accept_random, in
                 ]
                     
                 # Option 1: Choose randomly amongst 10 most common words
-                # bow = Counter(words)
-                # bow = Counter({ k: v for k, v in bow.items() if k not in stopwords})
-                # print(bow.most_common(10))
-                # repl_val = np.random.choice(list(map(lambda x: x[0], bow.most_common(10))))
+                bow = Counter(words)
+                bow = Counter({ k: v for k, v in bow.items() if k not in stopwords})
+                repl_val = pd.Series(bow).nsmallest(10).sample(1).index.item()
 
                 # Option 2: Choose randomly amongst words
-                repl_val = np.random.choice(words)
+                # repl_val = np.random.choice(words)
             
             # Special treatment for exclusion
             # Query with every other placeholder set
@@ -413,9 +458,9 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
             # Option 1: Exclude the partialy injected query to refill
             if solution_option == 1:
                 try:
-                    print("Option 1: Exclude the partialy injected query to refill")
+                    print("Option 1: Execute the partialy injected query to refill")
                     next_value_selection = f"{qroot}/{qname}.csv"
-                    ctx.invoke(execute_query, configfile=configfile, queryfile=next_queryfile, outfile=next_value_selection, batch_id=0)
+                    ctx.invoke(execute_query, configfile=configfile, queryfile=next_queryfile, outfile=next_value_selection, batch_id=0, dropna=True)
                     query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=False)
                 except RuntimeError:
                     solution_option = 2  
@@ -436,19 +481,18 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
                 try:
                     print("Option 3: Relax the query knowing there is NO solution mapping for given combination of placeholders")
                     print("Relaxing query...")
-                    relaxed_query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>))", r"##\2", query)
-                    next_queryfile = f"{qroot}/{qname}_relaxed.sparql"
+                    relaxed_query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>)\s*\.)", r"##\2", query)
                     with open(next_queryfile, "w+") as f:
                         f.write(relaxed_query)
                         f.close()
 
                     next_value_selection = f"{qroot}/{qname}.csv"
-                    ctx.invoke(execute_query, configfile=configfile, queryfile=next_queryfile, outfile=next_value_selection, batch_id=0)
+                    ctx.invoke(execute_query, configfile=configfile, queryfile=next_queryfile, outfile=next_value_selection, batch_id=0, dropna=True)
                     relaxed_query = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=False)
                     print("Restoring query...")
-                    query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>)) ", r"\2", relaxed_query)
+                    query = re.sub(r"(##)((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>)\s*\.)", r"\2", relaxed_query)
                 except:
-                    raise RuntimeError("Cannot instancitate this workload. Delete workload_value_selection.csv and retry.")
+                    raise RuntimeError("Cannot instancitate this workload. Either (1) Delete workload_value_selection.csv and retry. (2) Rewrite bounded tps into hard FILTER")
                 
         with open(next_queryfile, "w+") as f:
             f.write(query)
@@ -557,19 +601,15 @@ def build_provenance_query(queryfile, outfile):
             predicate = subline_search.group(5)
             object = subline_search.group(6)
             # print("parsed: ", subject, predicate, object)
-            if subline not in ss_cache:
-                # print("not cached")
-                ss_cache.append(subline)
-                ntp += 1
-                # predicate_search = re.search(r"(\?\w+|a|(\w+):(\w+)|<\S+>)", predicate)
-                # predicate_full = predicate_search.group(1)
-                # prefix, suffix = predicate_search.group(2),  predicate_search.group(3)
-                # if prefix is not None and suffix is not None:
-                #     predicate_full = f"{prefix_alias_to_full[prefix]}{suffix}"
-                composition[f"tp{ntp}"] = [subject, predicate, object]
-                queryBody += re.sub(re.escape(subline), f"GRAPH ?tp{ntp} {{ {subline} }}", line)
-            # else:
-            #     print("cached")
+                #ss_cache.append(subline)
+            ntp += 1
+            # predicate_search = re.search(r"(\?\w+|a|(\w+):(\w+)|<\S+>)", predicate)
+            # predicate_full = predicate_search.group(1)
+            # prefix, suffix = predicate_search.group(2),  predicate_search.group(3)
+            # if prefix is not None and suffix is not None:
+            #     predicate_full = f"{prefix_alias_to_full[prefix]}{suffix}"
+            composition[f"tp{ntp}"] = [subject, predicate, object]
+            queryBody += re.sub(re.escape(subline), f"GRAPH ?tp{ntp} {{ {subline} }}", line)
         else:
             queryBody += line
             if "WHERE" in line:
