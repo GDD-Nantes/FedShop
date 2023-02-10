@@ -24,7 +24,7 @@
 <type> bsbm:RatingSite 1
 
 <pgroup> 1.0
-#predicate rdfs:label string
+#predicate rdfs:label string{%label_wc}
 </pgroup>
 
 <pgroup> 1.0
@@ -49,21 +49,21 @@
 #predicate bsbm:country country
 </pgroup>
 
+<pgroup> 1.0
+#predicate bsbm:publishDate date 2008-5-20 2008-8-23
+</pgroup>
+
 </type>
 
 // ----- Review ----- //
 <type> bsbm:Review {%review_n}
 
 <pgroup> 1.0
-#predicate bsbm:reviewDate date
+#predicate dc:title string{%title_wc}
 </pgroup>
 
 <pgroup> 1.0
-#predicate dc:title string
-</pgroup>
-
-<pgroup> 1.0
-#predicate rev:text string
+#predicate rev:text string{%text_wc}
 </pgroup>
 
 <pgroup> {%rating1_p}
@@ -80,6 +80,14 @@
 
 <pgroup> {%rating4_p}
 #predicate bsbm:rating4 integer 1 10 normal
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:publishDate date
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:reviewDate date 2007-01-01 2007-12-31
 </pgroup>
 
 </type>

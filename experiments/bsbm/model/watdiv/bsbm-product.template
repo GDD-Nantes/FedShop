@@ -12,15 +12,19 @@
 <type> bsbm:Producer {%producer_n}
 
 <pgroup> 1.0
-#predicate rdfs:label string
+#predicate rdfs:label string{%label_wc}
 </pgroup>
 
 <pgroup> 1.0
-#predicate rdfs:comment string
+#predicate rdfs:comment string{%comment_wc}
 </pgroup>
 
 <pgroup> 1.0
 #predicate bsbm:country country
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:publishDate date 2000-07-20 2005-06-23
 </pgroup>
 
 </type>
@@ -30,31 +34,31 @@
 <type> bsbm:Product {%product_n}
 
 <pgroup> 1.0
-#predicate rdfs:label string
+#predicate rdfs:label string{%label_wc}
 </pgroup>
 
 <pgroup> 1.0
-#predicate rdfs:comment string
+#predicate rdfs:comment string{%comment_wc}
 </pgroup>
 
 <pgroup> 1.0
-#predicate bsbm:productPropertyTextual1 string
+#predicate bsbm:productPropertyTextual1 string{%textual_wc}
 </pgroup>
 
 <pgroup> 1.0
-#predicate bsbm:productPropertyTextual2 string
+#predicate bsbm:productPropertyTextual2 string{%textual_wc}
 </pgroup>
 
 <pgroup> 1.0
-#predicate bsbm:productPropertyTextual3 string
+#predicate bsbm:productPropertyTextual3 string{%textual_wc}
 </pgroup>
 
 <pgroup> {%productPropertyTextual4_p}
-#predicate bsbm:productPropertyTextual4 string
+#predicate bsbm:productPropertyTextual4 string{%textual_wc}
 </pgroup>
 
 <pgroup> {%productPropertyTextual5_p}
-#predicate bsbm:productPropertyTextual5 string
+#predicate bsbm:productPropertyTextual5 string{%textual_wc}
 </pgroup>
 
 <pgroup> 1.0
@@ -79,17 +83,25 @@
 #predicate bsbm:productPropertyNumeric5 integer 1 2000 normal
 </pgroup>
 
+<pgroup> 1.0
+#predicate bsbm:publishDate date 2000-09-20 2006-12-23
+</pgroup>
+
 </type>
 
 // ----- ProductFeature ----- //
 <type> bsbm:ProductFeature {%feature_n}
 
 <pgroup> 1.0
-#predicate rdfs:label string
+#predicate rdfs:label string{%label_wc}
 </pgroup>
 
 <pgroup> 1.0
-#predicate rdfs:comment string
+#predicate rdfs:comment string{%comment_wc}
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:publishDate date 2000-05-20 2000-06-23
 </pgroup>
 
 </type>
@@ -98,11 +110,15 @@
 <type> bsbm:ProductType {%type_n}
 
 <pgroup> 1.0
-#predicate rdfs:label string
+#predicate rdfs:label string{%label_wc}
 </pgroup>
 
 <pgroup> 1.0
-#predicate rdfs:comment string
+#predicate rdfs:comment string{%comment_wc}
+</pgroup>
+
+<pgroup> 1.0
+#predicate bsbm:publishDate date 2000-05-20 2000-06-23
 </pgroup>
 
 </type>

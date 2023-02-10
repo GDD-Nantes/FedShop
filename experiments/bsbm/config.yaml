@@ -41,6 +41,9 @@ generation:
         productPropertyTextual5_p: 0.8
         productPropertyNumeric4_p: 0.7
         productPropertyNumeric5_p: 0.8
+        textual_wc: "${normal_dist: 3, 1, 20}"
+        label_wc: "${normal_dist: 3, 1, 5}"
+        comment_wc: "${normal_dist: 3, 1, 50}"
 
     vendor:
       is_source: true
@@ -53,6 +56,8 @@ generation:
         vendor_n: "${multiply: 10, ${generation.n_batch}}"
         offer_n: "${normal_dist: 3, 1, 2000}" # specs: 100 productsVendorsRatio * 20 avgOffersPerProduct, ref: bsbmtools
         product_n: "${generation.schema.product.params.product_n}"
+        label_wc: "${normal_dist: 3, 1, 5}"
+        comment_wc: "${normal_dist: 3, 1, 50}"
 
     ratingsite:
       is_source: true
@@ -68,6 +73,9 @@ generation:
         review_n: "${normal_dist: 3, 1, 10000}" # specs: 10000
         person_n: "${divide: ${generation.schema.ratingsite.params.review_n}, 20}"
         # person_c: "${uniform_range: 2, 37}"
+        label_wc: "${normal_dist: 3, 1, 5}"
+        text_wc: "${normal_dist: 3, 1, 150}"
+        title_wc: "${normal_dist: 3, 1, 10}"
 
         #pgroup
         rating1_p: 0.7
