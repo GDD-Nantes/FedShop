@@ -14,7 +14,7 @@ sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
 from utils import kill_process, load_config, str2n3
 # Example of use : 
-# python3 utils/generate-fedx-config-file.py experiments/bsbm/model/vendor test/out.ttl
+# python3 utils/generate-engine-config-file.py experiments/bsbm/model/vendor test/out.ttl
 
 # Goal : Generate a configuration file for RDF4J to set the use of named graph as endpoint thanks to data file
 
@@ -25,6 +25,12 @@ def cli():
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 def prerequisites(eval_config):
+    """Obtain prerequisite artifact for engine, e.g, compile binaries, setup dependencies, etc.
+
+    Args:
+        eval_config (_type_): _description_
+    """
+    
     app_config = load_config(eval_config)["evaluation"]["engines"]["fedx"]
     app = app_config["dir"]
     jar = os.path.join(app, "FedX-1.0-SNAPSHOT.jar")
@@ -38,13 +44,14 @@ def prerequisites(eval_config):
 
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("fedx-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.argument("engine-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("query", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("result", type=click.Path(exists=False, file_okay=True, dir_okay=True))
-@click.argument("stats", type=click.Path(exists=False, file_okay=True, dir_okay=True))
-@click.option("--ideal-ss", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
+@click.option("--stats", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
+@click.option("--source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
+@click.option("--batch-id", type=click.INT, default=-1)
 @click.pass_context
-def run_benchmark(ctx: click.Context, eval_config, fedx_config, query, result, stats, ideal_ss):
+def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result, stats, source_selection, batch_id):
 
     app_config = load_config(eval_config)["evaluation"]["engines"]["fedx"]
     app = app_config["dir"]
@@ -56,7 +63,7 @@ def run_benchmark(ctx: click.Context, eval_config, fedx_config, query, result, s
 
     #stat = f"{r_root}/stats.csv"
 
-    args = [fedx_config, query, result, stats, ideal_ss]
+    args = [engine_config, query, result, stats, source_selection]
     args = " ".join(args)
     #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
     timeoutCmd = ""
@@ -65,13 +72,12 @@ def run_benchmark(ctx: click.Context, eval_config, fedx_config, query, result, s
     def write_empty_stats():
         with open(stats, "w+") as fout:
             fout.write("query;engine;instance;batch;mode;exec_time;distinct_ss\n")
-            basicInfos = re.match(r".*/(\w+)/(q\d+)/instance_(\d+)/batch_(\d+)/(\w+)/results", result)
+            basicInfos = re.match(r".*/(\w+)/(q\d+)/instance_(\d+)/batch_(\d+)/results", result)
             engine = basicInfos.group(1)
             queryName = basicInfos.group(2)
             instance = basicInfos.group(3)
             batch = basicInfos.group(4)
-            mode = basicInfos.group(5)
-            fout.write(";".join([queryName, engine, instance, batch, mode, "nan", "nan"])+"\n")
+            fout.write(";".join([queryName, engine, instance, batch, "nan", "nan"])+"\n")
             fout.close()
     
     def write_empty_result(msg):

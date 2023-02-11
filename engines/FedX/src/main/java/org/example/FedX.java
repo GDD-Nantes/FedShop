@@ -136,26 +136,12 @@ public class FedX {
             parseSS(sourceSelectionPath);
         }
 
-        File statFile = new File(statPath);
-        if (statFile.getParentFile() != null) {
-            statFile.getParentFile().mkdirs();
-        }
-        statFile.createNewFile();
-
-        CSVWriter statWriter = new CSVWriter(
-            new FileWriter(statFile), ',', 
-            CSVWriter.NO_QUOTE_CHARACTER, 
-            CSVWriter.DEFAULT_ESCAPE_CHARACTER, 
-            CSVWriter.DEFAULT_LINE_END
-        );
-
         String rawQuery = new String(Files.readAllBytes(Paths.get(queryPath)));
         //log.info("Query {}", rawQuery);
         File dataConfig = new File(configPath);
 
         Long startTime = null;
         Long endTime = null;
-        AtomicBoolean success = new AtomicBoolean(true);
 
         FedXRepository repo = FedXFactory.newFederation()
                 .withConfig(new FedXConfig()
@@ -166,9 +152,9 @@ public class FedX {
                         .withEnforceMaxQueryTime(86400))
                 .withMembers(dataConfig)
                 .create();
-        
+            
         startTime = System.currentTimeMillis();
-
+        
         try (RepositoryConnection conn = repo.getConnection()) {
             TupleQuery tq = conn.prepareTupleQuery(rawQuery);
             try (TupleQueryResult res = tq.evaluate()) {
@@ -187,29 +173,49 @@ public class FedX {
 
         long durationTime = endTime - startTime;
 
+        if (!statPath.equals("/dev/null")) {
+            File statFile = new File(statPath);
+            if (statFile.getParentFile() != null) {
+                statFile.getParentFile().mkdirs();
+            }
+            statFile.createNewFile();
+
+            CSVWriter statWriter = new CSVWriter(
+                new FileWriter(statFile), ',', 
+                CSVWriter.NO_QUOTE_CHARACTER, 
+                CSVWriter.DEFAULT_ESCAPE_CHARACTER, 
+                CSVWriter.DEFAULT_LINE_END
+            );
+
+            // resultPath: .../{engine}/{query}/{instance_id}/batch_{batch_id}/default/results
+            // research in reverse order
+
+            Pattern pattern = Pattern.compile(".*/(\\w+)/(q\\d+)/instance_(\\d+)/batch_(\\d+)/stats.csv");
+            System.out.println(statPath);
+            Matcher basicInfos = pattern.matcher(statPath);
+            basicInfos.find();
+            String engine = basicInfos.group(1);
+            String query = basicInfos.group(2);
+            String instance = basicInfos.group(3);
+            String batch = basicInfos.group(4);
+
+            String[] header = {"query","engine","instance","batch", "exec_time"};
+            statWriter.writeNext(header);
+
+            String[] content = {query, engine, instance, batch, Long.toString(durationTime)};
+            statWriter.writeNext(content);
+            statWriter.close();            
+        } 
+            
+
+        //System.out.println(success.get());
+
         // resultPath: .../{engine}/{query}/{instance_id}/batch_{batch_id}/default/results
         // research in reverse order
 
-        Pattern pattern = Pattern.compile(".*/(\\w+)/(q\\d+)/instance_(\\d+)/batch_(\\d+)/(\\w+)/results.ss");
-        
-        Matcher basicInfos = pattern.matcher(resultPath);
-        basicInfos.find();
-        String engine = basicInfos.group(1);
-        String query = basicInfos.group(2);
-        String instance = basicInfos.group(3);
-        String batch = basicInfos.group(4);
-        String mode = basicInfos.group(5);
-
-        int httpqueries = ((AtomicInteger) CONTAINER.get(COUNT_HTTP_REQ_KEY)).get();
-
-        String[] header = {"query","engine","instance","batch","mode","exec_time"};
-        statWriter.writeNext(header);
-
-        String[] content = {query, engine, instance, batch, mode, Long.toString(durationTime)};
-        statWriter.writeNext(content);
-        statWriter.close();
-
-        createSourceSelectionFile(resultPath);
+        if (!resultPath.equals("/dev/null")){
+            createSourceSelectionFile(resultPath);
+        }
 
         repo.shutDown();
 

@@ -67,12 +67,9 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
 
     CONFIG = load_config(configfile)
     GEN_CONFIG = CONFIG["generation"]
-    EVAL_CONFIG = CONFIG["evaluation"]
     WORK_DIR = GEN_CONFIG["workdir"]
 
-    SPARQL_COMPOSE_FILE = GEN_CONFIG["virtuoso"]["compose_file"]
     EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate.smk"
-    N_ENGINES = len(["engines"])
     N_BATCH = GEN_CONFIG["n_batch"]
 
     WORKFLOW_DIR = f"{WORK_DIR}/rulegraph"
@@ -84,8 +81,11 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
     # if in evaluate mode
     if clean is not None :
         print("Cleaning...")
-        shutil.rmtree(f"{WORK_DIR}/benchmark/evaluation", ignore_errors=True)
-
+        if clean == "all":
+            shutil.rmtree(f"{WORK_DIR}/benchmark/evaluation", ignore_errors=True)
+        elif clean == "metrics":
+            os.system(f"rm {WORK_DIR}/benchmark/evaluation/*.csv")
+    
     for batch in range(1, N_BATCH+1):
         if debug:
             print("Producing rulegraph...")

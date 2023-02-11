@@ -99,7 +99,6 @@ rule all:
 rule merge_metrics:
     priority: 1
     input: expand("{{benchDir}}/metrics_batch{batch_id}.csv", batch_id=range(N_BATCH))
-    #input: expand("{{benchDir}}/metrics_batch{batch_id}.csv", batch_id=0)
     output: "{benchDir}/metrics.csv"
     run: pd.concat((pd.read_csv(f) for f in input)).to_csv(f"{output}", index=False)
 
@@ -112,81 +111,82 @@ rule merge_batch_metrics:
     run:
         metrics_df = pd.read_csv(f"{input.metrics}")
         stats_df = pd.read_csv(f"{input.stats}")
-        out_df = pd.merge(metrics_df, stats_df, on = ["query", "batch", "instance", "mode", "engine"], how="left")
-        print(out_df)
+        out_df = pd.merge(metrics_df, stats_df, on = ["query", "batch", "instance", "engine"], how="left")
         out_df.to_csv(str(output), index=False)
+
+rule merge_stats:
+    input: 
+        expand(
+            "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/stats.csv", 
+            engine=CONFIG_EVAL["engines"],
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
+            instance_id=range(N_QUERY_INSTANCES)
+        )
+    output: "{benchDir}/eval_stats_batch{batch_id}.csv"
+    run: pd.concat((pd.read_csv(f, sep = ';') for f in input)).to_csv(f"{output}", index=False, sep = ';')
+
+rule evaluate_source_selection_on_fedx:
+    """Evaluate queries using each engine's source selection on FedX.
+    
+    - Output: only statistics, no source-seleciton
+    """
+    threads: 1
+    #retries: 3
+    input: 
+        query=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/injected.sparql", workDir=WORK_DIR),
+        engine_source_selection=expand("{{benchDir}}/{{engine}}/{{query}}/instance_{{instance_id}}/batch_{{batch_id}}/provenance.csv", workDir=WORK_DIR),
+        engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
+        virtuoso_last_batch=expand("{workDir}/benchmark/generation/virtuoso_batch{batch_n}-ok.txt", workDir=WORK_DIR, batch_n=N_BATCH-1),
+        engine_status="{benchDir}/{engine}/{engine}-ok.txt",
+        container_infos=expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR)
+    output: 
+        stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/stats.csv",
+    params:
+        eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR),
+        out_source_selection="/dev/null"
+    run: 
+        activate_one_container(input.container_infos, wildcards.batch_id)
+        shell("python rsfb/engines/fedx.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {params.out_source_selection} --stats {output.stats} --source-selection {input.engine_source_selection} --batch-id {wildcards.batch_id}")
+
 
 rule compute_metrics:
     priority: 2
     threads: 1
     input: 
         expand(
-            "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/{mode}/provenance.csv", 
+            "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/provenance.csv", 
             engine=CONFIG_EVAL["engines"],
             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            instance_id=range(N_QUERY_INSTANCES),
-            #mode=["ideal"]
-            mode=["default", "ideal"]
+            instance_id=range(N_QUERY_INSTANCES)
         )
     output: "{benchDir}/eval_metrics_batch{batch_id}.csv"
     shell: "python rsfb/metrics.py compute-metrics {CONFIGFILE} {output} {input}"
 
-rule merge_batch_stats:
-    input: 
-        expand(
-            "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/{mode}/stats.csv", 
-            engine=CONFIG_EVAL["engines"],
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            instance_id=range(N_QUERY_INSTANCES),
-            #mode=["ideal"]
-            mode=["default", "ideal"]
-        )
-    output: "{benchDir}/eval_stats_batch{batch_id}.csv"
-    run: pd.concat((pd.read_csv(f, sep = ';') for f in input)).to_csv(f"{output}", index=False, sep = ';')
-
 rule transform_result:
-    input: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/{mode}/results.ss"
-    output: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/{mode}/provenance.csv"
+    input: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/results.ss"
+    output: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv"
     params:
         prefix_cache=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/prefix_cache.json", workDir=WORK_DIR)
     shell: "python rsfb/engines/{wildcards.engine}.py transform-result {input} {output} {params.prefix_cache}"
 
-rule measure_default_stats:
-   threads: 1
-   #retries: 3
-   input: 
+rule extract_source_selection_from_engines:
+    """Extract source selection from each engine, without stats
+    """
+    threads: 1
+    #retries: 3
+    input: 
         query=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/injected.sparql", workDir=WORK_DIR),
         engine_config=expand("{workDir}/benchmark/evaluation/{{engine}}/config/batch_{{batch_id}}/{{engine}}.conf", workDir=WORK_DIR),
         virtuoso_last_batch=expand("{workDir}/benchmark/generation/virtuoso_batch{batch_n}-ok.txt", workDir=WORK_DIR, batch_n=N_BATCH-1),
         engine_status="{benchDir}/{engine}/{engine}-ok.txt",
         container_infos=expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR)
-   output: 
-       source_selection="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/default/results.ss",
-       stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/default/stats.csv"
-   params:
-       eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
-   run:
-        activate_one_container(input.container_infos, wildcards.batch_id)
-        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.source_selection} {output.stats}")
- 
-rule measure_ideal_source_selection_stats:
-    threads: 1
-    #retries: 3
-    input: 
-        query=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/injected.sparql", workDir=WORK_DIR),
-        ideal_ss=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/batch_{{batch_id}}/provenance.csv", workDir=WORK_DIR),
-        engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
-        virtuoso_last_batch=expand("{workDir}/benchmark/generation/virtuoso_batch{batch_n}-ok.txt", workDir=WORK_DIR, batch_n=N_BATCH-1),
-        engine_status="{benchDir}/{engine}/{engine}-ok.txt",
-        container_infos=expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR)
     output: 
-        source_selection="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/ideal/results.ss",
-        stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/ideal/stats.csv",
+        source_selection="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/results.ss",
     params:
         eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
-    run: 
+    run:
         activate_one_container(input.container_infos, wildcards.batch_id)
-        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.source_selection} {output.stats} --ideal-ss {input.ideal_ss}")
+        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.source_selection} --batch-id {wildcards.batch_id}")
 
 rule engines_prerequisites:
     output: "{benchDir}/{engine}/{engine}-ok.txt"

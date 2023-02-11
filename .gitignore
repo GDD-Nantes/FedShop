@@ -149,3 +149,9 @@ saved.txt
 *-up.txt
 *.dot
 *.png
+
+*.class
+*.n3
+
+engines/SPLENDID/bin/
+engines/SPLENDID/eval/
