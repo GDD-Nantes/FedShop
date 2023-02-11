@@ -162,6 +162,10 @@ def wipe(configfile, level: str):
                 os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/instance_{instance}/")
 
     if "all" in args:
+        print("Cleaning all databases...")
+        if os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)
+        if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)  
+        if os.system("docker volume prune --force") != 0: exit(1)
         Path(f"{WORK_DIR}/generator-ok.txt").unlink(missing_ok=True)
         shutil.rmtree(f"{WORK_DIR}/model/tmp", ignore_errors=True)
         remove_model()
