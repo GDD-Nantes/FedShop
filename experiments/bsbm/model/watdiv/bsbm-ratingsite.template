@@ -38,7 +38,7 @@
 <type> bsbm:Person {%person_n}
 
 <pgroup> 1.0
-#predicate foaf:name name
+#predicate foaf:name name{%person_name_wc}
 </pgroup>
 
 <pgroup> 1.0

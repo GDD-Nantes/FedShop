@@ -16,7 +16,7 @@
 </pgroup>
 
 <pgroup> 1.0
-#predicate rdfs:comment string{%comment_wc}
+#predicate rdfs:comment string{%producer_comment_wc}
 </pgroup>
 
 <pgroup> 1.0
@@ -97,7 +97,7 @@
 </pgroup>
 
 <pgroup> 1.0
-#predicate rdfs:comment string{%comment_wc}
+#predicate rdfs:comment string{%feature_comment_wc}
 </pgroup>
 
 <pgroup> 1.0
@@ -114,7 +114,7 @@
 </pgroup>
 
 <pgroup> 1.0
-#predicate rdfs:comment string{%comment_wc}
+#predicate rdfs:comment string{%type_comment_wc}
 </pgroup>
 
 <pgroup> 1.0

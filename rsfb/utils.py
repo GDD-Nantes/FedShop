@@ -1,7 +1,7 @@
 from io import BytesIO
 import subprocess
 import numpy as np
-from scipy.stats import norm
+from scipy.stats import norm, truncnorm
 from omegaconf import OmegaConf
 import psutil
 import pandas as pd
@@ -274,6 +274,9 @@ def get_virtuoso_containers(compose_file, service_name):
     result["containerId"] = result["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
     result.sort_values("containerId", inplace=True)
     return result["Name"].to_list()
+
+def normal_truncated(mu, sigma, lower, upper):
+    return int(truncnorm.rvs((lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma))
     
 OmegaConf.register_new_resolver("multiply", lambda *args: np.prod(args).item())
 OmegaConf.register_new_resolver("sum", lambda *args: np.sum(args).item())
@@ -288,6 +291,8 @@ OmegaConf.register_new_resolver("get_product_producer_n", lambda nbProd: get_pro
 
 OmegaConf.register_new_resolver("normal_dist", lambda *args: NormalDistGenerator(*args).getValue())
 OmegaConf.register_new_resolver("normal_dist_range", lambda *args: NormalDistRangeGenerator(*args).getValue())
+OmegaConf.register_new_resolver("normal_truncated", normal_truncated)
+
 
 def load_config(filename, saveAs=None):
     """Load configuration from a file. By default, attributes are interpolated at access time.
