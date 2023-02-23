@@ -46,12 +46,14 @@ def prerequisites(eval_config):
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("engine-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("query", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("result", type=click.Path(exists=False, file_okay=True, dir_okay=True))
+@click.option("--out-result", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
+@click.option("--out-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
+@click.option("--query-plan", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
 @click.option("--stats", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
-@click.option("--source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
+@click.option("--force-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
 @click.option("--batch-id", type=click.INT, default=-1)
 @click.pass_context
-def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result, stats, source_selection, batch_id):
+def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id):
 
     app_config = load_config(eval_config)["evaluation"]["engines"]["fedx"]
     app = app_config["dir"]
@@ -59,31 +61,33 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result,
     lib = os.path.join(app, "lib/*")
     timeout = int(app_config["timeout"])
 
-    r_root = Path(result).parent
+    r_root = Path(out_result).parent
 
     #stat = f"{r_root}/stats.csv"
 
-    args = [engine_config, query, result, stats, source_selection]
+    args = [engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection]
     args = " ".join(args)
     #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
     timeoutCmd = ""
     cmd = f'{timeoutCmd} java -classpath "{jar}:{lib}" org.example.FedX {args}'.strip()
     
     def write_empty_stats():
-        with open(stats, "w+") as fout:
-            fout.write("query;engine;instance;batch;mode;exec_time;distinct_ss\n")
-            basicInfos = re.match(r".*/(\w+)/(q\d+)/instance_(\d+)/batch_(\d+)/results", result)
-            engine = basicInfos.group(1)
-            queryName = basicInfos.group(2)
-            instance = basicInfos.group(3)
-            batch = basicInfos.group(4)
-            fout.write(";".join([queryName, engine, instance, batch, "nan", "nan"])+"\n")
-            fout.close()
-    
+        with open(stats, "w") as fout:
+            fout.write("query,engine,instance,batch,mode,exec_time\n")
+            if stats != "/dev/null":
+                basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
+                engine = basicInfos.group(1)
+                queryName = basicInfos.group(2)
+                instance = basicInfos.group(3)
+                batch = basicInfos.group(4)
+                attempt = basicInfos.group(5)
+                fout.write(",".join([queryName, engine, instance, batch, attempt, "nan", "nan"])+"\n")
+                
     def write_empty_result(msg):
-        with open(result, "w+") as fout:
+        with open(out_source_selection, "w") as fout:
             fout.write(msg)
             fout.close()
+
     print("=== FedX ===")
     print(cmd)
     print("============")
@@ -91,7 +95,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result,
     fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     try: 
         #output, error = fedx_proc.communicate(timeout=timeout)
-        # with open(result + ".log", "w+") as watdivWriter:
+        # with open(result + ".log", "w") as watdivWriter:
         #     for line in iter(fedx_proc.stderr.readline, b''):
         #         watdivWriter.write(line.decode())
         #     watdivWriter.close()  
@@ -104,6 +108,11 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result,
             print(f"{query} reported error")      
             # write_empty_stats()
             # write_empty_result("error")
+            # with open("evaluation_failed_logs.txt", "a") as fs:
+            #     fs.write(f"=== FedX - {query} ===\n")
+            #     fs.write(cmd + "\n")
+            #     fs.write("============\n")
+                
             raise RuntimeError(f"{query} reported error")
             
     except subprocess.TimeoutExpired: 
@@ -117,18 +126,11 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result,
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("prefix-cache", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 def transform_result(infile, outfile, prefix_cache):
-    in_df = pd.read_csv(infile)
-    
-    prefix2alias = json.load(open(prefix_cache, "r"))    
-    composition = json.load(open(os.path.join(Path(prefix_cache).parent, "provenance.sparql.comp"), "r"))
-    inv_composition = {f"{' '.join(v)}": k for k, v in composition.items()}
     
     def extract_triple(x):
         fedx_pattern = r"StatementPattern\s+(\(new scope\)\s+)?Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)"
         match = re.match(fedx_pattern, x)
         
-        #print(x)
-
         s = match.group(3)
         if s is None: s = f"?{match.group(4)}"
         
@@ -158,23 +160,29 @@ def transform_result(infile, outfile, prefix_cache):
     
     def lookup_composition(x: str):
         return inv_composition[x]
-        
     
-    in_df["triple"] = in_df["triple"].apply(extract_triple)
-    in_df["tp_name"] = in_df["triple"].apply(lookup_composition)
-    in_df["tp_number"] = in_df["tp_name"].str.replace("tp", "", regex=False).astype(int)
-    in_df.sort_values("tp_number", inplace=True)
-    in_df["source_selection"] = in_df["source_selection"].apply(extract_source_selection)
+    in_df = pd.read_csv(infile)
     
-    # If unequal length (as in union, optional), fill with nan
-    max_length = in_df["source_selection"].apply(len).max()
-    in_df["source_selection"] = in_df["source_selection"].apply(lambda x: np.pad(x, (0, max_length-len(x)), mode="empty"))
-        
-    out_df = in_df.set_index("tp_name")["source_selection"] \
-        .to_frame().T \
-        .apply(pd.Series.explode) \
-        .reset_index(drop=True) 
-    out_df.to_csv(outfile, index=False)
+    with open(prefix_cache, "r") as prefix_cache_fs, open(os.path.join(Path(prefix_cache).parent, "provenance.sparql.comp"), "r") as comp_fs:
+        prefix2alias = json.load(prefix_cache_fs)    
+        composition = json.load(comp_fs)
+        inv_composition = {f"{' '.join(v)}": k for k, v in composition.items()}
+                        
+        in_df["triple"] = in_df["triple"].apply(extract_triple)
+        in_df["tp_name"] = in_df["triple"].apply(lookup_composition)
+        in_df["tp_number"] = in_df["tp_name"].str.replace("tp", "", regex=False).astype(int)
+        in_df.sort_values("tp_number", inplace=True)
+        in_df["source_selection"] = in_df["source_selection"].apply(extract_source_selection)
+
+        # If unequal length (as in union, optional), fill with nan
+        max_length = in_df["source_selection"].apply(len).max()
+        in_df["source_selection"] = in_df["source_selection"].apply(lambda x: np.pad(x, (0, max_length-len(x)), mode="empty"))
+            
+        out_df = in_df.set_index("tp_name")["source_selection"] \
+            .to_frame().T \
+            .apply(pd.Series.explode) \
+            .reset_index(drop=True) 
+        out_df.to_csv(outfile, index=False)
 
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)

@@ -23,14 +23,13 @@ CONFIG = load_config(CONFIGFILE)
 CONFIG_GEN = CONFIG["generation"]
 CONFIG_EVAL = CONFIG["evaluation"]
 
-SPARQL_ENDPOINT = CONFIG_GEN["virtuoso"]["endpoints"]
-
 SPARQL_COMPOSE_FILE = CONFIG_GEN["virtuoso"]["compose_file"]
 SPARQL_SERVICE_NAME = CONFIG_GEN["virtuoso"]["service_name"]
 SPARQL_CONTAINER_NAMES = CONFIG_GEN["virtuoso"]["container_names"]
 
 N_QUERY_INSTANCES = CONFIG_GEN["n_query_instances"]
 N_BATCH = CONFIG_GEN["n_batch"]
+LAST_BATCH = N_BATCH-1
 
 # Config per batch
 N_VENDOR=CONFIG_GEN["schema"]["vendor"]["params"]["vendor_n"]
@@ -65,9 +64,8 @@ def wait_for_container(endpoints, outfile, wait=1):
         attempt += 1
         time.sleep(wait)
 
-    with open(f"{outfile}", "w+") as f:
+    with open(f"{outfile}", "w") as f:
         f.write("OK")
-        f.close()
 
 def activate_one_container(container_infos_file, batch_id):
     """ Activate one container while stopping all others
@@ -117,10 +115,11 @@ rule merge_batch_metrics:
 rule merge_stats:
     input: 
         expand(
-            "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/stats.csv", 
+            "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/attempt_{attempt_id}/stats.csv", 
             engine=CONFIG_EVAL["engines"],
             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            instance_id=range(N_QUERY_INSTANCES)
+            instance_id=range(N_QUERY_INSTANCES),
+            attempt_id=range(CONFIG_EVAL["n_attempts"])
         )
     output: "{benchDir}/eval_stats_batch{batch_id}.csv"
     run: pd.concat((pd.read_csv(f, sep = ';') for f in input)).to_csv(f"{output}", index=False, sep = ';')
@@ -140,13 +139,21 @@ rule evaluate_source_selection_on_fedx:
         engine_status="{benchDir}/{engine}/{engine}-ok.txt",
         container_infos=expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR)
     output: 
-        stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/stats.csv",
+        stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/stats.csv",
     params:
         eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR),
-        out_source_selection="/dev/null"
+        out_source_selection="/dev/null",
+        result="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.txt",
+        query_plan="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/query_plan.txt"
     run: 
-        activate_one_container(input.container_infos, wildcards.batch_id)
-        shell("python rsfb/engines/fedx.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {params.out_source_selection} --stats {output.stats} --source-selection {input.engine_source_selection} --batch-id {wildcards.batch_id}")
+        engine_source_selection = pd.read_csv(str(input.engine_source_selection))
+        hasDuplicates = engine_source_selection.duplicated().any()
+        if hasDuplicates:
+            raise RuntimeError(f"{input.engine_source_selection} contains duplicates!")
+        activate_one_container(input.container_infos, LAST_BATCH)
+        
+        # configPath, queryPath, outResultPath, outSourceSelectionPath, outQueryPlanFile, statPath, inSourceSelectionPath
+        shell("python rsfb/engines/fedx.py run-benchmark {params.eval_config} {input.engine_config} {input.query} --out-result {params.result} --out-source-selection {params.out_source_selection} --query-plan {params.query_plan} --stats {output.stats} --force-source-selection {input.engine_source_selection} --batch-id {wildcards.batch_id}")
 
 
 rule compute_metrics:
@@ -185,8 +192,9 @@ rule extract_source_selection_from_engines:
     params:
         eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
     run:
-        activate_one_container(input.container_infos, wildcards.batch_id)
-        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} {output.source_selection} --batch-id {wildcards.batch_id}")
+        activate_one_container(input.container_infos, LAST_BATCH)
+        # configPath, queryPath, outResultPath, outSourceSelectionPath, outQueryPlanFile, statPath, inSourceSelectionPath
+        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} --out-source-selection {output.source_selection} --batch-id {wildcards.batch_id}")
 
 rule engines_prerequisites:
     output: "{benchDir}/{engine}/{engine}-ok.txt"
@@ -207,19 +215,8 @@ rule generate_federation_declaration:
         vendorSliceId = np.histogram(np.arange(N_VENDOR), N_BATCH)[1][1:].astype(int)[batchId]
         batch_files = ratingsite_data_files[:ratingsiteSliceId+1] + vendor_data_files[:vendorSliceId+1]
 
-        activate_one_container(input.container_infos, wildcards.batch_id)
-        SPARQL_ENDPOINT = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[batchId])
+        activate_one_container(input.container_infos, LAST_BATCH)
+        sparql_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])
 
-        if str(wildcards.engine) == "splendid":
-            SPLENDID_PROPERTIES = CONFIG_EVAL["engines"]["splendid"]["properties"]
-            lines = []
-            with open(f"{SPLENDID_PROPERTIES}", "r") as properties_file:
-                lines = properties_file.readlines()
-                for i in range(len(lines)):
-                    if lines[i].startswith("sparql.endpoint"):
-                        lines[i] = re.sub(r'sparql.endpoint=.+',r'sparql.endpoint='+str(SPARQL_ENDPOINT), lines[i])
-            with open(f"{SPLENDID_PROPERTIES}", "w") as properties_file:
-                properties_file.writelines(lines)
-
-        os.system(f"python rsfb/engines/{wildcards.engine}.py generate-config-file {' '.join(batch_files)} {output} --endpoint {SPARQL_ENDPOINT}")
+        shell(f"python rsfb/engines/{wildcards.engine}.py generate-config-file {' '.join(batch_files)} {output} --endpoint {sparql_endpoint}")
 

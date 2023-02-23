@@ -236,44 +236,50 @@ def __get_publisher_info(x):
 
 def get_virtuoso_endpoints(compose_file, service_name):
     json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
-    infos = pd.read_json(BytesIO(json_bytes))
-    infos["containerId"] = infos["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
-    infos.sort_values("containerId", inplace=True)
-        
-    result = infos["Publishers"] \
-        .apply(__get_publisher_info) \
-        .apply(lambda x: f"http://localhost:{x}/sparql") \
-        .to_list()
-    return result
+    with BytesIO(json_bytes) as json_bs:
+        infos = pd.read_json(json_bs)
+        infos["containerId"] = infos["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
+        infos.sort_values("containerId", inplace=True)
+                
+        result = infos["Publishers"] \
+            .apply(__get_publisher_info) \
+            .apply(lambda x: f"http://localhost:{x}/sparql") \
+            .to_list()
+        return result
 
 def get_virtuoso_endpoint_by_container_name(compose_file, service_name, container_name):        
     json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
-    infos = pd.read_json(BytesIO(json_bytes))
-    infos["containerId"] = infos["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
-    infos.sort_values("containerId", inplace=True)
-    result = infos.query(f"`Name` == {repr(container_name)}")["Publishers"] \
-        .apply(__get_publisher_info) \
-        .apply(lambda x: f"http://localhost:{x}/sparql") \
-        .item()
-    return result
+    with BytesIO(json_bytes) as json_bs:
+        infos = pd.read_json(json_bs)
+        infos["containerId"] = infos["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
+        infos.sort_values("containerId", inplace=True)
+        result = infos.query(f"`Name` == {repr(container_name)}")["Publishers"] \
+            .apply(__get_publisher_info) \
+            .apply(lambda x: f"http://localhost:{x}/sparql") \
+            .item()
+        return result
 
 def check_container_status(compose_file, service_name, container_name):
     compose_proc = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True)
     json_bytes = compose_proc.stdout
-    infos = pd.read_json(BytesIO(json_bytes))
     
-    result = None
-    if not infos.empty:
-        result = infos.query(f"`Name` == {repr(container_name)}")["State"].item()
+    with BytesIO(json_bytes) as json_bs:
+        infos = pd.read_json(json_bs)
         
-    return result
+        result = None
+        if not infos.empty:
+            result = infos.query(f"`Name` == {repr(container_name)}")["State"].item()
+            
+        return result
     
 def get_virtuoso_containers(compose_file, service_name):    
     json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
-    result = pd.read_json(BytesIO(json_bytes))
-    result["containerId"] = result["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
-    result.sort_values("containerId", inplace=True)
-    return result["Name"].to_list()
+    
+    with BytesIO(json_bytes) as json_bs:
+        result = pd.read_json(json_bs)
+        result["containerId"] = result["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
+        result.sort_values("containerId", inplace=True)
+        return result["Name"].to_list()
 
 def normal_truncated(mu, sigma, lower, upper):
     return int(truncnorm.rvs((lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma))
@@ -310,7 +316,7 @@ def load_config(filename, saveAs=None):
         try: cache_config = OmegaConf.to_object(config)
         except: cache_config = { k: v for k, v in config.items() if k not in ["virtuoso"]}
         
-        with open(saveAs, "w+") as tmpfile:
+        with open(saveAs, "w") as tmpfile:
             OmegaConf.save(cache_config, tmpfile)
 
     return config

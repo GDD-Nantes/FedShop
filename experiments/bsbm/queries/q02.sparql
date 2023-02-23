@@ -7,21 +7,21 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 SELECT ?label ?comment ?producer ?ProductFeatureLabel ?propertyTextual1 ?propertyTextual2 ?propertyTextual3 ?propertyNumeric1 ?propertyNumeric2 ?propertyTextual4 ?propertyTextual5 ?propertyNumeric4 
 WHERE {
     # const ?product
-	?localProduct owl:sameAs ?product .
+    ?localProduct owl:sameAs ?product .
     ?localProduct rdfs:label ?label .
-	?localProduct rdfs:comment ?comment .
-	?localProduct bsbm:producer ?p .
-	?p rdfs:label ?producer .
+    ?localProduct rdfs:comment ?comment .
+    ?localProduct bsbm:producer ?p .
+    ?p rdfs:label ?producer .
     #?localProduct dc:publisher ?p . 
-	?localProduct bsbm:productFeature ?localProductFeature1 .
-	?localProductFeature1 owl:sameAs ?ProductFeature1 .
-	?localProductFeature1 rdfs:label ?ProductFeatureLabel .
-	?localProduct bsbm:productPropertyTextual1 ?propertyTextual1 .
-	?localProduct bsbm:productPropertyTextual2 ?propertyTextual2 .
+    ?localProduct bsbm:productFeature ?localProductFeature1 .
+    ?localProductFeature1 owl:sameAs ?ProductFeature1 .
+    ?localProductFeature1 rdfs:label ?ProductFeatureLabel .
+    ?localProduct bsbm:productPropertyTextual1 ?propertyTextual1 .
+    ?localProduct bsbm:productPropertyTextual2 ?propertyTextual2 .
     ?localProduct bsbm:productPropertyTextual3 ?propertyTextual3 .
-	?localProduct bsbm:productPropertyNumeric1 ?propertyNumeric1 .
-	?localProduct bsbm:productPropertyNumeric2 ?propertyNumeric2 .
-	OPTIONAL { ?localProduct bsbm:productPropertyTextual4 ?propertyTextual4 }
+    ?localProduct bsbm:productPropertyNumeric1 ?propertyNumeric1 .
+    ?localProduct bsbm:productPropertyNumeric2 ?propertyNumeric2 .
+    OPTIONAL { ?localProduct bsbm:productPropertyTextual4 ?propertyTextual4 }
     OPTIONAL { ?localProduct bsbm:productPropertyTextual5 ?propertyTextual5 }
     OPTIONAL { ?localProduct bsbm:productPropertyNumeric4 ?propertyNumeric4 }
 }

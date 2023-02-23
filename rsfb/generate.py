@@ -22,7 +22,10 @@ def generate(configfile, section, output, id):
     config = load_config(configfile, saveAs=f"{output_base}.yaml")["generation"]
     schema_config = config["schema"]
 
-    template = open(schema_config[section]["template"], "r").read()
+    template_fs = open(schema_config[section]["template"], "r")
+    template = template_fs.read()
+    template_fs.close()
+    
     # Replace all params in template
     params: dict = schema_config[section]["params"]
     if params is not None:
@@ -39,7 +42,6 @@ def generate(configfile, section, output, id):
         if schema_config[section].get("export_dep_output_dir") is not None:
             out = re.sub(re.escape("{%export_dep_output_dir}"), schema_config[section]["export_dep_output_dir"], out)
         outWriter.write(out)
-        outWriter.close()
 
     scale_factor = int(schema_config[section]["scale_factor"])
 

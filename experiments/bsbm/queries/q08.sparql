@@ -7,18 +7,18 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 SELECT ?title ?text ?reviewDate ?reviewer ?reviewerName ?rating1 ?rating2 ?rating3 ?rating4 
 WHERE { 
     # const ?ProductXYZ
-	?review bsbm:reviewFor ?localProductXYZ .
-	?localProductXYZ owl:sameAs ?ProductXYZ .
-	?review dc:title ?title .
-	?review rev:text ?text .
-	FILTER(langMatches( lang(?text), "en" ))
-	?review bsbm:reviewDate ?reviewDate .
-	?review rev:reviewer ?reviewer .
-	?reviewer foaf:name ?reviewerName .
-	OPTIONAL { ?review bsbm:rating1 ?rating1 . }
-	OPTIONAL { ?review bsbm:rating2 ?rating2 . }
-	OPTIONAL { ?review bsbm:rating3 ?rating3 . }
-	OPTIONAL { ?review bsbm:rating4 ?rating4 . }
+    ?review bsbm:reviewFor ?localProductXYZ .
+    ?localProductXYZ owl:sameAs ?ProductXYZ .
+    ?review dc:title ?title .
+    ?review rev:text ?text .
+    FILTER(langMatches( lang(?text), "en" ))
+    ?review bsbm:reviewDate ?reviewDate .
+    ?review rev:reviewer ?reviewer .
+    ?reviewer foaf:name ?reviewerName .
+    OPTIONAL { ?review bsbm:rating1 ?rating1 . }
+    OPTIONAL { ?review bsbm:rating2 ?rating2 . }
+    OPTIONAL { ?review bsbm:rating3 ?rating3 . }
+    OPTIONAL { ?review bsbm:rating4 ?rating4 . }
 }
 ORDER BY DESC(?reviewDate)
 LIMIT 20

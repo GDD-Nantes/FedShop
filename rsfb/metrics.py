@@ -1,4 +1,5 @@
 import re
+from typing import Dict, Tuple
 import click
 import pandas as pd
 import numpy as np
@@ -7,6 +8,13 @@ from utils import load_config
 @click.group
 def cli():
     pass
+
+# def __traverse_graph(max_size: int, const_count: int, constJoinVertexAllowed: bool, dupEdgesAllowed: bool, qmap: Dict[Tuple[str, str], Dict[str, str]]):
+#     v_array = []
+    
+
+# def __get_query_structures(configfile, queryfile):
+#     pass
 
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, dir_okay=False, file_okay=True))
@@ -72,12 +80,12 @@ def compute_metrics(configfile, outfile, workload):
     records = []        
     for provenance_file in workload:
         source_selection_result = pd.read_csv(provenance_file)
-        name_search = re.search(r".*/(\w+)/(q\d+)/instance_(\d+)/batch_(\d+)/((default|ideal)/)?provenance.csv", provenance_file)
+        name_search = re.search(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/provenance.csv", provenance_file)
+        print(provenance_file)
         engine = name_search.group(1)
         query = name_search.group(2)
         instance = int(name_search.group(3))
         batch = int(name_search.group(4))
-        mode = name_search.group(6)
         total_nb_sources = vendor_edges[batch] + ratingsite_edges[batch]
         
         record = {
@@ -93,9 +101,6 @@ def compute_metrics(configfile, outfile, workload):
         
         if engine in CONFIG["evaluation"]["engines"]:
             record.update({"engine": engine})
-        
-        if mode is not None:
-            record.update({"mode": mode })
         
         records.append(record)
     

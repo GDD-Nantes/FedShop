@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.2 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.2.3 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.example</groupId>
@@ -15,40 +15,39 @@
     </properties>
 
 
-        <build>
-            <plugins>
-                <plugin>
-                    <groupId>org.codehaus.mojo</groupId>
-                    <artifactId>exec-maven-plugin</artifactId>
-                    <version>1.2.1</version>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.2.1</version>
 
-                </plugin>
+            </plugin>
 
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-jar-plugin</artifactId>
-                    <configuration>
-                        <archive>
-                            <manifest>
-                                <mainClass>org.example.FedX</mainClass>
-                            </manifest>
-                        </archive>
-                    </configuration>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-dependency-plugin</artifactId>
-                    <configuration>
-                        <outputDirectory>
-                            ${project.build.directory}/lib
-                        </outputDirectory>
-                    </configuration>
-                </plugin>
-            </plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>org.example.FedX</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <outputDirectory>
+                        ${project.build.directory}/lib
+                    </outputDirectory>
+                </configuration>
+            </plugin>
+        </plugins>
 
 
-        </build>
-
+    </build>
 
 
     <dependencyManagement>
@@ -56,7 +55,7 @@
             <dependency>
                 <groupId>org.eclipse.rdf4j</groupId>
                 <artifactId>rdf4j-bom</artifactId>
-                <version>4.0.2</version>
+                <version>4.2.3</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -67,54 +66,54 @@
         <dependency>
             <groupId>org.eclipse.rdf4j</groupId>
             <artifactId>rdf4j-storage</artifactId>
-            <version>4.0.2</version>
+            <version>4.2.3</version>
             <type>pom</type>
         </dependency>
         <dependency>
             <groupId>org.eclipse.rdf4j</groupId>
             <artifactId>rdf4j-client</artifactId>
-            <version>4.0.2</version>
+            <version>4.2.3</version>
             <type>pom</type>
         </dependency>
         <dependency>
             <groupId>org.eclipse.rdf4j</groupId>
             <artifactId>rdf4j-repository-sail</artifactId>
-            <version>4.0.2</version>
+            <version>4.2.3</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.rdf4j</groupId>
             <artifactId>rdf4j-sail-memory</artifactId>
-            <version>4.0.2</version>
+            <version>4.2.3</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.rdf4j</groupId>
             <artifactId>rdf4j-sail-nativerdf</artifactId>
-            <version>4.0.2</version>
+            <version>4.2.3</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.rdf4j</groupId>
             <artifactId>rdf4j-rio-rdfxml</artifactId>
-            <version>4.0.2</version>
+            <version>4.2.3</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.rdf4j</groupId>
             <artifactId>rdf4j-rio-turtle</artifactId>
-            <version>4.0.2</version>
+            <version>4.2.3</version>
         </dependency>
         <dependency>
-        <groupId>org.eclipse.rdf4j</groupId>
-        <artifactId>rdf4j-repository-http</artifactId>
-            <version>4.0.2</version>
+            <groupId>org.eclipse.rdf4j</groupId>
+            <artifactId>rdf4j-repository-http</artifactId>
+            <version>4.2.3</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.rdf4j</groupId>
             <artifactId>rdf4j-repository-sparql</artifactId>
-            <version>4.0.2</version>
+            <version>4.2.3</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.rdf4j</groupId>
             <artifactId>rdf4j-tools-federation</artifactId>
-            <version>4.0.2</version>
+            <version>4.2.3</version>
         </dependency>
 
         <dependency>
@@ -150,9 +149,14 @@
             <version>1.2</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>[2.8.9,)</version>
+        </dependency>
+
     </dependencies>
 
-    
 
 </project>
                    

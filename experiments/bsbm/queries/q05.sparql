@@ -5,27 +5,27 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
 SELECT DISTINCT ?product ?localProductLabel
 WHERE { 
-	?localProduct rdfs:label ?localProductLabel .
-	
-	?localProduct bsbm:productFeature ?localProdFeature .
-	?localProduct bsbm:productPropertyNumeric1 ?simProperty1 .
-	?localProduct bsbm:productPropertyNumeric2 ?simProperty2 .	
+    ?localProduct rdfs:label ?localProductLabel .
+    
+    ?localProduct bsbm:productFeature ?localProdFeature .
+    ?localProduct bsbm:productPropertyNumeric1 ?simProperty1 .
+    ?localProduct bsbm:productPropertyNumeric2 ?simProperty2 .    
 
-	?localProduct owl:sameAs ?product .
-	?localProdFeature owl:sameAs ?prodFeature .
+    ?localProduct owl:sameAs ?product .
+    ?localProdFeature owl:sameAs ?prodFeature .
 
-	?localProductXYZ bsbm:productFeature ?localProdFeatureXYZ .
-	?localProductXYZ bsbm:productPropertyNumeric1 ?origProperty1 .
-	?localProductXYZ bsbm:productPropertyNumeric2 ?origProperty2 .
+    ?localProductXYZ bsbm:productFeature ?localProdFeatureXYZ .
+    ?localProductXYZ bsbm:productPropertyNumeric1 ?origProperty1 .
+    ?localProductXYZ bsbm:productPropertyNumeric2 ?origProperty2 .
 
-	# const ?ProductXYZ
-	?localProductXYZ owl:sameAs ?ProductXYZ .
-	?localProdFeatureXYZ owl:sameAs ?prodFeature .
+    # const ?ProductXYZ
+    ?localProductXYZ owl:sameAs ?ProductXYZ .
+    ?localProdFeatureXYZ owl:sameAs ?prodFeature .
 
-	FILTER (?ProductXYZ != ?product)
-	# Values are pre-determined because we knew the boundaries from the normal distribution
-	FILTER(?simProperty1 < (?origProperty1 + 20) && ?simProperty1 > (?origProperty1 - 20))
-	FILTER(?simProperty2 < (?origProperty2 + 70) && ?simProperty2 > (?origProperty2 - 70))
+    FILTER(?ProductXYZ != ?product)
+    # Values are pre-determined because we knew the boundaries from the normal distribution
+    FILTER(?simProperty1 < (?origProperty1 + 20) && ?simProperty1 > (?origProperty1 - 20))
+    FILTER(?simProperty2 < (?origProperty2 + 70) && ?simProperty2 > (?origProperty2 - 70))
 }
 ORDER BY ?localProductLabel
 LIMIT 5

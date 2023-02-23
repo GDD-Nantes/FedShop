@@ -14,7 +14,8 @@ services:
       VIRT_Parameters_NumberOfBuffers: 1360000
       VIRT_Parameters_MaxDirtyBuffers: 1000000
     volumes:
-      - "../model/tmp/product:/usr/local/virtuoso-opensource/share/virtuoso/vad"
+      - "../model/dataset:/usr/local/virtuoso-opensource/share/virtuoso/vad"
+      # - "../model/tmp/product:/usr/share/proj"
     ports:
       - 1111:1111
       - 8890:8890
@@ -22,7 +23,8 @@ services:
   bsbm-virtuoso:
     #container_name: "bsbm-virtuoso"
     #image: openlink/virtuoso-opensource-7:7.2.8
-    image: tenforce/virtuoso:virtuoso7.2.5
+    #image: tenforce/virtuoso:virtuoso7.2.5
+    image: minhhoangdang/virtuoso:virtuoso7.2.7
     #user: "1000:1000"
     environment:
       SPARQL_UPDATE: "false"
@@ -30,11 +32,13 @@ services:
       VIRT_SPARQL_MaxQueryCostEstimationTime: 0
       VIRT_SPARQL_ResultSetMaxRows: 0
       VIRT_SPARQL_MaxQueryExecutionTime: 0
-      #VIRT_SPARQL_MaxQueryExecutionTime: 300
       VIRT_Parameters_NumberOfBuffers: 1360000
       VIRT_Parameters_MaxDirtyBuffers: 1000000
+      VIRT_Parameters_ThreadCleanupInterval: 10
+      VIRT_Parameters_ResourcesCleanupInterval: 10
     volumes:
       - "../model/dataset:/usr/local/virtuoso-opensource/share/virtuoso/vad"
+      #- "../model/dataset:/usr/share/proj"
     ports:
-      - 1111
-      - 8890
+      - 33201-33210:1111
+      - 34201-34210:8890

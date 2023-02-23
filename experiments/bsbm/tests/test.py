@@ -67,8 +67,9 @@ def query(queryfile, cache=True, limit=None):
         if limit is not None:
             query_text += f"LIMIT {limit}"
         _, result = exec_query(configfile=CONFIGFILE, query=query_text, error_when_timeout=True, batch_id=BATCH_ID)
-        header = BytesIO(result).readline().decode().strip().replace('"', '').split(",")
-        result = pd.read_csv(BytesIO(result), parse_dates=[h for h in header if "date" in h])
+        with BytesIO(result) as header_stream, BytesIO(result) as data_stream: 
+            header = header_stream.readline().decode().strip().replace('"', '').split(",")
+            result = pd.read_csv(data_stream, parse_dates=[h for h in header if "date" in h])
         if cache: result.to_csv(saveAs, index=False)
     return result
 

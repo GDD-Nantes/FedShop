@@ -36,16 +36,18 @@ def prerequisites(eval_config):
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("engine-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("query", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("result", type=click.Path(exists=False, file_okay=True, dir_okay=True))
+@click.option("--out-result", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
+@click.option("--out-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
+@click.option("--query-plan", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
 @click.option("--stats", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
-@click.option("--source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
+@click.option("--force-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
 @click.option("--batch-id", type=click.INT, default=-1)
 @click.pass_context
-def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result, stats, source_selection, batch_id):
+def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id):
     """ Execute provenance.sparql on Virtuoso
     """
     provenance = f"{Path(query).parent}/batch_{batch_id}/provenance.csv"
-    os.system(f"cp {provenance} {result}")
+    os.system(f"cp {provenance} {out_source_selection}")
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
