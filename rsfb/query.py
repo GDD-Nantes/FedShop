@@ -16,11 +16,8 @@ from io import BytesIO, StringIO
 from rdflib import Literal, URIRef, XSD
 import click
 
-import logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-from utils import load_config, str2n3
+from utils import load_config, rsfb_logger, str2n3
+logger = rsfb_logger(Path(__file__).name)
 
 import nltk
 nltk.download('stopwords', quiet=True)
@@ -591,7 +588,7 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
             # Remove from set injected consts
             with open(next_queryfile, "w") as f:
                 query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {' '.join([c for c in consts if c[1:] not in injection_cache.keys()])}\nWHERE", query)
-                query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(\2),", query)
+                query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(str(\2)),", query)
                 query = re.sub(r"(#)*(FILTER\s*\(\!bound)", r"\2", query)
                 logger.debug(next_queryfile)
                 logger.debug(query)

@@ -3,8 +3,10 @@ from pathlib import Path
 import re
 import click
 import subprocess
-from utils import load_config, kill_process
+from utils import load_config, kill_process, rsfb_logger
 import psutil
+
+logger = rsfb_logger(Path(__file__).name)
 
 @click.group
 def cli():
@@ -64,7 +66,7 @@ def generate(configfile, section, output, id):
 
     # try: kill_process(watdiv_proc.pid)  
     # except:
-    #     print(f"watdiv proc (PID: {watdiv_proc.pid}) is already killed, skipping...")
+    #     logger.exception(f"watdiv proc (PID: {watdiv_proc.pid}) is already killed, skipping...")
 
 if __name__ == "__main__":
     cli()

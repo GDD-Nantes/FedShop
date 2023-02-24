@@ -1,11 +1,56 @@
 from io import BytesIO
 import subprocess
+import colorlog
 import numpy as np
 from scipy.stats import norm, truncnorm
 from omegaconf import OmegaConf
 import psutil
 import pandas as pd
 from rdflib import Literal, URIRef
+
+import logging
+
+class RSFBLogFormatter(logging.Formatter):
+    grey = "\x1b[38;20m"
+    yellow = "\x1b[33;20m"
+    red = "\x1b[31;20m"
+    bold_red = "\x1b[31;1m"
+    reset = "\x1b[0m"
+    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: grey + format + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+def rsfb_logger(logname):
+    logger = logging.getLogger(logname)
+    logger.setLevel(logging.DEBUG)
+
+    # create console handler with a higher log level
+    handler = colorlog.StreamHandler()
+    formatter = colorlog.ColoredFormatter(
+        "%(log_color)s%(levelname)s:%(name)s:%(message)s",
+        reset=True,
+        log_colors={
+            'DEBUG':    'cyan',
+            'INFO':     'purple',
+            'WARNING':  'yellow',
+            'ERROR':    'red',
+            'CRITICAL': 'red',
+        }
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
 
 def str2n3(value):
     if str(value).startswith("http") or str(value).startswith("nodeID"): 
@@ -22,7 +67,6 @@ class RandomBucket:
 	
     def add(self, percentage, obj):
         if self._index == len(self._objects):
-            print("No more objects can be added into Bucket!")
             return
         else:
             self._objects[self._index] = obj

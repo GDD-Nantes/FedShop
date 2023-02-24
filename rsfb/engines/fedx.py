@@ -8,15 +8,13 @@ import subprocess
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from sklearn.preprocessing import LabelEncoder
 
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import kill_process, load_config, str2n3
-# Example of use : 
-# python3 utils/generate-engine-config-file.py experiments/bsbm/model/vendor test/out.ttl
-
-# Goal : Generate a configuration file for RDF4J to set the use of named graph as endpoint thanks to data file
+from utils import kill_process, load_config, rsfb_logger, str2n3
+logger = rsfb_logger(Path(__file__).name)
 
 @click.group
 def cli():
@@ -88,9 +86,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             fout.write(msg)
             fout.close()
 
-    print("=== FedX ===")
-    print(cmd)
-    print("============")
+    logger.debug("=== FedX ===")
+    logger.debug(cmd)
+    logger.debug("============")
     
     fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     try: 
@@ -103,9 +101,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         fedx_proc.wait(timeout=timeout)
         #fedx_proc = subprocess.run(cmd, shell=True, timeout=timeout, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
         if fedx_proc.returncode == 0:
-            print(f"{query} benchmarked sucessfully")
+            logger.info(f"{query} benchmarked sucessfully")
         else:
-            print(f"{query} reported error")      
+            logger.error(f"{query} reported error")      
             # write_empty_stats()
             # write_empty_result("error")
             # with open("evaluation_failed_logs.txt", "a") as fs:
@@ -116,7 +114,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             raise RuntimeError(f"{query} reported error")
             
     except subprocess.TimeoutExpired: 
-        print(f"{query} timed out!")
+        logger.exception(f"{query} timed out!")
         write_empty_stats()
         write_empty_result("timeout")            
         kill_process(fedx_proc.pid)
@@ -124,8 +122,29 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
+def transform_results(infile, outfile):
+    with open(infile, "r") as in_fs:
+        records = []
+        for line in in_fs.readlines():
+            bindings = re.sub(r"(\[|\])", "", line.strip()).split(";")
+            record = dict()
+            for binding in bindings:
+                b = binding.split("=")
+                key = b[0]
+                value = "".join(b[1:])
+                value = re.sub(r"\"(.*)\"(\^\^|@).*", r"\1", value)
+                value = value.replace('"', "")
+                record[key] = value
+            records.append(record)
+            
+        result = pd.DataFrame.from_records(records)
+        result.to_csv(outfile, index=False)
+
+@cli.command()
+@click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
+@click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("prefix-cache", type=click.Path(exists=False, file_okay=True, dir_okay=False))
-def transform_result(infile, outfile, prefix_cache):
+def transform_provenance(infile, outfile, prefix_cache):
     
     def extract_triple(x):
         fedx_pattern = r"StatementPattern\s+(\(new scope\)\s+)?Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)"
@@ -161,6 +180,13 @@ def transform_result(infile, outfile, prefix_cache):
     def lookup_composition(x: str):
         return inv_composition[x]
     
+    def pad(x):
+        encoder = LabelEncoder()
+        encoded = encoder.fit_transform(x)
+        result = np.pad(encoded, (0, max_length-len(x)), mode="constant", constant_values=-1)                
+        decoded = [ encoder.inverse_transform([item]).item() if item != -1 else "" for item in result ]
+        return decoded
+    
     in_df = pd.read_csv(infile)
     
     with open(prefix_cache, "r") as prefix_cache_fs, open(os.path.join(Path(prefix_cache).parent, "provenance.sparql.comp"), "r") as comp_fs:
@@ -176,8 +202,8 @@ def transform_result(infile, outfile, prefix_cache):
 
         # If unequal length (as in union, optional), fill with nan
         max_length = in_df["source_selection"].apply(len).max()
-        in_df["source_selection"] = in_df["source_selection"].apply(lambda x: np.pad(x, (0, max_length-len(x)), mode="empty"))
-            
+        in_df["source_selection"] = in_df["source_selection"].apply(pad)
+        
         out_df = in_df.set_index("tp_name")["source_selection"] \
             .to_frame().T \
             .apply(pd.Series.explode) \
@@ -192,14 +218,17 @@ def generate_config_file(datafiles, outfile, endpoint):
     ssite = set()
     #for data_file in glob.glob(f'{dir_data_file}/*.nq'):
     for data_file in datafiles:
-        with open(data_file) as file:
+        with open(data_file, "r") as file:
             t_file = file.readlines()
             for line in t_file:
                 site = line.rsplit()[-2]
                 site = re.search(r"<(.*)>", site).group(1)
                 ssite.add(site)
     
-    with open(f'{outfile}', 'a') as ffile:
+    outfile = Path(outfile)
+    outfile.parent.mkdir(parents=True, exist_ok=True)
+    outfile.touch(exist_ok=True)
+    with outfile.open("w") as ffile:
         ffile.write(
 """
 @prefix sd: <http://www.w3.org/ns/sparql-service-description#> .

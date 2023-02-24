@@ -4,7 +4,9 @@ import re
 import shutil
 import subprocess
 import click
-from utils import load_config
+from utils import load_config, rsfb_logger
+
+logger = rsfb_logger(Path(__file__).name)
 
 @click.group
 def cli():
@@ -42,18 +44,18 @@ def generate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
 
     # If in generate mode
     if clean is not None:
-        print("Cleaning...")
+        logger.info("Cleaning...")
         ctx.invoke(wipe, configfile=configfile, level=clean)
 
     for batch in range(1, N_BATCH+1):
         if debug:
-            print("Producing rulegraph...")
+            logger.info("Producing rulegraph...")
             RULEGRAPH_FILE = f"{WORKFLOW_DIR}/rulegraph_generate_batch{batch}"
             if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {GENERATION_SNAKEFILE} --debug-dag --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
             if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {GENERATION_SNAKEFILE} --rulegraph > {RULEGRAPH_FILE}.dot") != 0 : exit(1)
             if os.system(f"dot -Tpng {RULEGRAPH_FILE}.dot > {RULEGRAPH_FILE}.png") != 0 : exit(1)
         else:
-            print(f"Producing metrics for batch {batch}/{N_BATCH}...")
+            logger.info(f"Producing metrics for batch {batch}/{N_BATCH}...")
             if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {GENERATION_SNAKEFILE} --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
 
 @cli.command()
@@ -80,7 +82,7 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
 
     # if in evaluate mode
     if clean is not None :
-        print("Cleaning...")
+        logger.info("Cleaning...")
         if clean == "all":
             shutil.rmtree(f"{WORK_DIR}/benchmark/evaluation", ignore_errors=True)
         elif clean == "metrics":
@@ -88,13 +90,13 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
     
     for batch in range(1, N_BATCH+1):
         if debug:
-            print("Producing rulegraph...")
+            logger.info("Producing rulegraph...")
             RULEGRAPH_FILE = f"{WORKFLOW_DIR}/rulegraph_generate_batch{batch}"
             if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --debug-dag --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
             if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --rulegraph > {RULEGRAPH_FILE}.dot") != 0 : exit(1)
             if os.system(f"dot -Tpng {RULEGRAPH_FILE}.dot > {RULEGRAPH_FILE}.png") != 0 : exit(1)
         else:
-            print(f"Producing metrics for batch {batch}/{N_BATCH}...")
+            logger.info(f"Producing metrics for batch {batch}/{N_BATCH}...")
             if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
             
 @cli.command()
@@ -128,7 +130,7 @@ def wipe(configfile, level: str):
         shutil.rmtree(f"{WORK_DIR}/rulegraph", ignore_errors=True)
         
     if "db" in args:
-        print("Cleaning all databases...")
+        logger.info("Cleaning all databases...")
         if os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)
         if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)  
         if os.system("docker volume prune --force") != 0: exit(1)
@@ -136,7 +138,7 @@ def wipe(configfile, level: str):
         os.system(f"{WORK_DIR}/benchmark/generation/virtuoso-*.csv")
         
     if "metrics" in args:
-        print("Cleaning all metrics...")
+        logger.info("Cleaning all metrics...")
         Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
         os.system(f"rm {WORK_DIR}/benchmark/generation/metrics_batch*.csv")
     elif "metrics_" in level:
@@ -145,11 +147,11 @@ def wipe(configfile, level: str):
         if matched is not None:
             batches = matched.group(1).split("%")
             for batch in batches:
-                print(f"Cleaning metrics for batch {batch}")
+                logger.info(f"Cleaning metrics for batch {batch}")
                 os.system(f"rm {WORK_DIR}/benchmark/generation/metrics_batch{batch}.csv")
                 
     if "instances" in args:
-        print("Cleaning all instances...")
+        logger.info("Cleaning all instances...")
         Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
         os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/instance_*/")
     elif "instance_" in level:
@@ -158,11 +160,11 @@ def wipe(configfile, level: str):
         if matched is not None:
             instances = matched.group(1).split("%")
             for instance in instances:
-                print(f"Cleaning instance {instance}")
+                logger.info(f"Cleaning instance {instance}")
                 os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/instance_{instance}/")
 
     if "all" in args:
-        print("Cleaning all databases...")
+        logger.info("Cleaning all databases...")
         if os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)
         if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)  
         if os.system("docker volume prune --force") != 0: exit(1)
