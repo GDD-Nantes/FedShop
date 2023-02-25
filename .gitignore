@@ -158,5 +158,6 @@ engines/SPLENDID/eval/
 
 .vscode/
 evaluation_failed_logs.txt
-.vscode/launch.json
-.vscode/settings.json
+!.vscode/launch.json
+
+logs/

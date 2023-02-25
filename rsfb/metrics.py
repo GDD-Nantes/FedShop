@@ -1,3 +1,4 @@
+from pathlib import Path
 import re
 from typing import Dict, Tuple
 import click
@@ -81,18 +82,19 @@ def compute_metrics(configfile, outfile, workload):
     for provenance_file in workload:
         source_selection_result = pd.read_csv(provenance_file)
         name_search = re.search(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/provenance.csv", provenance_file)
-        print(provenance_file)
         engine = name_search.group(1)
         query = name_search.group(2)
         instance = int(name_search.group(3))
         batch = int(name_search.group(4))
         total_nb_sources = vendor_edges[batch] + ratingsite_edges[batch]
+        nb_results = len(pd.read_csv(f"{Path(provenance_file).parent}/results.csv"))
         
         record = {
             "query": query,
             "instance": instance,
             "batch": batch,
-            "distinct_sources": get_distinct_sources(source_selection_result),
+            "nb_results": nb_results,
+            "nb_distinct_sources": get_distinct_sources(source_selection_result),
             "relevant_sources_selectivity": get_relevant_sources_selectivity(source_selection_result, total_nb_sources)
             #"tp_specific_relevant_sources_selectivity": get_tp_specific_relevant_sources(source_selection_result),
             #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(source_selection_result),

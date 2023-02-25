@@ -48,12 +48,21 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     """
     provenance = f"{Path(query).parent}/batch_{batch_id}/provenance.csv"
     os.system(f"cp {provenance} {out_source_selection}")
+    
+    results = f"{Path(query).parent}/batch_{batch_id}/results.csv"
+    os.system(f"cp {results} {out_result}")
+
+@cli.command()
+@click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
+@click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
+def transform_results(infile, outfile):
+    os.system(f"cp {infile} {outfile}")
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("prefix-cache", type=click.Path(exists=False, file_okay=True, dir_okay=False))
-def transform_result(infile, outfile, prefix_cache):
+def transform_provenance(infile, outfile, prefix_cache):
     os.system(f"cp {infile} {outfile}")
 
 @cli.command()
@@ -64,14 +73,17 @@ def generate_config_file(datafiles, outfile, endpoint):
     ssite = set()
     #for data_file in glob.glob(f'{dir_data_file}/*.nq'):
     for data_file in datafiles:
-        with open(data_file) as file:
+        with open(data_file, "r") as file:
             t_file = file.readlines()
             for line in t_file:
                 site = line.rsplit()[-2]
                 site = re.search(r"<(.*)>", site).group(1)
                 ssite.add(site)
     
-    with open(f'{outfile}', 'a') as ffile:
+    outfile = Path(outfile)
+    outfile.parent.mkdir(parents=True, exist_ok=True)
+    outfile.touch(exist_ok=True)
+    with outfile.open("w") as ffile:
         ffile.write(
 """
 @prefix sd: <http://www.w3.org/ns/sparql-service-description#> .

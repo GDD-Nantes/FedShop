@@ -19,3 +19,4 @@ scikit-learn==1.2.0
 img2unicode[n2]
 statsmodels==0.13.0
 numpy==1.22.0
+colorlog==6.7.0

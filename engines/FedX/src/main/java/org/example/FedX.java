@@ -93,8 +93,7 @@ public class FedX {
 
     public static void main(String[] args) throws Exception {
         Logger log = LoggerFactory.getLogger(FedX.class);
-        log.info("POUET pouet");
-        System.out.println("Numbers of arguments: " + args.length);
+        log.info("Numbers of arguments: " + args.length);
         // init
         CONTAINER.put(COUNT_HTTP_REQ_KEY, new AtomicInteger());
         CONTAINER.put(LIST_HTTP_REQ_KEY, new ConcurrentLinkedQueue<>());
@@ -123,27 +122,12 @@ public class FedX {
                         .withEnableMonitoring(true)
                         .withLogQueryPlan(true)
                         .withLogQueries(true)
-                        .withDebugQueryPlan(false)
+                        .withDebugQueryPlan(true)
                         .withEnforceMaxQueryTime(86400))
                 .withMembers(dataConfig)
                 .create();
 
         startTime = System.currentTimeMillis();
-
-        // RepositoryConnection conn = repo.getConnection();
-        // TupleQuery tq = conn.prepareTupleQuery(rawQuery);
-        // TupleQueryResult res = tq.evaluate();
-        // String queryPlan = QueryPlanLog.getQueryPlan();
-
-        // try {
-        // while (res.hasNext()) {
-        // System.out.println("LOL");
-        // BindingSet b = res.next();
-        // System.out.println(b.toString());
-        // }
-        // } catch (QueryEvaluationException err) {
-        // System.out.println(err.getMessage());
-        // }
 
         try (RepositoryConnection conn = repo.getConnection()) {
             TupleQuery tq = conn.prepareTupleQuery(rawQuery);
@@ -179,11 +163,8 @@ public class FedX {
         }
 
         endTime = System.currentTimeMillis();
-        // System.out.println(success.get());
 
         long durationTime = endTime - startTime;
-        System.out.println(durationTime);
-        System.out.println("POUET");
 
         if (!statPath.equals("/dev/null")) {
             File statFile = new File(statPath);
@@ -204,7 +185,6 @@ public class FedX {
 
             Pattern pattern = Pattern
                     .compile(".*/(\\w+)/(q\\w+)/instance_(\\d+)/batch_(\\d+)/attempt_(\\d+)/stats.csv");
-            System.out.println(statPath);
             Matcher basicInfos = pattern.matcher(statPath);
             basicInfos.find();
             String engine = basicInfos.group(1);
@@ -220,12 +200,6 @@ public class FedX {
             statWriter.writeNext(content);
             statWriter.close();
         }
-
-        // System.out.println(success.get());
-
-        // resultPath:
-        // .../{engine}/{query}/{instance_id}/batch_{batch_id}/default/results
-        // research in reverse order
 
         if (!outSourceSelectionPath.equals("/dev/null")) {
             createSourceSelectionFile(outSourceSelectionPath);
