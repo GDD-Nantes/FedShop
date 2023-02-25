@@ -87,6 +87,29 @@ def activate_one_container(container_infos_file, batch_id):
         container_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
         wait_for_container(container_endpoint, f"{BENCH_DIR}/virtuoso-ok.txt", wait=1)
 
+def generate_federation_declaration(federation_declaration_file, engine, batch_id):
+    sparql_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])
+
+    is_endpoint_updated = False
+    if is_file_exists := os.path.exists(federation_declaration_file):
+        with open(federation_declaration_file) as f:
+            search_string = f'sd:endpoint "{sparql_endpoint}'
+            is_endpoint_updated = search_string not in f.read()
+
+    if is_endpoint_updated or not is_file_exists:
+        print(f"Rewriting {engine} configfile as it is updated!")
+        container_infos_file = f"{WORK_DIR}/benchmark/generation/container_infos.csv"
+        ratingsite_data_files = [ f"{MODEL_DIR}/dataset/ratingsite{i}.nq" for i in range(N_RATINGSITE) ]
+        vendor_data_files = [ f"{MODEL_DIR}/dataset/vendor{i}.nq" for i in range(N_VENDOR) ]
+
+        batch_id = int(batch_id)
+        ratingsiteSliceId = np.histogram(np.arange(N_RATINGSITE), N_BATCH)[1][1:].astype(int)[batch_id]
+        vendorSliceId = np.histogram(np.arange(N_VENDOR), N_BATCH)[1][1:].astype(int)[batch_id]
+        batch_files = ratingsite_data_files[:ratingsiteSliceId+1] + vendor_data_files[:vendorSliceId+1]
+
+        activate_one_container(container_infos_file, LAST_BATCH)
+        shell(f"python rsfb/engines/{engine}.py generate-config-file {' '.join(batch_files)} {federation_declaration_file} --endpoint {sparql_endpoint}")
+
 #=================
 # PIPELINE
 #=================
@@ -130,30 +153,30 @@ rule evaluate_source_selection_on_fedx:
     - Output: only statistics, no source-seleciton
     """
     threads: 1
-    #retries: 3
+    retries: 1
     input: 
         query=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/injected.sparql", workDir=WORK_DIR),
         engine_source_selection=expand("{{benchDir}}/{{engine}}/{{query}}/instance_{{instance_id}}/batch_{{batch_id}}/provenance.csv", workDir=WORK_DIR),
-        engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
         virtuoso_last_batch=expand("{workDir}/benchmark/generation/virtuoso_batch{batch_n}-ok.txt", workDir=WORK_DIR, batch_n=N_BATCH-1),
         engine_status="{benchDir}/{engine}/{engine}-ok.txt",
         container_infos=expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR)
     output: 
         stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/stats.csv",
+        query_plan="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/query_plan.txt"
     params:
         eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR),
-        out_source_selection="/dev/null",
-        result="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.txt",
-        query_plan="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/query_plan.txt"
+        engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
+        out_source_selection="/dev/null"
     run: 
-        engine_source_selection = pd.read_csv(str(input.engine_source_selection))
-        hasDuplicates = engine_source_selection.duplicated().any()
-        if hasDuplicates:
-            raise RuntimeError(f"{input.engine_source_selection} contains duplicates!")
         activate_one_container(input.container_infos, LAST_BATCH)
-        
+
+        engine = str(wildcards.engine)
+        batch_id = str(wildcards.batch_id)
+        engine_config = f"{WORK_DIR}/benchmark/evaluation/{engine}/config/batch_{batch_id}/{engine}.conf"
+        generate_federation_declaration(engine_config, engine, batch_id)
+
         # configPath, queryPath, outResultPath, outSourceSelectionPath, outQueryPlanFile, statPath, inSourceSelectionPath
-        shell("python rsfb/engines/fedx.py run-benchmark {params.eval_config} {input.engine_config} {input.query} --out-result {params.result} --out-source-selection {params.out_source_selection} --query-plan {params.query_plan} --stats {output.stats} --force-source-selection {input.engine_source_selection} --batch-id {wildcards.batch_id}")
+        shell("python rsfb/engines/fedx.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-source-selection {params.out_source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {output.query_plan} --batch-id {wildcards.batch_id}")
 
 
 rule compute_metrics:
@@ -167,56 +190,68 @@ rule compute_metrics:
             instance_id=range(N_QUERY_INSTANCES)
         )
     output: "{benchDir}/eval_metrics_batch{batch_id}.csv"
-    shell: "python rsfb/metrics.py compute-metrics {CONFIGFILE} {output} {input}"
+    shell: "python rsfb/metrics.py compute-metrics {CONFIGFILE} {output} {input}"       
 
-rule transform_result:
-    input: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/results.ss"
+rule transform_provenance:
+    input: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/source_selection.txt"
     output: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv"
     params:
         prefix_cache=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/prefix_cache.json", workDir=WORK_DIR)
-    shell: "python rsfb/engines/{wildcards.engine}.py transform-result {input} {output} {params.prefix_cache}"
+    run: 
+        shell("python rsfb/engines/{wildcards.engine}.py transform-provenance {input} {output} {params.prefix_cache}")
 
 rule extract_source_selection_from_engines:
     """Extract source selection from each engine, without stats
     """
     threads: 1
-    #retries: 3
+    retries: 1
     input: 
         query=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/injected.sparql", workDir=WORK_DIR),
-        engine_config=expand("{workDir}/benchmark/evaluation/{{engine}}/config/batch_{{batch_id}}/{{engine}}.conf", workDir=WORK_DIR),
         virtuoso_last_batch=expand("{workDir}/benchmark/generation/virtuoso_batch{batch_n}-ok.txt", workDir=WORK_DIR, batch_n=N_BATCH-1),
         engine_status="{benchDir}/{engine}/{engine}-ok.txt",
         container_infos=expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR)
     output: 
-        source_selection="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/results.ss",
+        source_selection="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/source_selection.txt",
+        result_csv="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/results.csv",
     params:
-        eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
+        engine_config=expand("{workDir}/benchmark/evaluation/{{engine}}/config/batch_{{batch_id}}/{{engine}}.conf", workDir=WORK_DIR),
+        eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR),
+        result_txt="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/results.txt",
+        query_plan="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/query_plan.txt"
     run:
         activate_one_container(input.container_infos, LAST_BATCH)
-        # configPath, queryPath, outResultPath, outSourceSelectionPath, outQueryPlanFile, statPath, inSourceSelectionPath
-        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {input.engine_config} {input.query} --out-source-selection {output.source_selection} --batch-id {wildcards.batch_id}")
+
+        engine = str(wildcards.engine)
+        batch_id = str(wildcards.batch_id)
+        engine_config = f"{WORK_DIR}/benchmark/evaluation/{engine}/config/batch_{batch_id}/{engine}.conf"
+        generate_federation_declaration(engine_config, engine, batch_id)
+
+        # Evaluate
+        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {params.result_txt} --out-source-selection {output.source_selection} --query-plan {params.query_plan} --batch-id {wildcards.batch_id}")
+
+        # Transform results
+        shell("python rsfb/engines/{wildcards.engine}.py transform-results {params.result_txt} {output.result_csv}")
+        ideal_results = pd.read_csv(f"{WORK_DIR}/benchmark/generation/{wildcards.query}/instance_{wildcards.instance_id}/batch_{wildcards.batch_id}/results.csv").dropna(how="all", axis=1)
+        ideal_results = ideal_results.reindex(sorted(ideal_results.columns), axis=1)
+        ideal_results = ideal_results \
+            .sort_values(ideal_results.columns.to_list()) \
+            .reset_index(drop=True) 
+
+        engine_results = pd.read_csv(str(output.result_csv)).dropna(how="all", axis=1)
+        engine_results = engine_results.reindex(sorted(engine_results.columns), axis=1)
+        engine_results = engine_results \
+            .sort_values(engine_results.columns.to_list()) \
+            .reset_index(drop=True) 
+
+        if not ideal_results.equals(engine_results):
+            print(ideal_results)
+            print("not equals to")
+            print(engine_results)
+            raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
 
 rule engines_prerequisites:
     output: "{benchDir}/{engine}/{engine}-ok.txt"
     params:
         eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
     shell: "python rsfb/engines/{wildcards.engine}.py prerequisites {params.eval_config} && echo 'OK' > {output}"
-
-rule generate_federation_declaration:
-    input: 
-        container_infos=expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR)
-    output: "{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf"
-    run: 
-        ratingsite_data_files = [ f"{MODEL_DIR}/dataset/ratingsite{i}.nq" for i in range(N_RATINGSITE) ]
-        vendor_data_files = [ f"{MODEL_DIR}/dataset/vendor{i}.nq" for i in range(N_VENDOR) ]
-
-        batchId = int(wildcards.batch_id)
-        ratingsiteSliceId = np.histogram(np.arange(N_RATINGSITE), N_BATCH)[1][1:].astype(int)[batchId]
-        vendorSliceId = np.histogram(np.arange(N_VENDOR), N_BATCH)[1][1:].astype(int)[batchId]
-        batch_files = ratingsite_data_files[:ratingsiteSliceId+1] + vendor_data_files[:vendorSliceId+1]
-
-        activate_one_container(input.container_infos, LAST_BATCH)
-        sparql_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])
-
-        shell(f"python rsfb/engines/{wildcards.engine}.py generate-config-file {' '.join(batch_files)} {output} --endpoint {sparql_endpoint}")
 

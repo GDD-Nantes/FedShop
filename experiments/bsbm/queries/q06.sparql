@@ -6,8 +6,7 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 SELECT ?localProduct ?label
 WHERE {
     ?localProduct rdfs:label ?label .
-    BIND( STR(?label) as ?labelStr ) .
     ?localProduct rdf:type bsbm:Product .
-    # const ?word1 in ?labelStr 
+    # const ?word1 in ?label 
     FILTER regex(?label, ?word1)
 }

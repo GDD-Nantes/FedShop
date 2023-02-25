@@ -18,8 +18,9 @@ def cli():
 @click.option("--clean", type=click.STRING, help="[all, model, benchmark] + db + [metrics|metrics_batchk]")
 @click.option("--cores", type=click.INT, default=1, help="The number of cores used allocated. -1 if use all cores.")
 @click.option("--rerun-incomplete", is_flag=True, default=False)
+@click.option("--touch", is_flag=True, default=False)
 @click.pass_context
-def generate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomplete):
+def generate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomplete, touch):
     """Run the benchmark
 
     Args:
@@ -41,6 +42,11 @@ def generate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
 
     SNAKEMAKE_OPTS = f"-p --cores {cores} --config configfile={configfile}"
     if rerun_incomplete: SNAKEMAKE_OPTS += " --rerun-incomplete"
+    
+    if touch:
+        logger.info("Marking files as completed...")
+        shutil.rmtree(".snakemake", ignore_errors=True)
+        SNAKEMAKE_OPTS += " --touch"
 
     # If in generate mode
     if clean is not None:
@@ -64,8 +70,9 @@ def generate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
 @click.option("--clean", type=click.STRING, help="[all, model, benchmark] + db")
 @click.option("--cores", type=click.INT, default=1, help="The number of cores used allocated. -1 if use all cores.")
 @click.option("--rerun-incomplete", is_flag=True, default=False)
+@click.option("--touch", is_flag=True, default=False)
 @click.pass_context
-def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomplete):
+def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomplete, touch):
 
     CONFIG = load_config(configfile)
     GEN_CONFIG = CONFIG["generation"]
@@ -79,6 +86,11 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
 
     SNAKEMAKE_OPTS = f"-p --cores {cores} --config configfile={configfile}"
     if rerun_incomplete: SNAKEMAKE_OPTS += " --rerun-incomplete"
+    
+    if touch:
+        logger.info("Marking files as completed...")
+        shutil.rmtree(".snakemake", ignore_errors=False)
+        SNAKEMAKE_OPTS += " --touch"
 
     # if in evaluate mode
     if clean is not None :

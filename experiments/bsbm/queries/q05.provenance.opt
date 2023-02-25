@@ -11,17 +11,17 @@ SELECT DISTINCT ?bgp1 ?bgp2 WHERE {
         # const ?ProductXYZ
         ?localProductXYZ owl:sameAs ?ProductXYZ  .
         ?localProductXYZ bsbm:productFeature ?localProdFeatureXYZ . 
+        ?localProdFeatureXYZ owl:sameAs ?prodFeature .
         ?localProductXYZ bsbm:productPropertyNumeric1 ?origProperty1  .
         ?localProductXYZ bsbm:productPropertyNumeric2 ?origProperty2  .
-        ?localProdFeatureXYZ owl:sameAs ?prodFeature .
     } .
 
-    GRAPH ?bgp1 { 
-        ?localProdFeature owl:sameAs ?prodFeature .
+    GRAPH ?bgp1 {
         ?localProduct owl:sameAs ?product  .
-        FILTER (?ProductXYZ != ?product)
+        FILTER (?ProductXYZ != ?product)        
         ?localProduct rdfs:label ?localProductLabel  .
         ?localProduct bsbm:productFeature ?localProdFeature  .
+        ?localProdFeature owl:sameAs ?prodFeature .
         ?localProduct bsbm:productPropertyNumeric1 ?simProperty1  .
         ?localProduct bsbm:productPropertyNumeric2 ?simProperty2  .    
     } .
