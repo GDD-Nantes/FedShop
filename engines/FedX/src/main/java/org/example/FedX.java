@@ -4,22 +4,16 @@ import org.eclipse.rdf4j.federated.FedXConfig;
 import org.eclipse.rdf4j.federated.FedXFactory;
 import org.eclipse.rdf4j.federated.algebra.StatementSource;
 import org.eclipse.rdf4j.federated.repository.FedXRepository;
-import org.eclipse.rdf4j.federated.structures.FedXTupleQuery;
 import org.eclipse.rdf4j.federated.monitoring.MonitoringUtil;
-import org.eclipse.rdf4j.federated.monitoring.QueryLog;
 import org.eclipse.rdf4j.federated.monitoring.QueryPlanLog;
 import org.eclipse.rdf4j.query.BindingSet;
-import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
-import org.eclipse.rdf4j.query.explanation.Explanation;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
-import org.eclipse.rdf4j.repository.RepositoryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.gson.Gson;
 import com.opencsv.CSVWriter;
 
 import java.io.BufferedWriter;
@@ -29,26 +23,17 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class FedX {
     // private static final Logger log = LoggerFactory.getLogger(FedX.class);
-    public static final Map<String, Object> CONTAINER = new ConcurrentHashMap<>();
-    public static final String SOURCE_SELECTION_KEY = "SOURCE_SELECTION";
-    public static final String SOURCE_SELECTION2_KEY = "SOURCE_SELECTION_DO_SOURCE_SELECTION";
-    public static final String COUNT_HTTP_REQ_KEY = "HTTPCOUNTER";
-    public static final String LIST_HTTP_REQ_KEY = "HTTPLIST";
-
-    public static final String MAP_SS = "MAP_SS";
+    public static final FedXContainer CONTAINER = new FedXContainer();
 
     private static void createSourceSelectionFile(String sourceSelectionPath) throws Exception {
         try (BufferedWriter sourceSelectionWriter = new BufferedWriter(new FileWriter(sourceSelectionPath))) {
             sourceSelectionWriter.write("triple,source_selection\n");
-            Map<StatementPattern, List<StatementSource>> stmt = ((Map<StatementPattern, List<StatementSource>>) FedX.CONTAINER
-                    .get(FedX.SOURCE_SELECTION2_KEY));
+            Map<StatementPattern, List<StatementSource>> stmt = FedX.CONTAINER.getStmtToSources();
             if (stmt != null) {
                 // String jsonString = new Gson().toJson(stmt);
                 // sourceSelectionWriter.write(jsonString);
@@ -73,11 +58,12 @@ public class FedX {
         for (String line : tabSS) {
             if (lineId > 0) {
                 int tpId = 0;
-                for (String source : line.split(",")) {
+                for (String source : line.split(",", -1)) {
                     if (!tpMap.containsKey(tpId)) {
                         tpMap.put(tpId, new HashSet<>());
                     }
                     String ss = source.replace("http://", "").replace("/", "");
+                    System.out.println(ss);
                     if (!ss.isEmpty()) {
                         // www.shop69.fr -> sparql_www.shop69.fr
                         tpMap.get(tpId).add("sparql_" + ss + "_");
@@ -88,15 +74,13 @@ public class FedX {
             lineId++;
         }
 
-        CONTAINER.put(MAP_SS, tpMap);
+        CONTAINER.setTriplePatternSources(tpMap);
     }
 
     public static void main(String[] args) throws Exception {
         Logger log = LoggerFactory.getLogger(FedX.class);
         log.info("Numbers of arguments: " + args.length);
         // init
-        CONTAINER.put(COUNT_HTTP_REQ_KEY, new AtomicInteger());
-        CONTAINER.put(LIST_HTTP_REQ_KEY, new ConcurrentLinkedQueue<>());
         String configPath = args[0];
         String queryPath = args[1];
         String outResultPath = args[2];
@@ -128,6 +112,15 @@ public class FedX {
                 .create();
 
         startTime = System.currentTimeMillis();
+
+        // RepositoryConnection conn = repo.getConnection();
+        // TupleQuery tq = conn.prepareTupleQuery(rawQuery);
+        // TupleQueryResult res = tq.evaluate();
+
+        // while (res.hasNext()) {
+        //     BindingSet b = res.next();
+        //     System.out.println(b.toString());
+        // }
 
         try (RepositoryConnection conn = repo.getConnection()) {
             TupleQuery tq = conn.prepareTupleQuery(rawQuery);
