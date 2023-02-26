@@ -633,15 +633,22 @@ def unwrap(provenance, opt_comp, def_comp):
         
         provenance_df.to_csv(f"{provenance}.opt", index=False)
         
-        reversed_def_comp = {" ".join(v): k for k, v in def_comp_dict.items()}
+        reversed_def_comp = dict()        
+        for k, v in def_comp_dict.items():
+            if reversed_def_comp.get(k) is None:
+                reversed_def_comp[k] = []
+            else:
+                reversed_def_comp[k].append(" ".join(v))
+        
         result = dict()
         
         for bgp in provenance_df.columns:
             tps = opt_comp_dict[bgp] 
             sources = provenance_df[bgp]
             for tp in tps:
-                tpid = reversed_def_comp[tp]
-                result[tpid] = sources.to_list()
+                tpids = reversed_def_comp[tp]
+                for tpid in tpids:
+                    result[tpid] = sources.to_list()
         
         result_df = pd.DataFrame.from_dict(result)
         sorted_columns = "tp" + result_df.columns \

@@ -101,8 +101,8 @@ public class MainClientExec implements ClientExecChain {
         Args.notNull(request, "HTTP request");
         Args.notNull(context, "HTTP context");
 
-        ((AtomicInteger) FedX.CONTAINER.get(FedX.COUNT_HTTP_REQ_KEY)).getAndIncrement();
-        ((ConcurrentLinkedQueue) FedX.CONTAINER.get(FedX.LIST_HTTP_REQ_KEY)).add(execAware.toString());
+        FedX.CONTAINER.getHttpReqCount().getAndIncrement();
+        FedX.CONTAINER.getHttpReqList().add(execAware.toString());
 
         AuthState targetAuthState = context.getTargetAuthState();
         if (targetAuthState == null) {
