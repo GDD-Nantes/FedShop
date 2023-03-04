@@ -16,10 +16,12 @@ sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 from utils import kill_process, load_config, str2n3
 import fedx
 
-# Example of use : 
-# python3 utils/generate-engine-config-file.py experiments/bsbm/model/vendor test/out.ttl
-
-# Goal : Generate a configuration file for RDF4J to set the use of named graph as endpoint thanks to data file
+# How to use
+# 1. Duplicate this file and rename the new file with <engine>.py
+# 2. Implement all functions
+# 3. Register the engine in config.yaml, under evaluation.engines section
+# 
+# Note: when you update the signature of any of these functions, you also have to update their signature in other engines
 
 @click.group
 def cli():
@@ -34,7 +36,7 @@ def prerequisites(ctx: click.Context, eval_config):
     Args:
         eval_config (_type_): _description_
     """
-    ctx.invoke(fedx.prerequisites, eval_config=eval_config)
+    pass
 
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
@@ -48,57 +50,27 @@ def prerequisites(ctx: click.Context, eval_config):
 @click.option("--batch-id", type=click.INT, default=-1)
 @click.pass_context
 def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id):
-    """ Evaluate injected.sparql on Virtuoso. 
-    1. Transform the injected.sparql into
-        VALUES ?tp1 ... ?tpn { (s1, s2 ... sn) (s1, s2 ... sn) } .
-        SERVICE ?tp1 { ... } .
-        SERVICE ?tp2 { ... } .
-        ...
-    2. Execute the transformed query in virtuoso
-    3. Mesure execution time, compare the results with results.csv in generation phase
+    """Execute the workload instance then its associated source selection query.
+    
+    Expected output:
+    - results.txt: containing the results for the query
+    - source_selection.txt: containing the source selection for the query
+    - stats.csv: containing the execution time, http_requests for the query
+
+    Args:
+        ctx (click.Context): _description_
+        eval_config (_type_): _description_
+        engine_config (_type_): _description_
+        query (_type_): _description_
+        out_result (_type_): _description_
+        out_source_selection (_type_): _description_
+        query_plan (_type_): _description_
+        stats (_type_): _description_
+        force_source_selection (_type_): _description_
+        batch_id (_type_): _description_
     """
     
-    source_selection_df = pd.read_csv(force_source_selection)
-            
-    intermediate_result_files = []
-    intermediate_stats_files = []
-    
-    for row_id in range(len(source_selection_df)):
-        intermediate_provenance = source_selection_df.loc[row_id, :].to_frame().T
-
-        intermediate_provenance_file = Path(f"{force_source_selection}.r{row_id}")
-        intermediate_provenance_file.touch()
-        intermediate_provenance.to_csv(intermediate_provenance_file, index=False) 
-            
-        intermediate_result_file = Path(f"{out_result}.r{row_id}")
-        intermediate_result_file.touch()
-            
-        intermediate_qplan_file = Path(f"{query_plan}.r{row_id}")
-        intermediate_qplan_file.touch()
-            
-        intermediate_stats_file = Path(f"{stats}.r{row_id}")
-        intermediate_stats_file.touch()
-            
-        fedx.exec_fedx(
-            eval_config, engine_config, query, 
-            str(intermediate_result_file), "/dev/null", str(query_plan), 
-            str(intermediate_stats_file), str(intermediate_provenance_file), batch_id
-        )
-             
-        os.system(f"rm {intermediate_provenance_file}")
-        
-        intermediate_result_files.append(str(intermediate_result_file))
-        intermediate_stats_files.append(str(intermediate_stats_file))
-            
-    stats_df = pd.concat([ pd.read_csv(f) for f in intermediate_stats_files ], ignore_index=True)
-    stats_df.groupby(["query", "batch", "instance", "engine", "attempt"]).sum() \
-        .reset_index() \
-        .to_csv(stats, index=False)
-        
-    os.system(f"cat {' '.join(intermediate_result_files)} > {out_result}")
-    os.system(f"sed -i '/^\s*$/d' {out_result}")
-    os.system(f"find {Path(out_result).parent} -type f -empty -print -delete")
-    os.system(f"cp {force_source_selection} {out_source_selection}")
+    pass
         
 
 @cli.command()
@@ -106,7 +78,14 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.pass_context
 def transform_results(ctx: click.Context, infile, outfile):
-    ctx.invoke(fedx.transform_results, infile=infile, outfile=outfile)
+    """Transform the result from the engine's specific format to virtuoso csv format
+
+    Args:
+        ctx (click.Context): _description_
+        infile (_type_): Path to engine result file
+        outfile (_type_): Path to the csv file
+    """
+    pass
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
@@ -114,8 +93,15 @@ def transform_results(ctx: click.Context, infile, outfile):
 @click.argument("prefix-cache", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.pass_context
 def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
-    os.system(f"cp {infile} {outfile}")
-    #ctx.invoke(fedx.transform_provenance, infile=infile, outfile=outfile, prefix_cache=prefix_cache)
+    """Transform the source selection from engine's specific format to virtuoso csv format
+
+    Args:
+        ctx (click.Context): _description_
+        infile (_type_): _description_
+        outfile (_type_): _description_
+        prefix_cache (_type_): _description_
+    """
+    pass
 
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
@@ -123,8 +109,15 @@ def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
 @click.option("--endpoint", type=str, default="http://localhost:8890/sparql", help="URL to a SPARQL endpoint")
 @click.pass_context
 def generate_config_file(ctx: click.Context, datafiles, outfile, endpoint):
-    ctx.invoke(fedx.generate_config_file, datafiles=datafiles, outfile=outfile, endpoint=endpoint)
-    
+    """Generate the config file for the engine
+
+    Args:
+        ctx (click.Context): _description_
+        datafiles (_type_): _description_
+        outfile (_type_): _description_
+        endpoint (_type_): _description_
+    """
+    pass
 
 if __name__ == "__main__":
     cli()

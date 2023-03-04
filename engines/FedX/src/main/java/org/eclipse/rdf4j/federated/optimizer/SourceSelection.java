@@ -78,10 +78,10 @@ public class SourceSelection {
      */
     public void doSourceSelection(List<StatementPattern> stmts) {
         if (FedX.CONTAINER.getTriplePatternSources().isEmpty()) {
-            //log.info("[SOURCE_SELECTION] Default");
+            log.info("[SOURCE_SELECTION] Default");
             doSourceSelectionDefault(stmts);
         } else {
-            //log.info("[SOURCE_SELECTION] Force mode");
+            log.info("[SOURCE_SELECTION] Force mode");
             doSourceSelectionForce(stmts);
         }
     }

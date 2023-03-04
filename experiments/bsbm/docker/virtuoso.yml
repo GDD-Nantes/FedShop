@@ -1,12 +1,13 @@
 services:
   bsbm-product-only:
     container_name: "bsbm-product-only"
-    #image: openlink/virtuoso-opensource-7:7.2.8
-    image: tenforce/virtuoso:virtuoso7.2.5
-    #user: "1000:1000"
+    image: openlink/virtuoso-opensource-7:7.2.9
     environment:
       SPARQL_UPDATE: "false"
       DBA_PASSWORD: "dba"
+      VIRT_HTTPServer_ServerThreads: 20
+      VIRT_HTTPServer_MaxClientConnections: 20
+      VIRT_Parameters_MaxClientConnections: 20
       VIRT_SPARQL_MaxQueryCostEstimationTime: 0
       VIRT_SPARQL_ResultSetMaxRows: 0
       VIRT_SPARQL_MaxQueryExecutionTime: 0
@@ -21,14 +22,12 @@ services:
       - 8890:8890
 
   bsbm-virtuoso:
-    #container_name: "bsbm-virtuoso"
-    #image: openlink/virtuoso-opensource-7:7.2.8
-    #image: tenforce/virtuoso:virtuoso7.2.5
-    image: minhhoangdang/virtuoso:virtuoso7.2.7
-    #user: "1000:1000"
+    image: openlink/virtuoso-opensource-7:7.2.7
     environment:
       SPARQL_UPDATE: "false"
       DBA_PASSWORD: "dba"
+      VIRT_HTTPServer_ServerThreads: 20
+      VIRT_HTTPServer_MaxClientConnections: 20
       VIRT_SPARQL_MaxQueryCostEstimationTime: 0
       VIRT_SPARQL_ResultSetMaxRows: 0
       VIRT_SPARQL_MaxQueryExecutionTime: 0
@@ -36,9 +35,15 @@ services:
       VIRT_Parameters_MaxDirtyBuffers: 1000000
       VIRT_Parameters_ThreadCleanupInterval: 10
       VIRT_Parameters_ResourcesCleanupInterval: 10
+      VIRT_Parameters_MaxClientConnections: 20
+      VIRT_Parameters_IndexTreeMaps: 256
+      VIRT_Plugins_Load1: "plain, geos"
+      VIRT_Plugins_Load2: "plain, proj4"
+      VIRT_Plugins_Load3: "plain, shapefileio"
+      #VIRT_Plugins_Load4: "plain, graphql"
     volumes:
-      - "../model/dataset:/usr/local/virtuoso-opensource/share/virtuoso/vad"
-      #- "../model/dataset:/usr/share/proj"
+      #- "../model/dataset:/usr/local/virtuoso-opensource/share/virtuoso/vad"
+      - "../model/dataset:/usr/share/proj"
     ports:
       - 33201-33210:1111
       - 34201-34210:8890

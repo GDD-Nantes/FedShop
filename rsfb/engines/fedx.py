@@ -3,7 +3,6 @@ import json
 import os
 import re
 import click
-import glob
 import subprocess
 import pandas as pd
 import numpy as np
@@ -39,29 +38,13 @@ def prerequisites(eval_config):
     os.chdir(Path(app).parent)
     os.system("mvn clean && mvn install dependency:copy-dependencies package")
     os.chdir(oldcwd)
-
-@cli.command()
-@click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("engine-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("query", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.option("--out-result", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
-@click.option("--out-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
-@click.option("--query-plan", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
-@click.option("--stats", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
-@click.option("--force-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
-@click.option("--batch-id", type=click.INT, default=-1)
-@click.pass_context
-def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id):
-
+        
+def exec_fedx(eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id):
     app_config = load_config(eval_config)["evaluation"]["engines"]["fedx"]
     app = app_config["dir"]
     jar = os.path.join(app, "FedX-1.0-SNAPSHOT.jar")
     lib = os.path.join(app, "lib/*")
     timeout = int(app_config["timeout"])
-
-    r_root = Path(out_result).parent
-
-    #stat = f"{r_root}/stats.csv"
 
     args = [engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection]
     args = " ".join(args)
@@ -81,10 +64,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                 attempt = basicInfos.group(5)
                 fout.write(",".join([queryName, engine, instance, batch, attempt, "nan", "nan"])+"\n")
                 
-    def write_empty_result(msg):
-        with open(out_source_selection, "w") as fout:
-            fout.write(msg)
-            fout.close()
+    def write_empty_result():
+        Path(out_result).touch()
 
     logger.debug("=== FedX ===")
     logger.debug(cmd)
@@ -102,30 +83,47 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         #fedx_proc = subprocess.run(cmd, shell=True, timeout=timeout, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
         if fedx_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
+            if os.stat(out_result).st_size == 0:
+                logger.error(f"{input.query} yield no results!")
+                write_empty_result()
+                raise RuntimeError(f"{input.query} yield no results!")
         else:
-            logger.error(f"{query} reported error")      
-            # write_empty_stats()
-            # write_empty_result("error")
-            # with open("evaluation_failed_logs.txt", "a") as fs:
-            #     fs.write(f"=== FedX - {query} ===\n")
-            #     fs.write(cmd + "\n")
-            #     fs.write("============\n")
-                
+            logger.error(f"{query} reported error")                      
             raise RuntimeError(f"{query} reported error")
             
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
         write_empty_stats()
-        write_empty_result("timeout")            
-        kill_process(fedx_proc.pid)
+        write_empty_result()            
+    finally:
+        os.system('pkill -9 -f "FedX"')
+        #kill_process(fedx_proc.pid)
+
+@cli.command()
+@click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.argument("engine-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.argument("query", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.option("--out-result", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
+@click.option("--out-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
+@click.option("--query-plan", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
+@click.option("--stats", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
+@click.option("--force-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
+@click.option("--batch-id", type=click.INT, default=-1)
+@click.pass_context
+def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id):
+    exec_fedx(eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, "", batch_id)
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 def transform_results(infile, outfile):
+    if os.stat(infile).st_size == 0:
+        Path(outfile).touch()
+        return
+            
     with open(infile, "r") as in_fs:
         records = []
-        for line in in_fs.readlines():
+        for line in in_fs.readlines():            
             bindings = re.sub(r"(\[|\])", "", line.strip()).split(";")
             record = dict()
             for binding in bindings:
@@ -227,7 +225,7 @@ def generate_config_file(datafiles, outfile, endpoint):
     
     outfile = Path(outfile)
     outfile.parent.mkdir(parents=True, exist_ok=True)
-    outfile.touch(exist_ok=True)
+    outfile.touch()
     with outfile.open("w") as ffile:
         ffile.write(
 """

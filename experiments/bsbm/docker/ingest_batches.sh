@@ -7,7 +7,13 @@ function probe(){
 
 # PARAMS
 n_containers=10
-reset_database=false
+reset_database=true
+
+OPENLINK_CONTAINER_PATH_TO_ISQL="/opt/virtuoso-opensource/bin/isql"
+OPENLINK_CONTAINER_PATH_TO_DATA="/usr/share/proj/" 
+
+TENFORCE_CONTAINER_PATH_TO_ISQL="/usr/local/virtuoso-opensource/bin/isql-v" 
+TENFORCE_CONTAINER_PATH_TO_DATA="/usr/local/virtuoso-opensource/share/virtuoso/vad"
 
 # MAIN
 
@@ -16,7 +22,7 @@ if [ "$reset_database" = true ]; then
     docker-compose -f experiments/bsbm/docker/virtuoso.yml down --remove-orphans &&
     docker volume prune --force &&
     docker-compose -f experiments/bsbm/docker/virtuoso.yml create --no-recreate --scale bsbm-virtuoso=10
-    # docker volume ls | awk 'NR > 1 {print $2}' | xargs docker volume rm
+    docker volume ls | awk 'NR > 1 {print $2}' | xargs docker volume rm
 fi
 
 for container_id in $(seq 1 $n_containers)
@@ -43,10 +49,26 @@ do
     done
 
     batch_id=$(expr $container_id - 1)
-    echo "experiments/bsbm/model/virtuoso/ingest_vendor_batch${batch_id}.sh"
-    sh "experiments/bsbm/model/virtuoso/ingest_vendor_batch${batch_id}.sh" || exit -1
+    vendor_ingest_file="experiments/bsbm/model/virtuoso/ingest_vendor_batch${batch_id}.sh"
+    echo "$vendor_ingest_file"
 
-    echo "experiments/bsbm/model/virtuoso/ingest_ratingsite_batch${batch_id}.sh"
-    sh "experiments/bsbm/model/virtuoso/ingest_ratingsite_batch${batch_id}.sh" || exit -1
+    # sed -Ei "s#$TENFORCE_CONTAINER_PATH_TO_ISQL#$OPENLINK_CONTAINER_PATH_TO_ISQL#g" $vendor_ingest_file
+    # sed -Ei "s#$TENFORCE_CONTAINER_PATH_TO_DATA#$OPENLINK_CONTAINER_PATH_TO_DATA#g" $vendor_ingest_file
+
+    # sed -Ei "s#$OPENLINK_CONTAINER_PATH_TO_ISQL#$TENFORCE_CONTAINER_PATH_TO_ISQL#g" $vendor_ingest_file
+    # sed -Ei "s#$OPENLINK_CONTAINER_PATH_TO_DATA#$TENFORCE_CONTAINER_PATH_TO_DATA#g" $vendor_ingest_file
+
+    sh "$vendor_ingest_file" || exit -1
+
+    ratingsite_ingest_file="experiments/bsbm/model/virtuoso/ingest_ratingsite_batch${batch_id}.sh"
+    echo "$ratingsite_ingest_file"
+
+    # sed -Ei "s#$TENFORCE_CONTAINER_PATH_TO_ISQL#$OPENLINK_CONTAINER_PATH_TO_ISQL#g" $ratingsite_ingest_file
+    # sed -Ei "s#$TENFORCE_CONTAINER_PATH_TO_DATA#$OPENLINK_CONTAINER_PATH_TO_DATA#g" $ratingsite_ingest_file
+
+    # sed -Ei "s#$OPENLINK_CONTAINER_PATH_TO_ISQL#$TENFORCE_CONTAINER_PATH_TO_ISQL#g" $ratingsite_ingest_file
+    # sed -Ei "s#$OPENLINK_CONTAINER_PATH_TO_DATA#$TENFORCE_CONTAINER_PATH_TO_DATA#g" $ratingsite_ingest_file
+
+    sh "$ratingsite_ingest_file" || exit -1
 done
 

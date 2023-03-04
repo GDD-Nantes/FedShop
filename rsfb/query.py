@@ -600,8 +600,7 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
             itr+=1
         
         query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {select} WHERE", query)
-        query = re.sub(r"(#){2}(LIMIT|FILTER\s+)", r"\2", query)
-        #query = re.sub(r"(#){2}(FILTER\s+)", r"\2", query)
+        query = re.sub(r"(#)*(LIMIT|FILTER\s+|ORDER)", r"\2", query)
         with open(next_queryfile, "w") as f:
             f.write(query)
 

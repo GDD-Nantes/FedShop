@@ -90,7 +90,8 @@ generation:
 evaluation:
   n_attempts: 4
   engines:
-    ideal:
     fedx:
       dir: "engines/FedX/target"
-      timeout: 900
+      timeout: 300
+    ideal:
+      internal_endpoint_prefix: "http://localhost:8890/sparql/?default-graph-uri="
