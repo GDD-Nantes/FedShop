@@ -161,3 +161,4 @@ evaluation_failed_logs.txt
 !.vscode/launch.json
 
 logs/
+fuseki/

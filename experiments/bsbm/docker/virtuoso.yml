@@ -7,16 +7,21 @@ services:
       DBA_PASSWORD: "dba"
       VIRT_HTTPServer_ServerThreads: 20
       VIRT_HTTPServer_MaxClientConnections: 20
-      VIRT_Parameters_MaxClientConnections: 20
       VIRT_SPARQL_MaxQueryCostEstimationTime: 0
       VIRT_SPARQL_ResultSetMaxRows: 0
       VIRT_SPARQL_MaxQueryExecutionTime: 0
-      #VIRT_SPARQL_MaxQueryExecutionTime: 300
       VIRT_Parameters_NumberOfBuffers: 1360000
       VIRT_Parameters_MaxDirtyBuffers: 1000000
+      VIRT_Parameters_ThreadCleanupInterval: 10
+      VIRT_Parameters_ResourcesCleanupInterval: 10
+      VIRT_Parameters_MaxClientConnections: 20
+      VIRT_Parameters_IndexTreeMaps: 256
+      VIRT_Plugins_Load1: "plain, geos"
+      VIRT_Plugins_Load2: "plain, proj4"
+      VIRT_Plugins_Load3: "plain, shapefileio"
+      #VIRT_Plugins_Load4: "plain, graphql"
     volumes:
-      - "../model/dataset:/usr/local/virtuoso-opensource/share/virtuoso/vad"
-      # - "../model/tmp/product:/usr/share/proj"
+       - "../model/tmp/product:/usr/share/proj"
     ports:
       - 1111:1111
       - 8890:8890
@@ -42,7 +47,6 @@ services:
       VIRT_Plugins_Load3: "plain, shapefileio"
       #VIRT_Plugins_Load4: "plain, graphql"
     volumes:
-      #- "../model/dataset:/usr/local/virtuoso-opensource/share/virtuoso/vad"
       - "../model/dataset:/usr/share/proj"
     ports:
       - 33201-33210:1111

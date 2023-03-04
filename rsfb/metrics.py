@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import re
 from typing import Dict, Tuple
@@ -88,7 +89,8 @@ def compute_metrics(configfile, outfile, workload):
         batch = int(name_search.group(4))
         attempt = name_search.group(6)
         total_nb_sources = vendor_edges[batch] + ratingsite_edges[batch]
-        nb_results = len(pd.read_csv(f"{Path(provenance_file).parent}/results.csv"))
+        results_file = f"{Path(provenance_file).parent}/results.csv"
+        nb_results = np.nan if os.stat(results_file).st_size == 0 else len(pd.read_csv(results_file))
         
         record = {
             "query": query,
