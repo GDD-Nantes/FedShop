@@ -40,11 +40,12 @@ def prerequisites(eval_config):
     os.chdir(oldcwd)
         
 def exec_fedx(eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id):
-    app_config = load_config(eval_config)["evaluation"]["engines"]["fedx"]
+    config = load_config(eval_config)
+    app_config = config["evaluation"]["engines"]["fedx"]
     app = app_config["dir"]
     jar = os.path.join(app, "FedX-1.0-SNAPSHOT.jar")
     lib = os.path.join(app, "lib/*")
-    timeout = int(app_config["timeout"])
+    timeout = int(config["evaluation"]["timeout"])
 
     args = [engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection]
     args = " ".join(args)
@@ -52,9 +53,9 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
     timeoutCmd = ""
     cmd = f'{timeoutCmd} java -classpath "{jar}:{lib}" org.example.FedX {args}'.strip()
     
-    def write_empty_stats():
+    def write_empty_stats(reason):
         with open(stats, "w") as fout:
-            fout.write("query,engine,instance,batch,mode,exec_time\n")
+            fout.write("query,engine,instance,batch,attempt,exec_time,http_req\n")
             if stats != "/dev/null":
                 basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
                 engine = basicInfos.group(1)
@@ -62,7 +63,7 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
                 instance = basicInfos.group(3)
                 batch = basicInfos.group(4)
                 attempt = basicInfos.group(5)
-                fout.write(",".join([queryName, engine, instance, batch, attempt, "nan", "nan"])+"\n")
+                fout.write(",".join([queryName, engine, instance, batch, attempt, reason, reason])+"\n")
                 
     def write_empty_result():
         Path(out_result).touch()
@@ -88,12 +89,14 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
                 write_empty_result()
                 raise RuntimeError(f"{input.query} yield no results!")
         else:
-            logger.error(f"{query} reported error")                      
-            raise RuntimeError(f"{query} reported error")
+            logger.error(f"{query} reported error")    
+            write_empty_result()
+            write_empty_stats("error")                  
+            # raise RuntimeError(f"{query} reported error")
             
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
-        write_empty_stats()
+        write_empty_stats("timeout")
         write_empty_result()            
     finally:
         os.system('pkill -9 -f "FedX"')

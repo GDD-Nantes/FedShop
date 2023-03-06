@@ -1,0 +1,20 @@
+{
+    "bgp1": [
+        "?offer bsbm:product ?offerProduct",
+        "?offerProduct owl:sameAs ?ProductXYZ",
+        "?offer bsbm:price ?price",
+        "?offer bsbm:vendor ?vendor",
+        "?vendor rdfs:label ?vendorTitle",
+        "?vendor bsbm:country <http://downlode.org/rdf/iso-3166/countries#FR>",
+        "?offer bsbm:validTo ?date"
+    ],
+    "bgp2": [
+        "?review bsbm:reviewFor ?reviewProduct",
+        "?reviewProduct owl:sameAs ?ProductXYZ",
+        "?review rev:reviewer ?reviewer",
+        "?reviewer foaf:name ?revName",
+        "?review dc:title ?revTitle",
+        "?review bsbm:rating1 ?rating1",
+        "?review bsbm:rating2 ?rating2"
+    ]
+}

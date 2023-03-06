@@ -1,0 +1,11 @@
+{
+    "bgp1": [
+        "?offer bsbm:product ?localProductXYZ",
+        "?localProductXYZ owl:sameAs ?ProductXYZ",
+        "?offer bsbm:vendor ?vendor",
+        "?vendor bsbm:country <http://downlode.org/rdf/iso-3166/countries#US>",
+        "?offer bsbm:deliveryDays ?deliveryDays",
+        "?offer bsbm:price ?price",
+        "?offer bsbm:validTo ?date"
+    ]
+}

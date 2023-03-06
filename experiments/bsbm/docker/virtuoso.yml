@@ -45,6 +45,7 @@ services:
       VIRT_Plugins_Load1: "plain, geos"
       VIRT_Plugins_Load2: "plain, proj4"
       VIRT_Plugins_Load3: "plain, shapefileio"
+      VIRT_Plugins_Load4: "-"
       #VIRT_Plugins_Load4: "plain, graphql"
     volumes:
       - "../model/dataset:/usr/share/proj"

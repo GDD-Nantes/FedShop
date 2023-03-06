@@ -1,5 +1,7 @@
+import ast
 from io import BytesIO
 from pathlib import Path
+import re
 import subprocess
 import colorlog
 import numpy as np
@@ -37,6 +39,10 @@ LOGGER = rsfb_logger(Path(__file__).name)
 def str2n3(value):
     if str(value).startswith("http") or str(value).startswith("nodeID"): 
         return URIRef(value).n3()
+    elif re.match(r"\d{4}-\d{2}-\d{2}", str(value)):
+        return Literal(pd.to_datetime(value)).n3()
+    elif re.match(r"(-?\d+)((\.\d+)|(e-?\d+))?", str(value)):
+        return Literal(ast.literal_eval(str(value))).n3()
     else:
         return Literal(value).n3()
 
@@ -260,7 +266,7 @@ def __get_publisher_info(x):
         .query('`URL` == "0.0.0.0" and `TargetPort` == 8890')["PublishedPort"] \
         .astype(int).item()
 
-def get_virtuoso_endpoints(compose_file, service_name):
+def get_docker_endpoints(compose_file, service_name):
     json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
     with BytesIO(json_bytes) as json_bs:
         infos = pd.read_json(json_bs)
@@ -273,7 +279,7 @@ def get_virtuoso_endpoints(compose_file, service_name):
             .to_list()
         return result
 
-def get_virtuoso_endpoint_by_container_name(compose_file, service_name, container_name):        
+def get_docker_endpoint_by_container_name(compose_file, service_name, container_name):        
     json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
     with BytesIO(json_bytes) as json_bs:
         infos = pd.read_json(json_bs)
@@ -313,7 +319,7 @@ def normal_truncated(mu, sigma, lower, upper):
 OmegaConf.register_new_resolver("multiply", lambda *args: np.prod(args).item())
 OmegaConf.register_new_resolver("sum", lambda *args: np.sum(args).item())
 OmegaConf.register_new_resolver("divide", divide)
-OmegaConf.register_new_resolver("get_virtuoso_endpoints", get_virtuoso_endpoints)
+OmegaConf.register_new_resolver("get_docker_endpoints", get_docker_endpoints)
 OmegaConf.register_new_resolver("get_virtuoso_containers", get_virtuoso_containers)
 OmegaConf.register_new_resolver("get_product_type_n", lambda nbProd: len(create_product_type_hierarchy(nbProd)[0]))
 OmegaConf.register_new_resolver("get_product_type_c", lambda nbProd: get_product_producers(nbProd)[1])

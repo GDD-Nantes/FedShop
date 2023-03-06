@@ -1,0 +1,6 @@
+{
+    "bgp1": [
+        "?localProduct rdfs:label ?label",
+        "?localProduct rdf:type bsbm:Product"
+    ]
+}

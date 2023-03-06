@@ -12,7 +12,7 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import load_config, get_virtuoso_endpoint_by_container_name, check_container_status
+from utils import load_config, get_docker_endpoint_by_container_name, check_container_status
 
 #===============================
 # GENERATION PHASE:
@@ -188,7 +188,7 @@ def activate_one_container(container_infos_file, batch_id):
             
         print(f"Starting container {container_name}...")
         shell(f"docker start {container_name}")
-        container_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
+        container_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
         wait_for_container(container_endpoint, f"{BENCH_DIR}/virtuoso-ok.txt", wait=1)
 
 #=================
@@ -223,12 +223,14 @@ rule compute_metrics:
 rule execute_provenance_query:
     priority: 3
     threads: 1
-    retries: 2
+    #retries: 1
     input: 
         provenance_query="{benchDir}/{query}/instance_{instance_id}/provenance.sparql",
         loaded_virtuoso="{benchDir}/virtuoso_batch{batch_id}-ok.txt",
         results="{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/results.csv"
-    output: "{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv"
+    output: 
+        default_source_selection="{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv",
+        opt_source_selection="{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.opt.csv"
     run: 
         activate_one_container(f"{BENCH_DIR}/container_infos.csv", wildcards.batch_id)
 
@@ -239,19 +241,9 @@ rule execute_provenance_query:
         in_provenance_def_composition = f"{in_provenance_def_query}.comp"
 
         
-        shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_provenance_def_query} {output} {wildcards.batch_id}")
-        out_provenance_def = pd.read_csv(str(output))
-        
-        if os.path.exists(in_provenance_opt_query):
-            shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_provenance_opt_query} {output} {wildcards.batch_id}")
-            shell(f"python rsfb/query.py unwrap {output} {in_provenance_opt_composition} {in_provenance_def_composition}")
-            out_provenance_opt = pd.read_csv(str(output))
-
-            if not out_provenance_def.equals(out_provenance_opt):
-                print(out_provenance_def)
-                print("not the same as")
-                print(out_provenance_opt)
-                raise RuntimeError(f"{in_injected_def_query} doesn't yield the same result as {in_injected_opt_query}")
+        shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_provenance_def_query} {output.default_source_selection} {wildcards.batch_id}")
+        shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_provenance_opt_query} {output.opt_source_selection} {wildcards.batch_id}")
+        #shell(f"python rsfb/query.py unwrap {output.opt_source_selection} {in_provenance_opt_composition} {in_provenance_def_composition}")
 
 rule ingest_virtuoso:
     priority: 4

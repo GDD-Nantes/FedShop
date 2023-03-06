@@ -1,0 +1,14 @@
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+
+SELECT DISTINCT ?bgp1
+WHERE {
+    GRAPH ?bgp1 {
+        ?localProduct rdfs:label ?label .
+        ?localProduct rdf:type bsbm:Product .
+        # const ?word1 in ?label 
+        FILTER regex(?label, ?word1)
+    }
+}

@@ -1,0 +1,12 @@
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+
+SELECT DISTINCT ?bgp1
+WHERE {
+    GRAPH ?bgp1 {
+        # const ?OfferXYZ
+        ?OfferXYZ bsbm:product ?product . 
+        { ?OfferXYZ ?property ?hasValue }
+        UNION
+        { ?isValueOf ?property ?OfferXYZ }
+    }
+}

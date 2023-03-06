@@ -1,0 +1,29 @@
+PREFIX bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dc: <http://purl.org/dc/elements/1.1/>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+
+SELECT DISTINCT ?bgp1
+WHERE {
+    GRAPH ?bgp1 {
+        # const ?product
+        ?localProduct owl:sameAs ?product .
+        ?localProduct rdfs:label ?label .
+        ?localProduct rdfs:comment ?comment .
+        ?localProduct bsbm:producer ?p .
+        ?p rdfs:label ?producer .
+        #?localProduct dc:publisher ?p . 
+        ?localProduct bsbm:productFeature ?localProductFeature1 .
+        ?localProductFeature1 owl:sameAs ?ProductFeature1 .
+        ?localProductFeature1 rdfs:label ?ProductFeatureLabel .
+        ?localProduct bsbm:productPropertyTextual1 ?propertyTextual1 .
+        ?localProduct bsbm:productPropertyTextual2 ?propertyTextual2 .
+        ?localProduct bsbm:productPropertyTextual3 ?propertyTextual3 .
+        ?localProduct bsbm:productPropertyNumeric1 ?propertyNumeric1 .
+        ?localProduct bsbm:productPropertyNumeric2 ?propertyNumeric2 .
+        OPTIONAL { ?localProduct bsbm:productPropertyTextual4 ?propertyTextual4 }
+        OPTIONAL { ?localProduct bsbm:productPropertyTextual5 ?propertyTextual5 }
+        OPTIONAL { ?localProduct bsbm:productPropertyNumeric4 ?propertyNumeric4 }
+    }
+}

@@ -1,13 +1,19 @@
 services:
   jena-fuseki:
     image: minhhoangdang/jena-fuseki:4.7.0
+    container_name: "docker-jena-fuseki-1"
     environment:
       - ADMIN_PASSWORD=pw123
       - JVM_ARGS=-Xmx8g
       - TDB=2
       - FUSEKI_DATASET_1=RSFB
+    #network_mode: "host"
     ports:
       - 3030:3030
     volumes:
-      - "./fuseki:/fuseki"
+      - fuseki-data:/fuseki
       - "../model/dataset:/staging"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+volumes:
+  fuseki-data:

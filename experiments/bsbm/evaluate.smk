@@ -14,7 +14,7 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import load_config, get_virtuoso_endpoint_by_container_name, check_container_status
+from utils import load_config, get_docker_endpoint_by_container_name, check_container_status
 
 #===============================
 # EVALUATION PHASE:
@@ -92,11 +92,11 @@ def activate_one_container(container_infos_file, batch_id):
             
         print(f"Starting container {container_name}...")
         shell(f"docker start {container_name}")
-        container_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
+        container_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
         wait_for_container(container_endpoint, f"{BENCH_DIR}/virtuoso-ok.txt", wait=1)
 
 def generate_federation_declaration(federation_declaration_file, engine, batch_id):
-    sparql_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])
+    sparql_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])
 
     is_endpoint_updated = False
     if is_file_exists := os.path.exists(federation_declaration_file):

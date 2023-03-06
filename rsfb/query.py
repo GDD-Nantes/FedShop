@@ -43,35 +43,24 @@ def lang_detect(txt):
     result = Counter(map(lambda x: Lang(detect(text=x, low_memory=False)["lang"]).name.lower(), lines)).most_common(1)[0]
     return result
 
-def exec_query(configfile, query, batch_id, error_when_timeout=False):
-    
-    config = load_config(configfile)["generation"]
-    endpoint = config["virtuoso"]["endpoints"][batch_id]
+def exec_query_on_endpoint(query, endpoint, error_when_timeout, timeout = None):
     sparql_endpoint = SPARQLWrapper(endpoint)
-    if error_when_timeout: sparql_endpoint.addParameter("timeout", "300000") # in ms
-        
-    # if batch_id is not None:
-    #     from_clause = []
-    #     from_keyword = "FROM" if re.search(r"GRAPH\s+(\?\w+\s*)+\{", query) is None else "FROM NAMED"
-                
-    #     for schema_name, schema_props in config["schema"].items():
-    #         if schema_props["is_source"]:
-    #             n_items = schema_props["params"][f"{schema_name}_n"]
-                
-    #             _, edges = np.histogram(np.arange(n_items), config["n_batch"])
-    #             edges = edges[1:].astype(int) + 1
-    #             for id in range(edges[batch_id]):
-    #                 provenance =  re.sub(re.escape(f"{{%{schema_name}_id}}"), f"{schema_name}{id}", schema_props["provenance"])
-    #                 from_clause.append(f"{from_keyword} <{provenance}>")
-    
-    #     query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 \3 \n{' '.join(from_clause)}\nWHERE", query)
-        
+    if timeout is not None or error_when_timeout: 
+        sparql_endpoint.setTimeout(int(timeout))
+
     sparql_endpoint.setMethod("POST")
     sparql_endpoint.setReturnFormat(CSV)        
     sparql_endpoint.setQuery(query)
     response = sparql_endpoint.query()
     result = response.convert()
     return response, result
+    
+
+def exec_query(configfile, query, batch_id, error_when_timeout=False):
+    config = load_config(configfile)["generation"]
+    endpoint = config["virtuoso"]["endpoints"][batch_id]
+    return exec_query_on_endpoint(query, endpoint, error_when_timeout)
+    
 
 def __parse_query(queryfile) -> Tuple[Dict[str, str], Dict[str, Dict]]:
     """Parse input queryfile into get placeholders
@@ -204,7 +193,7 @@ def execute_query(configfile, queryfile, outfile, batch_id, sample, ignore_error
     with open(queryfile, mode="r") as qf:
         query_text = qf.read()
                 
-        _, result = exec_query(configfile=configfile, query=query_text, batch_id=batch_id, error_when_timeout=True)  
+        _, result = exec_query(configfile=configfile, query=query_text, batch_id=batch_id, error_when_timeout=False)  
 
         with BytesIO(result) as header_stream, BytesIO(result) as data_stream: 
             header = header_stream.readline().decode().strip().replace('"', '').split(",")
@@ -268,7 +257,8 @@ def inject_from_cache(queryfile, cache_file, outputfile):
     
     with open(queryfile, "r") as qf:
         query = qf.read()
-        injection_cache = json.load(open(cache_file, "r"))
+        injection_cache = pd.read_json(cache_file, convert_dates=True, typ="series")
+                
         for variable, value in injection_cache.items():
             # Convert to n3 representation
             value = str2n3(value)
@@ -278,6 +268,11 @@ def inject_from_cache(queryfile, cache_file, outputfile):
                     value = re.sub(rf"<{prefixSub}(\w+)>", rf"{prefixName}:\1", value)
             
             query = re.sub(rf"{re.escape('?'+variable)}(\W)", rf"{value}\1", query)
+        
+        query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(str(\2)),", query)
+        query = re.sub(r"(#)*(FILTER\s*\(\!bound)", r"\2", query)
+        query = re.sub(r"#*(DEFINE|OFFSET)", r"##\1", query)
+        query = re.sub(r"#*(ORDER|LIMIT)", r"\1", query)
             
         with open(outputfile, "w") as f:
             f.write(query)
@@ -631,16 +626,16 @@ def unwrap(provenance, opt_comp, def_comp):
         def_comp_dict = json.load(def_comp_fs)
         
         provenance_df.to_csv(f"{provenance}.opt", index=False)
-        
+                
         reversed_def_comp = dict()        
         for k, v in def_comp_dict.items():
-            if reversed_def_comp.get(k) is None:
-                reversed_def_comp[k] = []
-            else:
-                reversed_def_comp[k].append(" ".join(v))
-        
+            tp = " ".join(v)
+            if reversed_def_comp.get(tp) is None:
+                reversed_def_comp[tp] = []
+            reversed_def_comp[tp].append(k)
+
         result = dict()
-        
+                        
         for bgp in provenance_df.columns:
             tps = opt_comp_dict[bgp] 
             sources = provenance_df[bgp]
@@ -714,6 +709,124 @@ def build_provenance_query(queryfile, outfile):
                     #     predicate_full = f"{prefix_alias_to_full[prefix]}{suffix}"
                     composition[f"tp{ntp}"] = [subject, predicate, object]
                     queryBody += re.sub(re.escape(subline), f"GRAPH ?tp{ntp} {{ {subline} }}", line)
+                else:
+                    queryBody += line
+                    if "WHERE" in line:
+                        wherePos = cur
+        
+        # Wrap tpi with STR(...) as ... because there is a bug where Virtuoso v7.5.2 yield duplicata with empty OPTIONAL columns
+        # Reproduce bug:
+        #   - Take two query instances of the same template: A: (q02 instance 8) and B: (q02 instance 5)
+        #   - Execute A, wait for completion, then execute B, watt for completion
+        #   - There should be duplicated results for query B 
+        graph_proj = ' '.join([ f"(STR(?tp{i}) AS ?tp{i})" for i in np.arange(1, ntp+1) ])
+        
+        with open(outfile, mode="w") as out:
+            query = queryHeader + queryBody
+            query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {graph_proj} WHERE", query)
+            # Disable filters
+            query = re.sub(r"(#)*(LIMIT|OFFSET|ORDER)", r"##\2", query)
+            out.write(query)
+        
+        with open(f"{outfile}.comp", mode="w") as composition_fs:
+            json.dump(composition, composition_fs)
+
+@cli.command()
+@click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("source-selection", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("outfile", type=click.Path(dir_okay=False, file_okay=True))
+@click.option("use-service", is_flag=True, default=False)
+def build_optimized_query(queryfile, source_selection, outfile, use_service):
+    """Given an injected query and an source selection file, detect exclusive groups and optmize query
+     
+
+    Args:
+        queryfile (path): input query
+        instance_id (integer): instance_id number
+        value_selection (path): the value seletion csv file
+        outfile (_type_): file that holds the result
+        endpoint (_type_): the virtuoso endpoint
+
+    Returns:
+        _type_: _description_
+    """
+    
+    keyword = "SERVICE" if use_service else "GRAPH"
+    
+    source_selection_df = pd.read_csv(source_selection)
+    exclusive_groups_tps = None
+    exclusive_groups = []
+    for row_id in range(len(source_selection_df)):
+        tmp = pd.Series(source_selection_df.loc[row_id, :]) \
+            .to_frame("source") \
+            .reset_index() \
+            .groupby("source", dropna=False) \
+            .aggregate(list) \
+            .sort_values("index").reset_index()
+        tmp["bgp"] = tmp.index.map(lambda x: f"bgp{x}")
+        
+        if exclusive_groups_tps is None: 
+            exclusive_groups_tps = tmp
+            
+        elif not exclusive_groups_tps["index"].equals(tmp["index"]):
+            msg = f"This source selection produce more than one type of exclusive group, which is not supported at this time"
+            logger.warn(msg)
+            raise RuntimeError(msg)
+        
+        exclusive_groups.append(exclusive_groups_tps)
+        
+    exclusive_groups_df = pd.concat(exclusive_groups, ignore_index=True)\
+        .groupby("bgp").aggregate({"source": lambda x: frozenset(pd.Series(x).dropna().sort_values()), "index": "first"}) \
+        .groupby("source").aggregate(list)
+    print(exclusive_groups_df)
+    
+    for source_candidates, tps in exclusive_groups_df.iterrows():
+        bgp = np.array(tps.to_list()).flatten().tolist()
+        print(source_candidates, bgp)
+        
+        
+
+    with open(queryfile, "r") as qfs:
+        query = qfs.read()
+        prefix_full_to_alias, _ = __parse_query(queryfile)
+        ss_cache = []
+
+        # Wrap each tp with GRAPH clause
+        ntp = 0
+        bgp_id = 0
+        wherePos = np.inf
+        composition = dict()
+        prefix_alias_to_full = {v: k for k, v in prefix_full_to_alias.items()}
+
+        queryHeader = ""
+        queryBody = ""
+        with StringIO(query) as query_ss:
+            for cur, line in enumerate(query_ss.readlines()):
+                if "WHERE" not in line and cur < wherePos: 
+                    if "SELECT" not in line:
+                        queryHeader += line
+                    continue
+                
+                # if cur > wherePos:
+                #   queryBody += f"{keyword} ?bgp{bgp_id} " + "{"
+                
+                #logger.debug("read:", line.strip())
+                subline_search = re.search(r"^(\s|(\w+\s*\{)|\{)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\?\w+|\w+:\w+|<\S+>))(\s|\}|\.)*\s*$", line)
+                if subline_search is not None:
+                    subline = subline_search.group(3)
+                    subject = subline_search.group(4)
+                    predicate = subline_search.group(5)
+                    object = subline_search.group(6)
+                    # logger.debug("parsed: ", subject, predicate, object)
+                        #ss_cache.append(subline)
+                    ntp += 1
+                    # predicate_search = re.search(r"(\?\w+|a|(\w+):(\w+)|<\S+>)", predicate)
+                    # predicate_full = predicate_search.group(1)
+                    # prefix, suffix = predicate_search.group(2),  predicate_search.group(3)
+                    # if prefix is not None and suffix is not None:
+                    #     predicate_full = f"{prefix_alias_to_full[prefix]}{suffix}"
+                    composition[f"tp{ntp}"] = [subject, predicate, object]
+                    queryBody += re.sub(re.escape(subline), f"{keyword} ?tp{ntp} {{ {subline} }}", line)
                 else:
                     queryBody += line
                     if "WHERE" in line:
