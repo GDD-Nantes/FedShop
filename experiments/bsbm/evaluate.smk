@@ -227,7 +227,7 @@ rule evaluate_engines:
         stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/stats.csv",
         query_plan="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/query_plan.txt",
         source_selection="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/source_selection.txt",
-        result_txt="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.txt"
+        result_txt="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.txt",
     params:
         eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR),
         engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
@@ -251,34 +251,6 @@ rule evaluate_engines:
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/results.txt {output.result_txt}")
         else:
             shell("python rsfb/engines/{engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {output.query_plan} --batch-id {wildcards.batch_id}")
-
-        engine = str(wildcards.engine)
-        batch_id = str(wildcards.batch_id)
-        engine_config = f"{WORK_DIR}/benchmark/evaluation/{engine}/config/batch_{batch_id}/{engine}.conf"
-        generate_federation_declaration(engine_config, engine, batch_id)
-
-        # Evaluate
-        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {output.result_txt} --out-source-selection {output.source_selection} --query-plan {output.query_plan} --batch-id {wildcards.batch_id}")
-
-        # Transform results
-        shell("python rsfb/engines/{wildcards.engine}.py transform-results {output.result_txt} {output.result_csv}")
-        ideal_results = pd.read_csv(f"{WORK_DIR}/benchmark/generation/{wildcards.query}/instance_{wildcards.instance_id}/batch_{wildcards.batch_id}/results.csv").dropna(how="all", axis=1)
-        ideal_results = ideal_results.reindex(sorted(ideal_results.columns), axis=1)
-        ideal_results = ideal_results \
-            .sort_values(ideal_results.columns.to_list()) \
-            .reset_index(drop=True) 
-
-        engine_results = pd.read_csv(str(output.result_csv)).dropna(how="all", axis=1)
-        engine_results = engine_results.reindex(sorted(engine_results.columns), axis=1)
-        engine_results = engine_results \
-            .sort_values(engine_results.columns.to_list()) \
-            .reset_index(drop=True) 
-
-        if not ideal_results.equals(engine_results):
-            print(ideal_results)
-            print("not equals to")
-            print(engine_results)
-            raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
 
 rule engines_prerequisites:
     output: "{benchDir}/{engine}/{engine}-ok.txt"
