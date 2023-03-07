@@ -227,7 +227,7 @@ rule evaluate_engines:
         stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/stats.csv",
         query_plan="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/query_plan.txt",
         source_selection="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/source_selection.txt",
-        result_txt="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.txt",
+        result_txt="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.txt"
     params:
         eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR),
         engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
@@ -258,10 +258,10 @@ rule evaluate_engines:
         generate_federation_declaration(engine_config, engine, batch_id)
 
         # Evaluate
-        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {params.result_txt} --out-source-selection {output.source_selection} --query-plan {params.query_plan} --batch-id {wildcards.batch_id}")
+        shell("python rsfb/engines/{wildcards.engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {output.result_txt} --out-source-selection {output.source_selection} --query-plan {output.query_plan} --batch-id {wildcards.batch_id}")
 
         # Transform results
-        shell("python rsfb/engines/{wildcards.engine}.py transform-results {params.result_txt} {output.result_csv}")
+        shell("python rsfb/engines/{wildcards.engine}.py transform-results {output.result_txt} {output.result_csv}")
         ideal_results = pd.read_csv(f"{WORK_DIR}/benchmark/generation/{wildcards.query}/instance_{wildcards.instance_id}/batch_{wildcards.batch_id}/results.csv").dropna(how="all", axis=1)
         ideal_results = ideal_results.reindex(sorted(ideal_results.columns), axis=1)
         ideal_results = ideal_results \
