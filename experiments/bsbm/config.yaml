@@ -94,9 +94,10 @@ evaluation:
     fedx:
       dir: "engines/FedX/target"
     # fedx_ideal:
-    arq:
-      internal_endpoint_prefix: "http://host.docker.internal:8890/sparql/?default-graph-uri="
-      compose_file: "${generation.workdir}/docker/jena.yml"
-      service_name: "jena-fuseki"
-      endpoint: "http://localhost:3030/RSFB"
-      container_name: "docker-jena-fuseki-1"
+    # arq:
+    #   dir: "engines/ARQ"
+    #   internal_endpoint_prefix: "http://host.docker.internal:8890/sparql/?default-graph-uri="
+    #   compose_file: "${generation.workdir}/docker/jena.yml"
+    #   service_name: "jena-fuseki"
+    #   endpoint: "http://localhost:3030/RSFB"
+    #   container_name: "docker-jena-fuseki-1"

@@ -162,3 +162,4 @@ evaluation_failed_logs.txt
 
 logs/
 fuseki/
+engines/ARQ/jena

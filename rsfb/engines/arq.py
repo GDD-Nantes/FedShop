@@ -17,8 +17,10 @@ from rdflib import URIRef
 import requests
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import kill_process, load_config, str2n3
-from query import exec_query_on_endpoint, execute_query
+from utils import load_config, rsfb_logger
+from query import exec_query_on_endpoint
+
+logger = rsfb_logger(Path(__file__).name)
 
 import fedx
 
@@ -42,7 +44,17 @@ def prerequisites(ctx: click.Context, eval_config):
     Args:
         eval_config (_type_): _description_
     """
-    os.system()
+    config = load_config(eval_config)
+
+    # Download and install Jena
+    current_pwd = os.getcwd()
+    os.chdir(config["evaluation"]["engines"]["arq"]["dir"])
+    os.system("sh setup.sh")
+    os.chdir(current_pwd)
+    
+    # Start fuseki server
+    compose_file = config["evaluation"]["engines"]["arq"]["compose_file"]
+    os.system(f"docker-compose -f {compose_file} up --force-recreate jena-fuseki")
 
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
@@ -99,6 +111,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     with    open(opt_source_selection_query_file, "r") as opt_source_selection_qfs, \
             open(query, "r") as query_fs:
 
+        # Create SERVICE query
         query_text = query_fs.read()
         select_clause = re.search(r"(SELECT(.*)[\S\s]+WHERE)", query_text).group(1)
         
@@ -113,13 +126,26 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         out_query_text = re.sub(r"#*(DEFINE|OFFSET)", r"##\1", out_query_text)
         out_query_text = re.sub(r"#*(ORDER|LIMIT)", r"\1", out_query_text)
         out_query_text = re.sub("GRAPH", "SERVICE", out_query_text)
-        
-        # footer = re.search(r"((ORDER|OFFSET|LIMIT).*[\S\s])", query_text).group(1)
-        # out_query_text += footer
-        
+                
+        # Write service query
         with open(service_query_file, "w") as service_query_fs:
             service_query_fs.write(out_query_text)
             service_query_fs.close()
+            
+        # Explain query
+        with open(query_plan, "w") as query_plan_fs:
+            arq = f'{config["evaluation"]["engines"]["arq"]["dir"]}/jena/bin/arq'
+            explain_cmd = f"{arq} --explain --query {service_query_file}"
+            
+            logger.debug("==== ARQ EXPLAIN ====")
+            logger.debug(explain_cmd)
+            logger.debug("=====================")
+            
+            arq_proc = subprocess.run(explain_cmd, shell=True, capture_output=True)
+            if arq_proc.returncode == 0:
+                query_plan_fs.write(arq_proc.stdout.decode())
+            else:
+                raise RuntimeError("ARQ explain reported error!")
    
         # Execute results
         endpoint = config["evaluation"]["engines"]["arq"]["endpoint"]
