@@ -1,0 +1,7 @@
+{
+    "bgp1": [
+        "?OfferXYZ bsbm:product ?product",
+        "?OfferXYZ ?property ?hasValue",
+        "?isValueOf ?property ?OfferXYZ"
+    ]
+}

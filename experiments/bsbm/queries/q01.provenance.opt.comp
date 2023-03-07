@@ -1,0 +1,12 @@
+{
+    "bgp1": [
+        "?product rdfs:label ?label",
+        "?product rdf:type ?localProductType",
+        "?localProductType owl:sameAs ?ProductType",
+        "?product bsbm:productFeature ?localProductFeature1",
+        "?localProductFeature1 owl:sameAs ?ProductFeature1",
+        "?product bsbm:productFeature ?localProductFeature2",
+        "?localProductFeature2 owl:sameAs ?ProductFeature2",
+        "?product bsbm:productPropertyNumeric1 ?value1"
+    ]
+}

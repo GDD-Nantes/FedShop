@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import re
 from typing import Dict, Tuple
@@ -81,13 +82,15 @@ def compute_metrics(configfile, outfile, workload):
     records = []        
     for provenance_file in workload:
         source_selection_result = pd.read_csv(provenance_file)
-        name_search = re.search(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/provenance.csv", provenance_file)
+        name_search = re.search(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/(attempt_(\d+)/)?provenance.csv", provenance_file)
         engine = name_search.group(1)
         query = name_search.group(2)
         instance = int(name_search.group(3))
         batch = int(name_search.group(4))
+        attempt = name_search.group(6)
         total_nb_sources = vendor_edges[batch] + ratingsite_edges[batch]
-        nb_results = len(pd.read_csv(f"{Path(provenance_file).parent}/results.csv"))
+        results_file = f"{Path(provenance_file).parent}/results.csv"
+        nb_results = np.nan if os.stat(results_file).st_size == 0 else len(pd.read_csv(results_file))
         
         record = {
             "query": query,
@@ -100,6 +103,9 @@ def compute_metrics(configfile, outfile, workload):
             #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(source_selection_result),
             #"xfed_join_restricted_source_level_tp_selectivity": get_xfed_join_restricted_source_level_tp_selectivity(source_selection_result)
         }
+        
+        if attempt is not None:
+            record.update({"attempt": int(attempt)})
         
         if engine in CONFIG["evaluation"]["engines"]:
             record.update({"engine": engine})

@@ -12,7 +12,17 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import load_config, get_virtuoso_endpoint_by_container_name, check_container_status
+from utils import load_config, get_docker_endpoint_by_container_name, check_container_status
+
+#===============================
+# GENERATION PHASE:
+# - Generate data
+# - Ingest the data in virtuoso
+# - Generate query instances
+# - Generate expected results
+# - Generate expected source selection
+# - Generate expected metrics
+#===============================
 
 CONFIGFILE = config["configfile"]
 
@@ -25,11 +35,12 @@ SPARQL_SERVICE_NAME = CONFIG["virtuoso"]["service_name"]
 GENERATOR_ENDPOINT = CONFIG["generator"]["endpoint"]
 GENERATOR_COMPOSE_FILE = CONFIG["generator"]["compose_file"]
 GENERATOR_CONTAINER_NAME = CONFIG["generator"]["container_name"]
-# CONTAINER_PATH_TO_ISQL = "/opt/virtuoso-opensource/bin/isql"
-# CONTAINER_PATH_TO_DATA = "/usr/share/proj/" 
 
-CONTAINER_PATH_TO_ISQL = "/usr/local/virtuoso-opensource/bin/isql-v" 
-CONTAINER_PATH_TO_DATA = "/usr/local/virtuoso-opensource/share/virtuoso/vad"
+CONTAINER_PATH_TO_ISQL = "/opt/virtuoso-opensource/bin/isql"
+CONTAINER_PATH_TO_DATA = "/usr/share/proj/" 
+
+# CONTAINER_PATH_TO_ISQL = "/usr/local/virtuoso-opensource/bin/isql-v" 
+# CONTAINER_PATH_TO_DATA = "/usr/local/virtuoso-opensource/share/virtuoso/vad"
 
 N_QUERY_INSTANCES = CONFIG["n_query_instances"]
 VERBOSE = CONFIG["verbose"]
@@ -80,7 +91,6 @@ def deploy_virtuoso(container_infos_file, restart=False):
     # wait_for_container(CONFIG["virtuoso"]["endpoints"], f"{BENCH_DIR}/virtuoso-up.txt", wait=1)
     
     shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} create --no-recreate --scale {SPARQL_SERVICE_NAME}={N_BATCH} {SPARQL_SERVICE_NAME}") # For docker-compose version > 2.15.1
-    
     SPARQL_CONTAINER_NAMES = CONFIG["virtuoso"]["container_names"]
     pd.DataFrame(SPARQL_CONTAINER_NAMES, columns=["Name"]).to_csv(str(container_infos_file), index=False)
 
@@ -178,7 +188,7 @@ def activate_one_container(container_infos_file, batch_id):
             
         print(f"Starting container {container_name}...")
         shell(f"docker start {container_name}")
-        container_endpoint = get_virtuoso_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
+        container_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
         wait_for_container(container_endpoint, f"{BENCH_DIR}/virtuoso-ok.txt", wait=1)
 
 #=================
@@ -213,12 +223,14 @@ rule compute_metrics:
 rule execute_provenance_query:
     priority: 3
     threads: 1
-    retries: 2
+    #retries: 1
     input: 
         provenance_query="{benchDir}/{query}/instance_{instance_id}/provenance.sparql",
         loaded_virtuoso="{benchDir}/virtuoso_batch{batch_id}-ok.txt",
         results="{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/results.csv"
-    output: "{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv"
+    output: 
+        default_source_selection="{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv",
+        opt_source_selection="{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.opt.csv"
     run: 
         activate_one_container(f"{BENCH_DIR}/container_infos.csv", wildcards.batch_id)
 
@@ -228,11 +240,10 @@ rule execute_provenance_query:
         in_provenance_def_query = f"{input.provenance_query}"
         in_provenance_def_composition = f"{in_provenance_def_query}.comp"
 
-        if os.path.exists(in_provenance_opt_query):
-            shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_provenance_opt_query} {output} {wildcards.batch_id}")
-            shell(f"python rsfb/query.py unwrap {output} {in_provenance_opt_composition} {in_provenance_def_composition}")
-        else: 
-            shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_provenance_def_query} {output} {wildcards.batch_id}")
+        
+        shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_provenance_def_query} {output.default_source_selection} {wildcards.batch_id}")
+        shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_provenance_opt_query} {output.opt_source_selection} {wildcards.batch_id}")
+        #shell(f"python rsfb/query.py unwrap {output.opt_source_selection} {in_provenance_opt_composition} {in_provenance_def_composition}")
 
 rule ingest_virtuoso:
     priority: 4
@@ -298,6 +309,7 @@ rule build_provenance_query:
     we select 10 random values for the placeholders in the BSBM query templates.
     """
     priority: 6
+    threads: 5
     input: 
         injected="{benchDir}/{query}/instance_{instance_id}/injected.sparql",
         injection_cache="{benchDir}/{query}/instance_{instance_id}/injection_cache.json"
@@ -316,6 +328,8 @@ rule build_provenance_query:
             shell(f"python rsfb/query.py inject-from-cache {in_provenance_opt_composition} {input.injection_cache} {out_provenance_opt_composition}")
 
 rule execute_workload_instances:
+    priority: 7
+    threads: 1
     input: 
         workload_instance="{benchDir}/{query}/instance_{instance_id}/injected.sparql",
         loaded_virtuoso="{benchDir}/virtuoso_batch{batch_id}-ok.txt",
@@ -356,6 +370,7 @@ rule instanciate_workload:
 
 rule create_workload_value_selection:
     priority: 8
+    threads: 5
     input: 
         value_selection_query="{benchDir}/{query}/value_selection.sparql",
         value_selection="{benchDir}/{query}/value_selection.csv"
@@ -381,6 +396,7 @@ rule exec_value_selection_query:
 
 rule build_value_selection_query:
     priority: 10
+    threads: 5
     input: 
         queryfile=expand("{queryDir}/{{query}}.sparql", queryDir=QUERY_DIR)
     output: "{benchDir}/{query}/value_selection.sparql"
@@ -396,6 +412,7 @@ rule build_value_selection_query:
 
 rule generate_ratingsites:
     priority: 12
+    threads: 5
     input: 
         status=expand("{workDir}/generator-ok.txt", workDir=WORK_DIR),
         product=ancient(CONFIG["schema"]["product"]["export_output_dir"])
@@ -404,6 +421,7 @@ rule generate_ratingsites:
 
 rule generate_vendors:
     priority: 13
+    threads: 5
     input: 
         status=expand("{workDir}/generator-ok.txt", workDir=WORK_DIR),
         product=ancient(CONFIG["schema"]["product"]["export_output_dir"])
@@ -415,6 +433,7 @@ rule generate_vendors:
 
 rule generate_products:
     priority: 14
+    threads: 1
     input: expand("{workDir}/generator-ok.txt", workDir=WORK_DIR)
     output: directory(CONFIG["schema"]["product"]["export_output_dir"]), 
     shell: 'python rsfb/generate.py generate {CONFIGFILE} product {output}'

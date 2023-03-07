@@ -1,0 +1,41 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rev: <http://purl.org/stuff/rev#>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX dc: <http://purl.org/dc/elements/1.1/>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+
+SELECT DISTINCT ?bgp1 ?bgp2
+WHERE { 
+    ?localProduct rdf:type bsbm:Product .
+    # const ?ProductXYZ
+    ?localProduct owl:sameAs ?ProductXYZ .
+    ?localProduct rdfs:label ?productLabel .
+
+    OPTIONAL {
+        GRAPH ?bgp1 {
+            ?offer bsbm:product ?offerProduct .
+            ?offerProduct  owl:sameAs ?ProductXYZ .  
+            ?offer bsbm:price ?price .
+            ?offer bsbm:vendor ?vendor .
+            ?vendor rdfs:label ?vendorTitle .
+            ?vendor bsbm:country <http://downlode.org/rdf/iso-3166/countries#FR> .
+            ?offer bsbm:validTo ?date .
+
+            # const ?currentDate < ?date 
+            FILTER (?date > ?currentDate )
+        }
+    }
+    OPTIONAL {
+        GRAPH ?bgp2 {
+            ?review bsbm:reviewFor ?reviewProduct .
+            ?reviewProduct owl:sameAs ?ProductXYZ .
+            ?review rev:reviewer ?reviewer .
+            ?reviewer foaf:name ?revName .
+            ?review dc:title ?revTitle .
+            OPTIONAL { ?review bsbm:rating1 ?rating1 . }
+            OPTIONAL { ?review bsbm:rating2 ?rating2 . } 
+        }
+    }
+}

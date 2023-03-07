@@ -1,0 +1,20 @@
+{
+    "bgp1": [
+        "?localProduct owl:sameAs ?product",
+        "?localProduct rdfs:label ?label",
+        "?localProduct rdfs:comment ?comment",
+        "?localProduct bsbm:producer ?p",
+        "?p rdfs:label ?producer",
+        "?localProduct bsbm:productFeature ?localProductFeature1",
+        "?localProductFeature1 owl:sameAs ?ProductFeature1",
+        "?localProductFeature1 rdfs:label ?ProductFeatureLabel",
+        "?localProduct bsbm:productPropertyTextual1 ?propertyTextual1",
+        "?localProduct bsbm:productPropertyTextual2 ?propertyTextual2",
+        "?localProduct bsbm:productPropertyTextual3 ?propertyTextual3",
+        "?localProduct bsbm:productPropertyNumeric1 ?propertyNumeric1",
+        "?localProduct bsbm:productPropertyNumeric2 ?propertyNumeric2",
+        "?localProduct bsbm:productPropertyTextual4 ?propertyTextual4",
+        "?localProduct bsbm:productPropertyTextual5 ?propertyTextual5",
+        "?localProduct bsbm:productPropertyNumeric4 ?propertyNumeric4"
+    ]
+}

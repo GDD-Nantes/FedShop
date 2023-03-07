@@ -1,0 +1,9 @@
+PREFIX rev: <http://purl.org/stuff/rev#>
+
+SELECT DISTINCT ?bgp1
+WHERE { 
+    GRAPH ?bgp1 {
+        # const ?ReviewXYZ
+        ?ReviewXYZ rev:reviewer ?x 
+    }
+}

@@ -15,7 +15,7 @@ generation:
   virtuoso:
     compose_file: "${generation.workdir}/docker/virtuoso.yml"
     service_name: "bsbm-virtuoso"
-    endpoints: "${get_virtuoso_endpoints: ${generation.virtuoso.compose_file}, ${generation.virtuoso.service_name}}" 
+    endpoints: "${get_docker_endpoints: ${generation.virtuoso.compose_file}, ${generation.virtuoso.service_name}}" 
     container_names: "${get_virtuoso_containers: ${generation.virtuoso.compose_file}, ${generation.virtuoso.service_name}}" 
   schema:
     # Configuration for ONE batch
@@ -89,8 +89,15 @@ generation:
 
 evaluation:
   n_attempts: 4
+  timeout: 600
   engines:
-    ideal:
     fedx:
       dir: "engines/FedX/target"
-      timeout: 900
+    # fedx_ideal:
+    # arq:
+    #   dir: "engines/ARQ"
+    #   internal_endpoint_prefix: "http://host.docker.internal:8890/sparql/?default-graph-uri="
+    #   compose_file: "${generation.workdir}/docker/jena.yml"
+    #   service_name: "jena-fuseki"
+    #   endpoint: "http://localhost:3030/RSFB"
+    #   container_name: "docker-jena-fuseki-1"
