@@ -1,0 +1,9 @@
+[submodule "engines/Odyssey"]
+	path = engines/Odyssey
+	url = https://github.com/Yotlan/Odyssey.git
+[submodule "engines/CostFed"]
+	path = engines/CostFed
+	url = https://github.com/Yotlan/CostFed.git
+[submodule "engines/SPLENDID"]
+	path = engines/SPLENDID
+	url = https://github.com/Yotlan/SPLENDID.git
