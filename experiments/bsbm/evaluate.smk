@@ -116,7 +116,7 @@ def generate_federation_declaration(federation_declaration_file, engine, batch_i
         batch_files = ratingsite_data_files[:ratingsiteSliceId+1] + vendor_data_files[:vendorSliceId+1]
 
         activate_one_container(container_infos_file, LAST_BATCH)
-        shell(f"python rsfb/engines/{engine}.py generate-config-file {' '.join(batch_files)} {federation_declaration_file} --endpoint {sparql_endpoint}")
+        shell(f"python rsfb/engines/{engine}.py generate-config-file {' '.join(batch_files)} {federation_declaration_file} {CONFIGFILE} --endpoint {sparql_endpoint}")
 
 #=================
 # PIPELINE

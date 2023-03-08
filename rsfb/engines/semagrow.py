@@ -118,7 +118,14 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, en
         outfile (_type_): _description_
         endpoint (_type_): _description_
     """
-    pass
+    
+    config = load_config(eval_config)
+    app_dir = config["evaluation"]["engines"]["semagrow"]["dir"]
+    metadata_configfile = f"{app_dir}/metadata.ttl"
+    repository_configfile = f"{app_dir}/repository.ttl"
+    
+    with open("fdfs") as fs:
+        fs.write
 
 if __name__ == "__main__":
     cli()

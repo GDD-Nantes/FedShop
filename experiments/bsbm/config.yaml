@@ -93,6 +93,8 @@ evaluation:
   engines:
     fedx:
       dir: "engines/FedX/target"
+    semagrow:
+      dir: "engines/semagrow"
     # fedx_ideal:
     # arq:
     #   dir: "engines/ARQ"
