@@ -169,9 +169,10 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result,
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
+@click.argument("eval-config", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 @click.option("--endpoint", type=str, default="http://localhost:8890/sparql", help="URL to a SPARQL endpoint")
-@click.option("--configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False), default="experiments/bsbm/config.yaml")
-def generate_config_file(datafiles, outfile, endpoint, configfile):
+@click.pass_context
+def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, endpoint):
 
     # FedX config part
 
