@@ -8,7 +8,6 @@ import requests
 import subprocess
 import json
 import re
-from itertools import pairwise
 
 import sys
 smk_directory = os.path.abspath(workflow.basedir)
@@ -243,7 +242,15 @@ rule evaluate_engines:
         previous_batch = batch_id - 1
         same_file_previous_batch = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/results.txt"
         
-        if os.stat(same_file_previous_batch).st_size == 0 and batch_id > 0:
+        # Early stop if earlier attempts got timed out
+        canSkip = batch_id > 0 and os.stat(same_file_previous_batch).st_size == 0
+        for attempt in range(CONFIG_EVAL["n_attempts"]):
+            same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{attempt}/results.txt"
+            if os.path.exists(same_file_other_attempt) and os.stat(same_file_other_attempt).st_size == 0:
+                canSkip = True
+                break
+
+        if canSkip:
             print(f"Skip evaluation for this because {same_file_previous_batch} timed out")
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/query_plan.txt {output.query_plan}")

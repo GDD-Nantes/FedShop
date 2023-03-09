@@ -263,9 +263,12 @@ def inject_from_cache(queryfile, cache_file, outputfile):
             # Convert to n3 representation
             value = str2n3(value)
             prefix_full_to_alias = json.load(open(f"{Path(cache_file).parent}/prefix_cache.json", 'r'))
-            for prefixSub, prefixName in prefix_full_to_alias.items():
-                if prefixSub in value:
-                    value = re.sub(rf"<{prefixSub}(\w+)>", rf"{prefixName}:\1", value)
+            for prefix_full_name, prefix_alias in prefix_full_to_alias.items():
+                if prefix_full_name in value:
+                    value = re.sub(rf"<{prefix_full_name}(\w+)>", rf"{prefix_alias}:\1", value)
+                    missing_prefix = f"PREFIX {prefix_alias}: <{prefix_full_name}>"
+                    if re.search(re.escape(missing_prefix), query) is None:
+                        query = f"PREFIX {prefix_alias}: <{prefix_full_name}>" + "\n" + query
             
             query = re.sub(rf"{re.escape('?'+variable)}(\W)", rf"{value}\1", query)
         
