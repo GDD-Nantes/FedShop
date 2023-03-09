@@ -353,6 +353,21 @@ def load_config(filename, saveAs=None):
 
     return config
 
+def write_empty_stats(outfile, reason):
+    with open(outfile, "w") as fout:
+        fout.write("query,engine,instance,batch,attempt,exec_time,http_req\n")
+        if outfile != "/dev/null":
+            basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", outfile)
+            engine = basicInfos.group(1)
+            queryName = basicInfos.group(2)
+            instance = basicInfos.group(3)
+            batch = basicInfos.group(4)
+            attempt = basicInfos.group(5)
+            fout.write(",".join([queryName, engine, instance, batch, attempt, reason, reason])+"\n")
+                
+def write_empty_result(outfile):
+    Path(outfile).touch()
+
 def kill_process(proc_pid):
     try:
         process = psutil.Process(proc_pid)

@@ -12,7 +12,7 @@ from sklearn.preprocessing import LabelEncoder
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import kill_process, load_config, rsfb_logger, str2n3
+from utils import load_config, rsfb_logger, str2n3, write_empty_result, write_empty_stats
 logger = rsfb_logger(Path(__file__).name)
 
 @click.group
@@ -52,52 +52,31 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
     #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
     timeoutCmd = ""
     cmd = f'{timeoutCmd} java -classpath "{jar}:{lib}" org.example.FedX {args}'.strip()
-    
-    def write_empty_stats(reason):
-        with open(stats, "w") as fout:
-            fout.write("query,engine,instance,batch,attempt,exec_time,http_req\n")
-            if stats != "/dev/null":
-                basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
-                engine = basicInfos.group(1)
-                queryName = basicInfos.group(2)
-                instance = basicInfos.group(3)
-                batch = basicInfos.group(4)
-                attempt = basicInfos.group(5)
-                fout.write(",".join([queryName, engine, instance, batch, attempt, reason, reason])+"\n")
-                
-    def write_empty_result():
-        Path(out_result).touch()
 
     logger.debug("=== FedX ===")
     logger.debug(cmd)
     logger.debug("============")
     
     fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-    try: 
-        #output, error = fedx_proc.communicate(timeout=timeout)
-        # with open(result + ".log", "w") as watdivWriter:
-        #     for line in iter(fedx_proc.stderr.readline, b''):
-        #         watdivWriter.write(line.decode())
-        #     watdivWriter.close()  
-        
+    try:        
         fedx_proc.wait(timeout=timeout)
         #fedx_proc = subprocess.run(cmd, shell=True, timeout=timeout, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
         if fedx_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
             if os.stat(out_result).st_size == 0:
                 logger.error(f"{input.query} yield no results!")
-                write_empty_result()
+                write_empty_result(out_result)
                 raise RuntimeError(f"{input.query} yield no results!")
         else:
             logger.error(f"{query} reported error")    
-            write_empty_result()
-            write_empty_stats("error")                  
+            write_empty_result(out_result)
+            write_empty_stats(stats, "error")                  
             # raise RuntimeError(f"{query} reported error")
             
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
-        write_empty_stats("timeout")
-        write_empty_result()            
+        write_empty_stats(stats, "timeout")
+        write_empty_result(out_result)            
     finally:
         os.system('pkill -9 -f "FedX"')
         #kill_process(fedx_proc.pid)
