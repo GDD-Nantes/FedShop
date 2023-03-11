@@ -1,5 +1,7 @@
 #!/bin/sh
 
+find . ! -name 'setup.sh' -exec rm -rf {} +
+
 # Update below according to https://jena.apache.org/download/
 # and checksum for apache-jena-3.x.x.tar.gz.sha512
 JENA_SHA512="db8d05c28d890b5456f08e277d04c6b15fa10c20740430ce60de38689ff136e21a3b1cce298cd429c21b7af0a0a858080880b3fee0e121d9b68801e0b67ec51b"

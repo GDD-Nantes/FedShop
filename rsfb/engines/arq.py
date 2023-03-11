@@ -17,7 +17,7 @@ from rdflib import URIRef
 import requests
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import load_config, rsfb_logger
+from utils import load_config, rsfb_logger, str2n3, write_empty_result, write_empty_stats
 from query import exec_query_on_endpoint
 
 logger = rsfb_logger(Path(__file__).name)
@@ -52,13 +52,13 @@ def prerequisites(ctx: click.Context, eval_config):
     os.system("sh setup.sh")
     os.chdir(current_pwd)
     
-    # Start fuseki server
-    compose_file = config["evaluation"]["engines"]["arq"]["compose_file"]
-    os.system(f"docker-compose -f {compose_file} up --force-recreate jena-fuseki")
+    # # Start fuseki server
+    # compose_file = config["evaluation"]["engines"]["arq"]["compose_file"]
+    # os.system(f"docker-compose -f {compose_file} up -d --force-recreate jena-fuseki")
 
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("engine-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.argument("engine-config", type=click.Path(exists=False, file_okay=True, dir_okay=True)) # Engine config is not needed
 @click.argument("query", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.option("--out-result", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
 @click.option("--out-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
@@ -93,7 +93,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     
     config = load_config(eval_config)
     internal_endpoint_prefix=str(config["evaluation"]["engines"]["arq"]["internal_endpoint_prefix"])
-    endpoint = re.search(r":(\d+)", config["generation"]["virtuoso"]["endpoints"][batch_id]).group(1)
+    endpoint = re.search(r":(\d+)", config["generation"]["virtuoso"]["endpoints"][-1]).group(1)
     internal_endpoint_prefix=internal_endpoint_prefix.replace("8890", endpoint, 1)
     
     source_selection_combinations = source_selection_df \
@@ -143,36 +143,49 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
             arq_proc = subprocess.run(explain_cmd, shell=True, capture_output=True)
             if arq_proc.returncode == 0:
-                query_plan_fs.write(arq_proc.stdout.decode())
+                query_plan_fs.write(arq_proc.stderr.decode())
             else:
                 raise RuntimeError("ARQ explain reported error!")
    
         # Execute results
         endpoint = config["evaluation"]["engines"]["arq"]["endpoint"]
         timeout = config["evaluation"]["timeout"]
-        exec_time = None
         http_req = "N/A"
-        result = None
+        startTime = time.time()
         
-        try:
-            startTime = time.time()
-            _, result = exec_query_on_endpoint(out_query_text, endpoint=endpoint, error_when_timeout=True, timeout=timeout)
-            endTime = time.time()
-            exec_time = (endTime-startTime)*1e3
-        except:
-            exec_time = "timeout"
-            http_req = "timeout"
+        arq = f'{config["evaluation"]["engines"]["arq"]["dir"]}/jena/bin/arq'
+        exec_cmd = f"{arq} --query {service_query_file} --results=CSV > {out_result}"
+            
+        logger.debug("==== ARQ EXEC ====")
+        logger.debug(exec_cmd)
+        logger.debug("==================")
+            
+        arq_proc = subprocess.Popen(exec_cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+        # arq_proc.wait(timeout=timeout)
+        try: 
+            arq_proc.wait(timeout=timeout)
+            if arq_proc.returncode == 0:
+                logger.info(f"{query} benchmarked sucessfully")
+                if os.stat(out_result).st_size == 0:
+                    logger.error(f"{query} yield no results!")
+                    write_empty_result(out_result)
+                    raise RuntimeError(f"{query} yield no results!")
+            else:
+                logger.error(f"{query} reported error")    
+                write_empty_result(out_result)
+                write_empty_stats(stats, "error")                  
+                # raise RuntimeError(f"{query} reported error")
+                
+        except subprocess.TimeoutExpired: 
+            logger.exception(f"{query} timed out!")
+            write_empty_stats(stats, "timeout")
+            write_empty_result(out_result)            
         
-        # Write results
-        if result is not None:
-            with BytesIO(result) as header_stream, BytesIO(result) as data_stream: 
-                header = header_stream.readline().decode().strip().replace('"', '').split(",")
-                csvOut = pd.read_csv(data_stream, parse_dates=[h for h in header if "date" in h])
-                csvOut.to_csv(out_result, index=False)
-        else:
-            Path(out_result).touch()
+        endTime = time.time()
+        exec_time = (endTime-startTime)*1e3
         
         # Write stats
+        logger.info(f"Writing stats to {stats}")
         with open(stats, "w") as stats_fs:
             stats_fs.write("query,engine,instance,batch,attempt,exec_time,http_req\n")
             basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
@@ -181,7 +194,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             instance = basicInfos.group(3)
             batch = basicInfos.group(4)
             attempt = basicInfos.group(5)
-            stats_fs.write(",".join([queryName, engine, instance, batch, attempt, exec_time, http_req])+"\n") 
+            stats_fs.write(",".join([queryName, engine, instance, batch, attempt, str(exec_time), str(http_req)])+"\n") 
         
         # Write output source selection
         os.system(f"cp {force_source_selection} {out_source_selection}")
@@ -198,7 +211,7 @@ def transform_results(ctx: click.Context, infile, outfile):
         infile (_type_): Path to engine result file
         outfile (_type_): Path to the csv file
     """
-    pass
+    os.system(f"cp {infile} {outfile}")
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
@@ -214,8 +227,8 @@ def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
         outfile (_type_): _description_
         prefix_cache (_type_): _description_
     """
-    pass
-
+    os.system(f"cp {infile} {outfile}")
+    
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))

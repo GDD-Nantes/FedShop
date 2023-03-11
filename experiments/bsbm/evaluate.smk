@@ -13,7 +13,7 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import load_config, get_docker_endpoint_by_container_name, check_container_status
+from utils import rsfb_logger, load_config, get_docker_endpoint_by_container_name, check_container_status, write_empty_result, write_empty_stats
 
 #===============================
 # EVALUATION PHASE:
@@ -49,6 +49,8 @@ MODEL_DIR = f"{WORK_DIR}/model"
 BENCH_DIR = f"{WORK_DIR}/benchmark/evaluation"
 TEMPLATE_DIR = f"{MODEL_DIR}/watdiv"
 
+LOGGER = rsfb_logger(__file__)
+
 #=================
 # USEFUL FUNCTIONS
 #=================
@@ -58,14 +60,14 @@ def wait_for_container(endpoints, outfile, wait=1):
         endpoints = [ endpoints ]
     endpoint_ok = 0
     attempt=1
-    print(f"Waiting for all endpoints...")
+    logger.info(f"Waiting for all endpoints...")
     while(endpoint_ok < len(endpoints)):
-        print(f"Attempt {attempt} ...")
+        logger.info(f"Attempt {attempt} ...")
         try:
             for endpoint in endpoints:
                 status = requests.get(endpoint).status_code
                 if status == 200:
-                    print(f"{endpoint} is ready!")
+                    logger.info(f"{endpoint} is ready!")
                     endpoint_ok += 1   
         except: pass
         attempt += 1
@@ -86,10 +88,10 @@ def activate_one_container(container_infos_file, batch_id):
         deploy_virtuoso(container_infos_file, restart=True)
 
     if container_status != "running":
-        print("Stopping all containers...")
+        logger.info("Stopping all containers...")
         shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} stop {SPARQL_SERVICE_NAME}")
             
-        print(f"Starting container {container_name}...")
+        logger.info(f"Starting container {container_name}...")
         shell(f"docker start {container_name}")
         container_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
         wait_for_container(container_endpoint, f"{BENCH_DIR}/virtuoso-ok.txt", wait=1)
@@ -104,7 +106,7 @@ def generate_federation_declaration(federation_declaration_file, engine, batch_i
             is_endpoint_updated = search_string not in f.read()
 
     if is_endpoint_updated or not is_file_exists:
-        print(f"Rewriting {engine} configfile as it is updated!")
+        logger.info(f"Rewriting {engine} configfile as it is updated!")
         container_infos_file = f"{WORK_DIR}/benchmark/generation/container_infos.csv"
         ratingsite_data_files = [ f"{MODEL_DIR}/dataset/ratingsite{i}.nq" for i in range(N_RATINGSITE) ]
         vendor_data_files = [ f"{MODEL_DIR}/dataset/vendor{i}.nq" for i in range(N_VENDOR) ]
@@ -204,10 +206,13 @@ rule transform_results:
                 .reset_index(drop=True) 
 
             if not expected_results.equals(engine_results):
-                print(expected_results)
-                print("not equals to")
-                print(engine_results)
-                raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
+                logger.debug(expected_results)
+                logger.debug("not equals to")
+                logger.debug(engine_results)
+
+                write_empty_result(str(output))
+                write_empty_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
+                logger.error(f"{wildcards.engine} does not produce the expected results")
 
 rule evaluate_engines:
     """Evaluate queries using each engine's source selection on FedX.
@@ -215,13 +220,13 @@ rule evaluate_engines:
     - Output: only statistics, no source-seleciton
     """
     threads: 1
-    retries: 1
+    #retries: 1
     input: 
         query=ancient(expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/injected.sparql", workDir=WORK_DIR)),
         engine_source_selection=ancient(expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/batch_{{batch_id}}/provenance.csv", workDir=WORK_DIR)),
         virtuoso_last_batch=ancient(expand("{workDir}/benchmark/generation/virtuoso_batch{batch_n}-ok.txt", workDir=WORK_DIR, batch_n=N_BATCH-1)),
-        engine_status="{benchDir}/{engine}/{engine}-ok.txt",
-        container_infos=expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR)
+        engine_status=ancient("{benchDir}/{engine}/{engine}-ok.txt"),
+        container_infos=ancient(expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR))
     output: 
         stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/stats.csv",
         query_plan="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/query_plan.txt",
@@ -245,14 +250,17 @@ rule evaluate_engines:
         # Early stop if earlier attempts got timed out
         canSkip = batch_id > 0 and os.stat(same_file_previous_batch).st_size == 0
         for attempt in range(CONFIG_EVAL["n_attempts"]):
-            same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{attempt}/results.txt"
+            same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{batch_id}/attempt_{attempt}/results.txt"
+            logger.info(f"Checking {same_file_other_attempt} ...")
             if os.path.exists(same_file_other_attempt) and os.stat(same_file_other_attempt).st_size == 0:
                 canSkip = True
                 break
 
         if canSkip:
-            print(f"Skip evaluation for this because {same_file_previous_batch} timed out")
-            shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
+            logger.info(f"Skip evaluation for this because {same_file_previous_batch} timed out")
+            previous_reason = str(output.stats) | cat() | find_first_pattern([r"(error.*|timeout)"])
+            write_empty_stats(str(output.stats), previous_reason)
+            #shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/query_plan.txt {output.query_plan}")
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/source_selection.txt {output.source_selection}")
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/results.txt {output.result_txt}")

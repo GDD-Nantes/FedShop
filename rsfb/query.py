@@ -45,7 +45,7 @@ def lang_detect(txt):
 
 def exec_query_on_endpoint(query, endpoint, error_when_timeout, timeout = None):
     sparql_endpoint = SPARQLWrapper(endpoint)
-    if timeout is not None or error_when_timeout: 
+    if error_when_timeout and timeout is not None: 
         sparql_endpoint.setTimeout(int(timeout))
 
     sparql_endpoint.setMethod("POST")
@@ -275,7 +275,9 @@ def inject_from_cache(queryfile, cache_file, outputfile):
         query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(str(\2)),", query)
         query = re.sub(r"(#)*(FILTER\s*\(\!bound)", r"\2", query)
         query = re.sub(r"#*(DEFINE|OFFSET)", r"##\1", query)
-        query = re.sub(r"#*(ORDER|LIMIT)", r"\1", query)
+        
+        if "provenance" in queryfile:
+            query = re.sub(r"#*(ORDER|LIMIT)", r"##\1", query)
             
         with open(outputfile, "w") as f:
             f.write(query)
