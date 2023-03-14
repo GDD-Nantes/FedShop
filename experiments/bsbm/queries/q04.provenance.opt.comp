@@ -8,8 +8,9 @@
         "?product bsbm:productFeature ?localProductFeature2",
         "?localProductFeature2 owl:sameAs ?ProductFeature2",
         "?product bsbm:productPropertyTextual1 ?propertyTextual",
-        "?product bsbm:productPropertyNumeric1 ?p1",
-        
+        "?product bsbm:productPropertyNumeric1 ?p1"
+    ],
+    "bgp2": [  
         "?product rdfs:label ?label",
         "?product rdf:type ?localProductType",
         "?localProductType owl:sameAs ?ProductType",

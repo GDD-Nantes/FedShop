@@ -20,3 +20,4 @@ img2unicode[n2]
 statsmodels==0.13.0
 numpy==1.22.0
 colorlog==6.7.0
+python-textops3==3.2.1

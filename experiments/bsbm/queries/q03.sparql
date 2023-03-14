@@ -27,6 +27,8 @@ WHERE {
         ?localProductFeature2 owl:sameAs ?ProductFeature2 .
         ?localProduct rdfs:label ?testVar 
     }
+
+    # @skip
     FILTER (!bound(?testVar)) 
 }
 ORDER BY ?label

@@ -12,7 +12,7 @@ import re
 import numpy as np
 import pandas as pd
 from SPARQLWrapper import SPARQLWrapper, CSV, DESCRIBE
-from io import BytesIO, StringIO
+from io import BytesIO, StringIO, TextIOWrapper
 from rdflib import Literal, URIRef, XSD
 import click
 
@@ -44,6 +44,18 @@ def lang_detect(txt):
     return result
 
 def exec_query_on_endpoint(query, endpoint, error_when_timeout, timeout = None):
+    """Send a query to ANY endpoint
+
+    Args:
+        query (_type_): _description_
+        endpoint (_type_): _description_
+        error_when_timeout (_type_): _description_
+        timeout (_type_, optional): _description_. Defaults to None.
+
+    Returns:
+        _type_: _description_
+    """
+    
     sparql_endpoint = SPARQLWrapper(endpoint)
     if error_when_timeout and timeout is not None: 
         sparql_endpoint.setTimeout(int(timeout))
@@ -57,12 +69,122 @@ def exec_query_on_endpoint(query, endpoint, error_when_timeout, timeout = None):
     
 
 def exec_query(configfile, query, batch_id, error_when_timeout=False):
+    """Send a query to an endpoint of certain batch and return results
+
+    Args:
+        configfile (_type_): _description_
+        query (_type_): _description_
+        batch_id (_type_): _description_
+        error_when_timeout (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        _type_: _description_
+    """
     config = load_config(configfile)["generation"]
     endpoint = config["virtuoso"]["endpoints"][batch_id]
     return exec_query_on_endpoint(query, endpoint, error_when_timeout)
-    
 
-def __parse_query(queryfile) -> Tuple[Dict[str, str], Dict[str, Dict]]:
+def __parse_query(io: TextIOWrapper) -> Tuple[Dict, Dict]:
+    """Parse an input query and returns (1) prefix composition, (2) ordered parse tree for placeholders
+
+    Args:
+        io (TextIOWrapper): _description_
+
+    Returns:
+        Tuple[Dict, Dict]: _description_
+    """
+    
+    parse_result = dict()
+    prefix_full_to_alias = dict()
+    prefix_full_to_alias["http://www.w3.org/2001/XMLSchema#"] = "xsd"
+    prefix_full_to_alias["http://www.w3.org/2002/07/owl#"] = "owl"
+    
+    lines = io.readlines()
+    parse_result["@skip"] = []
+    for line_id, line in enumerate(lines):
+            
+        if line in parse_result["@skip"]: continue
+            
+        toks = np.array(re.split(r"\s+", line))
+        if "#" in toks:
+            exclusive = False
+            priority_level = 0
+            
+            if "@skip" in toks:
+                parse_result["@skip"].append(lines[line_id+1])
+
+            elif (comp := re.search(r"const([\*\!]*)\s+(\?\w+)\s+(\W+|\w+)\s+((\?\w+|\w+:\w+)(,\s*(\?\w+|\w+:\w+))*)", line)) is not None:
+                op = comp.group(3)
+                left = comp.group(2)
+
+                priority = comp.group(1)
+                if priority is not None:
+                    priority_level = priority.count("*")
+                    exclusive = ("!" in priority)
+
+                deps = re.split(r",\s*", comp.group(4))
+
+                right = deps[0]
+                if op == "$!":
+                    right = deps.pop(0)
+                elif op == "!=":
+                    right = left
+
+                parse_result[left] = {
+                    "priority": priority_level,
+                    "exclusive": exclusive,
+                    "type": "comparison",
+                    "src": right,
+                    "op": op,
+                    "op_kind": "binary",
+                    "extras": deps
+                }
+
+            elif (assertion := re.search(r"const([\*\!]*)\s+(not)\s+(\?\w+)", line)) is not None:
+                op = assertion.group(2)
+                left = assertion.group(3)
+
+                priority = assertion.group(1)
+                if priority is not None:
+                    priority_level = priority.count("*")
+                    exclusive = ("!" in priority)
+
+                parse_result[left] = {
+                    "priority": priority_level,
+                    "exclusive": exclusive,
+                    "type": "assertion",
+                    "op": op,
+                    "op_kind": "unary"
+                }
+            else:
+                const_search = re.search(r"const([\*\!]*)\s+(\?\w+)", line)
+                if const_search is not None:
+                    left = const_search.group(2)
+
+                    priority = const_search.group(1)
+                    if priority is not None:
+                        priority_level = priority.count("*")
+                        exclusive = ("!" in priority)
+
+                    parse_result[left] = {
+                        "priority": priority_level,
+                        "exclusive": exclusive,
+                        "type": None
+                    }
+            continue
+
+        elif "PREFIX" in toks:
+            regex = r"PREFIX\s+([\w\-]+):\s*<(.*)>\s*"
+            alias = re.search(regex, line).group(1)
+            full_name = re.search(regex, line).group(2)
+            prefix_full_to_alias[full_name] = alias
+
+    # Order the parse tree by placeholder priority
+    parse_result = dict(sorted(parse_result.items(),
+                        key=lambda item: 0 if item[0] == "@skip" else item[1]["priority"], reverse=True))
+    return prefix_full_to_alias, parse_result
+
+def __parse_query_from_file(queryfile) -> Tuple[Dict[str, str], Dict[str, Dict]]:
     """Parse input queryfile into get placeholders
 
     Args:
@@ -71,90 +193,23 @@ def __parse_query(queryfile) -> Tuple[Dict[str, str], Dict[str, Dict]]:
     Returns:
         _type_: subDict containing constant, their depending contants and a prefix dictionary
     """
-    parse_result = dict()
-    prefix_full_to_alias = dict()
-    prefix_full_to_alias["http://www.w3.org/2001/XMLSchema#"] = "xsd"
-    prefix_full_to_alias["http://www.w3.org/2002/07/owl#"] = "owl"
+    
 
     with open(queryfile, mode="r") as qfs:
-        for line in qfs.readlines():
-            toks = np.array(re.split(r"\s+", line))
-            if "#" in toks:
-                exclusive = False
-                priority_level = 0
-
-                if (comp := re.search(r"const([\*\!]*)\s+(\?\w+)\s+(\W+|\w+)\s+((\?\w+|\w+:\w+)(,\s*(\?\w+|\w+:\w+))*)", line)) is not None:
-                    op = comp.group(3)
-                    left = comp.group(2)
-
-                    priority = comp.group(1)
-                    if priority is not None:
-                        priority_level = priority.count("*")
-                        exclusive = ("!" in priority)
-
-                    deps = re.split(r",\s*", comp.group(4))
-
-                    right = deps[0]
-                    if op == "$!":
-                        right = deps.pop(0)
-                    elif op == "!=":
-                        right = left
-
-                    parse_result[left] = {
-                        "priority": priority_level,
-                        "exclusive": exclusive,
-                        "type": "comparison",
-                        "src": right,
-                        "op": op,
-                        "op_kind": "binary",
-                        "extras": deps
-                    }
-
-                elif (assertion := re.search(r"const([\*\!]*)\s+(not)\s+(\?\w+)", line)) is not None:
-                    op = assertion.group(2)
-                    left = assertion.group(3)
-
-                    priority = assertion.group(1)
-                    if priority is not None:
-                        priority_level = priority.count("*")
-                        exclusive = ("!" in priority)
-
-                    parse_result[left] = {
-                        "priority": priority_level,
-                        "exclusive": exclusive,
-                        "type": "assertion",
-                        "op": op,
-                        "op_kind": "unary"
-                    }
-                else:
-                    const_search = re.search(r"const([\*\!]*)\s+(\?\w+)", line)
-                    if const_search is not None:
-                        left = const_search.group(2)
-
-                        priority = const_search.group(1)
-                        if priority is not None:
-                            priority_level = priority.count("*")
-                            exclusive = ("!" in priority)
-
-                        parse_result[left] = {
-                            "priority": priority_level,
-                            "exclusive": exclusive,
-                            "type": None
-                        }
-                continue
-
-            elif "PREFIX" in toks:
-                regex = r"PREFIX\s+([\w\-]+):\s*<(.*)>\s*"
-                alias = re.search(regex, line).group(1)
-                full_name = re.search(regex, line).group(2)
-                prefix_full_to_alias[full_name] = alias
-
-        parse_result = dict(sorted(parse_result.items(),
-                            key=lambda item: item[1]["priority"], reverse=True))
-        return prefix_full_to_alias, parse_result
+        return __parse_query(qfs)
+        
 
 def __get_uninjected_placeholders(queryfile, exclusive=False):
-    _, parse_result = __parse_query(queryfile)       
+    """Returns a set of available placeholders (not yet injected).
+
+    Args:
+        queryfile (_type_): input queryfile to read from.
+        exclusive (bool, optional): If set to True, only return constants that require to be injected exclusively. If False, return all placeholders. Defaults to False.
+
+    Returns:
+        _type_: a set of available placeholders (not yet injected)
+    """
+    _, parse_result = __parse_query_from_file(queryfile)       
     
     consts = set()
     for const, resource in parse_result.items():
@@ -237,17 +292,49 @@ def build_value_selection_query(queryfile, outfile):
     if len(consts) == 0:
         consts = __get_uninjected_placeholders(queryfile, exclusive=False)
     logger.debug(consts)
-
+    
     with open(queryfile, "r") as qf:
         query = qf.read()
         query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {' '.join(consts)} WHERE", query)
         #query = re.sub(r"((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(<\S+>))", r"##\1", query)
-        query = re.sub(r"(#)*(LIMIT|FILTER\s+|OFFSET|ORDER)", r"##\2", query)
-
-        with open(outfile, "w") as out:
-            out.write(query)
+        query = re.sub(r"(#)*(LIMIT|FILTER|OFFSET|ORDER)", r"##\2", query)
+            
+        write_query(query, outfile)
 
         return query
+    
+def write_query(query, outfile):
+    """Restore lines marked with "@skip", rewrite "ORDER BY" and export a query into a file. 
+
+    Args:
+        query (_type_): the content
+        outfile (_type_): the output file
+
+    Returns:
+        _type_: the input query
+    """
+    
+    _, parse_result = __parse_query(StringIO(query))
+    
+    # Restore every disabled line if marked
+    for skipline in parse_result["@skip"]:
+        query = re.sub(rf"(#)*({re.escape(skipline)})", r"\2", query)
+    
+    # If there is a ORDER BY, make it ORDER BY (all projected columns)
+    if "ORDER BY" in query:
+        if (projection_search := re.search(r"SELECT([\S\s]+)WHERE", query)) is not None:
+            projection = re.findall(r"\?\w+", projection_search.group(1).strip())
+            
+            if projection == "*":
+                projection = re.findall(r"\?\w+", query)
+            
+            query = re.sub(r"ORDER BY(.*)", f"ORDER BY {' '.join(projection)}", query)
+                    
+        
+    with open(outfile, "w") as out_fs:
+        out_fs.write(query)
+    
+    return query
 
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
@@ -273,15 +360,12 @@ def inject_from_cache(queryfile, cache_file, outputfile):
             query = re.sub(rf"{re.escape('?'+variable)}(\W)", rf"{value}\1", query)
         
         query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(str(\2)),", query)
-        query = re.sub(r"(#)*(FILTER\s*\(\!bound)", r"\2", query)
         query = re.sub(r"#*(DEFINE|OFFSET)", r"##\1", query)
-        
+                
         if "provenance" in queryfile:
             query = re.sub(r"#*(ORDER|LIMIT)", r"##\1", query)
-            
-        with open(outputfile, "w") as f:
-            f.write(query)
-            f.close()
+                        
+        write_query(query, outputfile)
 
 @cli.command()
 @click.argument("queryfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
@@ -327,10 +411,13 @@ def inject_constant(queryfile, value_selection, ignore_errors, instance_id):
         placeholder_chosen_values = value_selection_values
         placeholder_chosen_values_idx = instance_id
         
-        prefix_full_to_alias, parse_result = __parse_query(queryfile)
+        prefix_full_to_alias, parse_result = __parse_query_from_file(queryfile)
         prefix_alias_to_full = {v: k for k, v in prefix_full_to_alias.items()}
         
-        for const, resource in parse_result.items():                
+        for const, resource in parse_result.items():
+            
+            if const == "@skip": continue
+                            
             # Replace all tokens in subDict
             isOpUnary = (resource["type"] is None or resource.get("src") is None)
             left = right = const[1:] if isOpUnary else resource.get("src")[1:]        
@@ -574,9 +661,9 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
                         logger.debug("Option 3: Relax the query knowing there is NO solution mapping for given combination of placeholders")
                         logger.debug("Relaxing query...")
                         relaxed_query = re.sub(r"(#)*((\?\w+|\w+:\w+|<\S+>)\s+(\?\w+|a|\w+:\w+|<\S+>)\s+(\w+:\w+|<\S+>)\s*\.)", r"##\2", query)
-                        with open(next_queryfile, "w") as f:
-                            f.write(relaxed_query)
-
+                        
+                        query = write_query(relaxed_query, next_queryfile)
+                        
                         next_value_selection = f"{qroot}/{qname}.csv"
                         ctx.invoke(execute_query, configfile=configfile, queryfile=next_queryfile, outfile=next_value_selection, batch_id=0, dropna=True)
                         relaxed_query, injection_cache = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=False)
@@ -586,23 +673,20 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
                     #   raise RuntimeError("Cannot instancitate this workload. Either (1) Delete workload_value_selection.csv and retry. (2) Rewrite bounded tps into hard FILTER")
             
             # Remove from set injected consts
-            with open(next_queryfile, "w") as f:
-                query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {' '.join([c for c in consts if c[1:] not in injection_cache.keys()])}\nWHERE", query)
-                query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(str(\2)),", query)
-                query = re.sub(r"(#)*(FILTER\s*\(\!bound)", r"\2", query)
-                logger.debug(next_queryfile)
-                logger.debug(query)
-                f.write(query)
-                #raise ValueError("LOL")
+            query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {' '.join([c for c in consts if c[1:] not in injection_cache.keys()])}\nWHERE", query)
+            query = re.sub(r"(regex|REGEX)\s*\(\s*(\?\w+)\s*,", r"\1(lcase(str(\2)),", query)
+            logger.debug(next_queryfile)
+            logger.debug(query)
+            
+            query = write_query(query, next_queryfile)
             
             initial_queryfile = next_queryfile
             consts = __get_uninjected_placeholders(initial_queryfile)
             itr+=1
         
-        query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {select} WHERE", query)
-        query = re.sub(r"(#)*(LIMIT|FILTER\s+|ORDER)", r"\2", query)
-        with open(next_queryfile, "w") as f:
-            f.write(query)
+        # Restore the original select
+        query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {select} WHERE", query)        
+        write_query(query, next_queryfile)
 
 @cli.command
 @click.argument("provenance", type=click.Path(exists=True, file_okay=True, dir_okay=False))
@@ -679,7 +763,7 @@ def build_provenance_query(queryfile, outfile):
 
     with open(queryfile, "r") as qfs:
         query = qfs.read()
-        prefix_full_to_alias, _ = __parse_query(queryfile)
+        prefix_full_to_alias, _ = __parse_query_from_file(queryfile)
         ss_cache = []
 
         # Wrap each tp with GRAPH clause
@@ -726,12 +810,13 @@ def build_provenance_query(queryfile, outfile):
         #   - There should be duplicated results for query B 
         graph_proj = ' '.join([ f"(STR(?tp{i}) AS ?tp{i})" for i in np.arange(1, ntp+1) ])
         
-        with open(outfile, mode="w") as out:
-            query = queryHeader + queryBody
-            query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {graph_proj} WHERE", query)
-            # Disable filters
-            query = re.sub(r"(#)*(LIMIT|OFFSET|ORDER)", r"##\2", query)
-            out.write(query)
+        
+        query = queryHeader + queryBody
+        query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {graph_proj} WHERE", query)
+        # Disable filters
+        query = re.sub(r"(#)*(LIMIT|OFFSET|ORDER)", r"##\2", query)
+        
+        write_query(query, outfile)
         
         with open(f"{outfile}.comp", mode="w") as composition_fs:
             json.dump(composition, composition_fs)
@@ -793,7 +878,7 @@ def build_optimized_query(queryfile, source_selection, outfile, use_service):
 
     with open(queryfile, "r") as qfs:
         query = qfs.read()
-        prefix_full_to_alias, _ = __parse_query(queryfile)
+        prefix_full_to_alias, _ = __parse_query_from_file(queryfile)
         ss_cache = []
 
         # Wrap each tp with GRAPH clause
@@ -844,12 +929,12 @@ def build_optimized_query(queryfile, source_selection, outfile, use_service):
         #   - There should be duplicated results for query B 
         graph_proj = ' '.join([ f"(STR(?tp{i}) AS ?tp{i})" for i in np.arange(1, ntp+1) ])
         
-        with open(outfile, mode="w") as out:
-            query = queryHeader + queryBody
-            query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {graph_proj} WHERE", query)
-            # Disable filters
-            query = re.sub(r"(#)*(LIMIT|OFFSET|ORDER)", r"##\2", query)
-            out.write(query)
+        query = queryHeader + queryBody
+        query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", f"SELECT DISTINCT {graph_proj} WHERE", query)
+        # Disable filters
+        query = re.sub(r"(#)*(LIMIT|OFFSET|ORDER)", r"##\2", query)
+        
+        write_query(query, outfile)
         
         with open(f"{outfile}.comp", mode="w") as composition_fs:
             json.dump(composition, composition_fs)
@@ -897,7 +982,7 @@ def create_workload_value_selection(queryfile, value_selection, workload_value_s
         
         workload = value_selection_values.query(query)
         
-    _, parse_result = __parse_query(queryfile)
+    _, parse_result = __parse_query_from_file(queryfile)
     filter_query_clauses = []
 
     for const, resource in parse_result.items():                

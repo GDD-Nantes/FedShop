@@ -3,10 +3,10 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
-SELECT DISTINCT ?bgp1
+SELECT DISTINCT ?bgp1 ?bgp2
 WHERE {
-    GRAPH ?bgp1 {
-        { 
+    {
+        GRAPH ?bgp1 { 
             ?product rdfs:label ?label .
             # const!* ?ProductType
             ?product rdf:type ?localProductType .
@@ -21,7 +21,9 @@ WHERE {
             ?product bsbm:productPropertyNumeric1 ?p1 .
             # const** ?x < ?p1
             FILTER ( ?p1 > ?x )
-        } UNION {
+        } 
+    } UNION {
+        GRAPH ?bgp2 {
             ?product rdfs:label ?label .
             # const!* ?ProductType
             ?product rdf:type ?localProductType .

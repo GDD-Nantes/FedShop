@@ -7,6 +7,7 @@ import org.eclipse.rdf4j.federated.repository.FedXRepository;
 import org.eclipse.rdf4j.federated.monitoring.MonitoringUtil;
 import org.eclipse.rdf4j.federated.monitoring.QueryPlanLog;
 import org.eclipse.rdf4j.query.BindingSet;
+import org.eclipse.rdf4j.query.QueryInterruptedException;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
@@ -19,12 +20,14 @@ import com.opencsv.CSVWriter;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.TimeoutException;
 
 public class FedX {
     // private static final Logger log = LoggerFactory.getLogger(FedX.class);
@@ -77,10 +80,11 @@ public class FedX {
         String outSourceSelectionPath = args[3];
         String outQueryPlanFile = args[4];
         String statPath = args[5];
+        Integer timeout = Integer.parseInt(args[6]);
         String inSourceSelectionPath = "";
 
-        if (args.length == 7) {
-            inSourceSelectionPath = args[6];
+        if (args.length == 8) {
+            inSourceSelectionPath = args[7];
             parseSourceSelection(inSourceSelectionPath);
         }
 
@@ -100,7 +104,7 @@ public class FedX {
                         .withJoinWorkerThreads(30)
                         .withUnionWorkerThreads(30)
                         .withBoundJoinBlockSize(30)
-                        .withEnforceMaxQueryTime(0))
+                        .withEnforceMaxQueryTime(timeout))
                 .withMembers(dataConfig)
                 .create();
 
@@ -157,9 +161,13 @@ public class FedX {
                         }
                     }
                 }
+            } catch (QueryInterruptedException exception) {
+                writeEmptyStats(statPath, "timeout");
             }
 
             MonitoringUtil.printMonitoringInformation(repo.getFederationContext());
+        } finally {
+            repo.shutDown();
         }
 
         endTime = System.currentTimeMillis();
@@ -180,10 +188,6 @@ public class FedX {
                     CSVWriter.DEFAULT_ESCAPE_CHARACTER,
                     CSVWriter.DEFAULT_LINE_END);
 
-            // resultPath:
-            // .../{engine}/{query}/{instance_id}/batch_{batch_id}/default/results
-            // research in reverse order
-
             Pattern pattern = Pattern
                     .compile(".*/(\\w+)/(q\\w+)/instance_(\\d+)/batch_(\\d+)/attempt_(\\d+)/stats.csv");
             Matcher basicInfos = pattern.matcher(statPath);
@@ -201,8 +205,38 @@ public class FedX {
             statWriter.writeNext(content);
             statWriter.close();
         }
+    }
 
-        repo.shutDown();
+    private static void writeEmptyStats(String statPath, String reason) throws IOException {
+        if (!statPath.equals("/dev/null")) {
+            File statFile = new File(statPath);
+            if (statFile.getParentFile() != null) {
+                statFile.getParentFile().mkdirs();
+            }
+            statFile.createNewFile();
 
+            CSVWriter statWriter = new CSVWriter(
+                    new FileWriter(statFile), ',',
+                    CSVWriter.NO_QUOTE_CHARACTER,
+                    CSVWriter.DEFAULT_ESCAPE_CHARACTER,
+                    CSVWriter.DEFAULT_LINE_END);
+
+            Pattern pattern = Pattern
+                    .compile(".*/(\\w+)/(q\\w+)/instance_(\\d+)/batch_(\\d+)/attempt_(\\d+)/stats.csv");
+            Matcher basicInfos = pattern.matcher(statPath);
+            basicInfos.find();
+            String engine = basicInfos.group(1);
+            String query = basicInfos.group(2);
+            String instance = basicInfos.group(3);
+            String batch = basicInfos.group(4);
+            String attempt = basicInfos.group(5);
+
+            String[] header = { "query", "engine", "instance", "batch", "attempt", "exec_time", "http_req" };
+            statWriter.writeNext(header);
+
+            String[] content = { query, engine, instance, batch, attempt, reason, reason };
+            statWriter.writeNext(content);
+            statWriter.close();
+        }
     }
 }

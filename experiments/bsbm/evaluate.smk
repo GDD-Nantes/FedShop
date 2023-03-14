@@ -8,6 +8,7 @@ import requests
 import subprocess
 import json
 import re
+from textops import cat, find_first_pattern
 
 import sys
 smk_directory = os.path.abspath(workflow.basedir)
@@ -49,7 +50,7 @@ MODEL_DIR = f"{WORK_DIR}/model"
 BENCH_DIR = f"{WORK_DIR}/benchmark/evaluation"
 TEMPLATE_DIR = f"{MODEL_DIR}/watdiv"
 
-LOGGER = rsfb_logger(__file__)
+LOGGER = rsfb_logger(Path(__file__).name)
 
 #=================
 # USEFUL FUNCTIONS
@@ -235,6 +236,7 @@ rule evaluate_engines:
     params:
         eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR),
         engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
+        last_batch=LAST_BATCH
     run: 
         activate_one_container(input.container_infos, LAST_BATCH)
 
@@ -244,28 +246,34 @@ rule evaluate_engines:
         generate_federation_declaration(engine_config, engine, batch_id)
 
         # configPath, queryPath, outResultPath, outSourceSelectionPath, outQueryPlanFile, statPath, inSourceSelectionPath
-        previous_batch = batch_id - 1
-        same_file_previous_batch = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/results.txt"
-        
+        skipBatch = batch_id - 1
+        same_file_previous_batch = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{wildcards.attempt_id}/results.txt"
+        skipAttempt = int(wildcards.attempt_id)
+
         # Early stop if earlier attempts got timed out
         canSkip = batch_id > 0 and os.stat(same_file_previous_batch).st_size == 0
+        skipReason = f"Skip evaluation because previous batch at {same_file_previous_batch} timed out or error"
         for attempt in range(CONFIG_EVAL["n_attempts"]):
             same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{batch_id}/attempt_{attempt}/results.txt"
             logger.info(f"Checking {same_file_other_attempt} ...")
             if os.path.exists(same_file_other_attempt) and os.stat(same_file_other_attempt).st_size == 0:
+                skipBatch = batch_id
+                skipAttempt = attempt
+                skipReason = f"Skip evaluation because another attempt at {same_file_other_attempt} timed out or error"
                 canSkip = True
                 break
 
         if canSkip:
-            logger.info(f"Skip evaluation for this because {same_file_previous_batch} timed out")
-            previous_reason = str(output.stats) | cat() | find_first_pattern([r"(error.*|timeout)"])
+            logger.info(skipReason)
+            skip_stats_file = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/stats.csv"
+            previous_reason = skip_stats_file | cat() | find_first_pattern([r"(error.*|timeout)"])
             write_empty_stats(str(output.stats), previous_reason)
             #shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
-            shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/query_plan.txt {output.query_plan}")
-            shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/source_selection.txt {output.source_selection}")
-            shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/results.txt {output.result_txt}")
+            shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/query_plan.txt {output.query_plan}")
+            shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/source_selection.txt {output.source_selection}")
+            shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/results.txt {output.result_txt}")
         else:
-            shell("python rsfb/engines/{engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {output.query_plan} --batch-id {wildcards.batch_id}")
+            shell("python rsfb/engines/{engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {output.query_plan} --batch-id {params.last_batch}")
 
 rule engines_prerequisites:
     output: "{benchDir}/{engine}/{engine}-ok.txt"

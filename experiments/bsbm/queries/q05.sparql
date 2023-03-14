@@ -22,10 +22,13 @@ WHERE {
     ?localProductXYZ owl:sameAs ?ProductXYZ .
     ?localProdFeatureXYZ owl:sameAs ?prodFeature .
 
-    FILTER(?ProductXYZ != ?product)
+    # @skip
+    FILTER (?ProductXYZ != ?product)
     # Values are pre-determined because we knew the boundaries from the normal distribution
-    FILTER(?simProperty1 < (?origProperty1 + 20) && ?simProperty1 > (?origProperty1 - 20))
-    FILTER(?simProperty2 < (?origProperty2 + 70) && ?simProperty2 > (?origProperty2 - 70))
+    # @skip
+    FILTER (?simProperty1 < (?origProperty1 + 20) && ?simProperty1 > (?origProperty1 - 20))
+    # @skip
+    FILTER (?simProperty2 < (?origProperty2 + 70) && ?simProperty2 > (?origProperty2 - 70))
 }
 ORDER BY ?localProductLabel
 LIMIT 5

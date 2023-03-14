@@ -47,7 +47,7 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
     lib = os.path.join(app, "lib/*")
     timeout = int(config["evaluation"]["timeout"])
 
-    args = [engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection]
+    args = [engine_config, query, out_result, out_source_selection, query_plan, stats, str(timeout), force_source_selection]
     args = " ".join(args)
     #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
     timeoutCmd = ""
@@ -59,8 +59,7 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
     
     fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     try:        
-        fedx_proc.wait(timeout=timeout)
-        #fedx_proc = subprocess.run(cmd, shell=True, timeout=timeout, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+        fedx_proc.wait()
         if fedx_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
             if os.stat(out_result).st_size == 0:
@@ -70,13 +69,9 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
         else:
             logger.error(f"{query} reported error")    
             write_empty_result(out_result)
-            write_empty_stats(stats, "error")                  
-            # raise RuntimeError(f"{query} reported error")
-            
-    except subprocess.TimeoutExpired: 
-        logger.exception(f"{query} timed out!")
-        write_empty_stats(stats, "timeout")
-        write_empty_result(out_result)            
+            if os.path.exists(stats) and os.stat(stats).st_size == 0:
+                write_empty_stats(stats, "error_runtime")                  
+           
     finally:
         os.system('pkill -9 -f "FedX"')
         #kill_process(fedx_proc.pid)

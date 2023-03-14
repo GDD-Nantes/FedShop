@@ -12,7 +12,8 @@ WHERE {
         ?localProductXYZ owl:sameAs ?ProductXYZ .
         ?review dc:title ?title .
         ?review rev:text ?text .
-        FILTER(langMatches( lang(?text), "en" ))
+        # @skip
+        FILTER (langMatches( lang(?text), "en" ))
         ?review bsbm:reviewDate ?reviewDate .
         ?review rev:reviewer ?reviewer .
         ?reviewer foaf:name ?reviewerName .
@@ -22,3 +23,5 @@ WHERE {
         OPTIONAL { ?review bsbm:rating4 ?rating4 . }
     }
 }
+ORDER BY DESC(?reviewDate)
+LIMIT 20

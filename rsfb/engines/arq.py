@@ -18,7 +18,7 @@ import requests
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
 from utils import load_config, rsfb_logger, str2n3, write_empty_result, write_empty_stats
-from query import exec_query_on_endpoint
+from query import write_query
 
 logger = rsfb_logger(Path(__file__).name)
 
@@ -128,9 +128,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         out_query_text = re.sub("GRAPH", "SERVICE", out_query_text)
                 
         # Write service query
-        with open(service_query_file, "w") as service_query_fs:
-            service_query_fs.write(out_query_text)
-            service_query_fs.close()
+        out_query_text = write_query(out_query_text, service_query_file)
             
         # Explain query
         with open(query_plan, "w") as query_plan_fs:
@@ -154,26 +152,31 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         startTime = time.time()
         
         arq = f'{config["evaluation"]["engines"]["arq"]["dir"]}/jena/bin/arq'
-        exec_cmd = f"{arq} --query {service_query_file} --results=CSV > {out_result}"
+        exec_cmd = f"{arq} --query {service_query_file} --results=CSV"
             
         logger.debug("==== ARQ EXEC ====")
         logger.debug(exec_cmd)
         logger.debug("==================")
             
-        arq_proc = subprocess.Popen(exec_cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-        # arq_proc.wait(timeout=timeout)
         try: 
-            arq_proc.wait(timeout=timeout)
+            arq_proc = subprocess.run(exec_cmd, shell=True, capture_output=True, timeout=timeout)
             if arq_proc.returncode == 0:
                 logger.info(f"{query} benchmarked sucessfully")
-                if os.stat(out_result).st_size == 0:
+                result_df = pd.read_csv(BytesIO(arq_proc.stdout))
+
+                if result_df.empty:
                     logger.error(f"{query} yield no results!")
                     write_empty_result(out_result)
                     raise RuntimeError(f"{query} yield no results!")
+                else:
+                    # Some post processing
+                    if "*" in select_clause:
+                        result_df = result_df[[col for col in result_df.columns if "bgp" not in col]]
+                    result_df.to_csv(out_result, index=False)
             else:
                 logger.error(f"{query} reported error")    
                 write_empty_result(out_result)
-                write_empty_stats(stats, "error")                  
+                write_empty_stats(stats, "error_runtime")                  
                 # raise RuntimeError(f"{query} reported error")
                 
         except subprocess.TimeoutExpired: 

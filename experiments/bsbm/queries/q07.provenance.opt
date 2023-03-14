@@ -8,13 +8,12 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
 SELECT DISTINCT ?bgp1 ?bgp2
 WHERE { 
-    ?localProduct rdf:type bsbm:Product .
-    # const ?ProductXYZ
-    ?localProduct owl:sameAs ?ProductXYZ .
-    ?localProduct rdfs:label ?productLabel .
-
     OPTIONAL {
         GRAPH ?bgp1 {
+            ?localProduct rdf:type bsbm:Product .
+            # const ?ProductXYZ
+            ?localProduct owl:sameAs ?ProductXYZ .
+            ?localProduct rdfs:label ?productLabel .
             ?offer bsbm:product ?offerProduct .
             ?offerProduct  owl:sameAs ?ProductXYZ .  
             ?offer bsbm:price ?price .
@@ -29,6 +28,10 @@ WHERE {
     }
     OPTIONAL {
         GRAPH ?bgp2 {
+            ?localProduct rdf:type bsbm:Product .
+            # const ?ProductXYZ
+            ?localProduct owl:sameAs ?ProductXYZ .
+            ?localProduct rdfs:label ?productLabel .
             ?review bsbm:reviewFor ?reviewProduct .
             ?reviewProduct owl:sameAs ?ProductXYZ .
             ?review rev:reviewer ?reviewer .

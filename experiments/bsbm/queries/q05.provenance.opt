@@ -27,8 +27,10 @@ SELECT DISTINCT ?bgp1 ?bgp2 WHERE {
     } .
 
     # Values are pre-determined because we knew the boundaries from the normal distribution
-    FILTER(?simProperty1 < (?origProperty1 + 20) && ?simProperty1 > (?origProperty1 - 20))
-    FILTER(?simProperty2 < (?origProperty2 + 70) && ?simProperty2 > (?origProperty2 - 70))
+    # @skip
+    FILTER (?simProperty1 < (?origProperty1 + 20) && ?simProperty1 > (?origProperty1 - 20))
+    # @skip
+    FILTER (?simProperty2 < (?origProperty2 + 70) && ?simProperty2 > (?origProperty2 - 70))
 
 }
 ##ORDER BY ?localProductLabel

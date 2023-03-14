@@ -104,7 +104,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result,
         else:
             # print(f"{query} reported error")
             # write_empty_stats()
-            # write_empty_result("error")
+            # write_empty_result("error_runtime")
             raise RuntimeError(f"{query} reported error")
            
     except subprocess.TimeoutExpired: 
@@ -157,7 +157,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result,
         else:
             # print(f"{query} reported error")
             # write_empty_stats()
-            # write_empty_result("error")
+            # write_empty_result("error_runtime")
             raise RuntimeError(f"{query} reported error")
            
     except subprocess.TimeoutExpired: 
