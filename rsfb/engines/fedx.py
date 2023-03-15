@@ -63,9 +63,9 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
         if fedx_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
             if os.stat(out_result).st_size == 0:
-                logger.error(f"{input.query} yield no results!")
+                logger.error(f"{query} yield no results!")
                 write_empty_result(out_result)
-                raise RuntimeError(f"{input.query} yield no results!")
+                raise RuntimeError(f"{query} yield no results!")
         else:
             logger.error(f"{query} reported error")    
             write_empty_result(out_result)

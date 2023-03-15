@@ -149,10 +149,10 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         endpoint = config["evaluation"]["engines"]["arq"]["endpoint"]
         timeout = config["evaluation"]["timeout"]
         http_req = "N/A"
-        startTime = time.time()
+        exec_time = None
         
         arq = f'{config["evaluation"]["engines"]["arq"]["dir"]}/jena/bin/arq'
-        exec_cmd = f"{arq} --query {service_query_file} --results=CSV"
+        exec_cmd = f"{arq} --query {service_query_file} --results=CSV --time"
             
         logger.debug("==== ARQ EXEC ====")
         logger.debug(exec_cmd)
@@ -163,7 +163,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             if arq_proc.returncode == 0:
                 logger.info(f"{query} benchmarked sucessfully")
                 result_df = pd.read_csv(BytesIO(arq_proc.stdout))
-
+                                
+                exec_time = float(re.search(r"Time: (\d+(\.\d+)?) sec.*", arq_proc.stderr.decode()).group(1)) * 1e3
+                
                 if result_df.empty:
                     logger.error(f"{query} yield no results!")
                     write_empty_result(out_result)
@@ -183,10 +185,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             logger.exception(f"{query} timed out!")
             write_empty_stats(stats, "timeout")
             write_empty_result(out_result)            
-        
-        endTime = time.time()
-        exec_time = (endTime-startTime)*1e3
-        
+            
         # Write stats
         logger.info(f"Writing stats to {stats}")
         with open(stats, "w") as stats_fs:

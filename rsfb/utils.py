@@ -1,5 +1,6 @@
 import ast
 from io import BytesIO
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -367,7 +368,14 @@ def write_empty_stats(outfile, reason):
                 
 def write_empty_result(outfile):
     Path(outfile).touch()
-
+    
+def __exec_virtuoso_command(cmd, compose_file, service_name, batch_id):
+    container_name = get_virtuoso_containers(compose_file, service_name)[batch_id]
+    os.system(f"docker exec {container_name} /opt/virtuoso-opensource/bin/isql \"EXEC={cmd};\"")
+    
+def virtuoso_kill_all_transactions(compose_file, service_name, batch_id):
+    __exec_virtuoso_command("txn_killall(6)", compose_file, service_name, batch_id)
+    
 def kill_process(proc_pid):
     try:
         process = psutil.Process(proc_pid)

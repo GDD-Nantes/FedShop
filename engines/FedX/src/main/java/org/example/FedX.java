@@ -7,6 +7,7 @@ import org.eclipse.rdf4j.federated.repository.FedXRepository;
 import org.eclipse.rdf4j.federated.monitoring.MonitoringUtil;
 import org.eclipse.rdf4j.federated.monitoring.QueryPlanLog;
 import org.eclipse.rdf4j.query.BindingSet;
+import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryInterruptedException;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
@@ -70,6 +71,7 @@ public class FedX {
     }
 
     public static void main(String[] args) throws Exception {
+        boolean isInterrupted = false;
         Logger log = LoggerFactory.getLogger(FedX.class);
         log.info("Numbers of arguments: " + args.length);
         log.info("Numbers of arguments: " + args.length);
@@ -161,8 +163,13 @@ public class FedX {
                         }
                     }
                 }
-            } catch (QueryInterruptedException exception) {
-                writeEmptyStats(statPath, "timeout");
+            } catch (Exception exception) {
+                isInterrupted = true; 
+                if (exception.getMessage().equals("org.eclipse.rdf4j.federated.exception.OptimizationException: Source selection has run into a timeout")) {
+                    writeEmptyStats(statPath, "timeout");
+                } else {
+                    throw exception;
+                }
             }
 
             MonitoringUtil.printMonitoringInformation(repo.getFederationContext());
@@ -175,7 +182,7 @@ public class FedX {
         long durationTime = endTime - startTime;
         int nbHttpQueries = CONTAINER.getHttpReqCount().get();
 
-        if (!statPath.equals("/dev/null")) {
+        if (!statPath.equals("/dev/null") && !isInterrupted) {
             File statFile = new File(statPath);
             if (statFile.getParentFile() != null) {
                 statFile.getParentFile().mkdirs();
