@@ -150,10 +150,8 @@ rule merge_stats:
         expand(
             "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/attempt_{attempt_id}/stats.csv", 
             engine=CONFIG_EVAL["engines"],
-            #query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            query=["q08"],
-            #instance_id=range(N_QUERY_INSTANCES),
-            instance_id=[3, 6, 9],
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
+            instance_id=range(N_QUERY_INSTANCES),
             attempt_id=range(CONFIG_EVAL["n_attempts"])
         )
     output: "{benchDir}/eval_stats_batch{batch_id}.csv"
@@ -166,19 +164,15 @@ rule compute_metrics:
         provenance=expand(
             "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/attempt_{attempt_id}/provenance.csv", 
             engine=CONFIG_EVAL["engines"],
-            #query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            query=["q08"],
-            #instance_id=range(N_QUERY_INSTANCES),
-            instance_id=[3, 6, 9],
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
+            instance_id=range(N_QUERY_INSTANCES),
             attempt_id=range(CONFIG_EVAL["n_attempts"])
         ),
         results=expand(
             "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/attempt_{attempt_id}/results.csv", 
             engine=CONFIG_EVAL["engines"],
-            #query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            query=["q08"],
-            #instance_id=range(N_QUERY_INSTANCES),
-            instance_id=[3, 6, 9],
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
+            instance_id=range(N_QUERY_INSTANCES),
             attempt_id=range(CONFIG_EVAL["n_attempts"])
         ),
     output: "{benchDir}/eval_metrics_batch{batch_id}.csv"
@@ -227,7 +221,7 @@ rule evaluate_engines:
     - Output: only statistics, no source-seleciton
     """
     threads: 1
-    #retries: 1
+    retries: 1
     input: 
         query=ancient(expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/injected.sparql", workDir=WORK_DIR)),
         engine_source_selection=ancient(expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/batch_{{batch_id}}/provenance.csv", workDir=WORK_DIR)),
@@ -252,37 +246,34 @@ rule evaluate_engines:
         generate_federation_declaration(engine_config, engine, batch_id)
 
         # Early stop if earlier attempts got timed out
-        # skipBatch = batch_id - 1
-        # same_file_previous_batch = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{wildcards.attempt_id}/results.txt"
-        # skipAttempt = int(wildcards.attempt_id)
+        skipBatch = batch_id - 1
+        same_file_previous_batch = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{wildcards.attempt_id}/results.txt"
+        skipAttempt = int(wildcards.attempt_id)
 
-        # canSkip = batch_id > 0 and os.path.exists(same_file_previous_batch) and os.stat(same_file_previous_batch).st_size == 0
-        # skipReason = f"Skip evaluation because previous batch at {same_file_previous_batch} timed out or error"
-        # for attempt in range(CONFIG_EVAL["n_attempts"]):
-        #     same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{batch_id}/attempt_{attempt}/results.txt"
-        #     logger.info(f"Checking {same_file_other_attempt} ...")
-        #     if os.path.exists(same_file_other_attempt) and os.path.exists(same_file_other_attempt) and os.stat(same_file_other_attempt).st_size == 0:
-        #         skipBatch = batch_id
-        #         skipAttempt = attempt
-        #         skipReason = f"Skip evaluation because another attempt at {same_file_other_attempt} timed out or error"
-        #         canSkip = True
-        #         break
+        canSkip = batch_id > 0 and os.path.exists(same_file_previous_batch) and os.stat(same_file_previous_batch).st_size == 0
+        skipReason = f"Skip evaluation because previous batch at {same_file_previous_batch} timed out or error"
+        for attempt in range(CONFIG_EVAL["n_attempts"]):
+            same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{batch_id}/attempt_{attempt}/results.txt"
+            logger.info(f"Checking {same_file_other_attempt} ...")
+            if os.path.exists(same_file_other_attempt) and os.path.exists(same_file_other_attempt) and os.stat(same_file_other_attempt).st_size == 0:
+                skipBatch = batch_id
+                skipAttempt = attempt
+                skipReason = f"Skip evaluation because another attempt at {same_file_other_attempt} timed out or error"
+                canSkip = True
+                break
 
-        # if canSkip:
-        #     logger.info(skipReason)
-        #     skip_stats_file = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/stats.csv"
-        #     previous_reason = skip_stats_file | cat() | find_first_pattern([r"(error.*|timeout)"])
-        #     write_empty_stats(str(output.stats), previous_reason)
-        #     #shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
-        #     shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/query_plan.txt {output.query_plan}")
-        #     shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/source_selection.txt {output.source_selection}")
-        #     shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/results.txt {output.result_txt}")
-        # else:
-        #     virtuoso_kill_all_transactions(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, LAST_BATCH)
-        #     shell("python rsfb/engines/{engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {output.query_plan} --batch-id {params.last_batch}")
-         
-        virtuoso_kill_all_transactions(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, LAST_BATCH)
-        shell("python rsfb/engines/{engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {output.query_plan} --batch-id {params.last_batch}")
+        if canSkip:
+            logger.info(skipReason)
+            skip_stats_file = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/stats.csv"
+            previous_reason = skip_stats_file | cat() | find_first_pattern([r"(error.*|timeout)"])
+            write_empty_stats(str(output.stats), previous_reason)
+            #shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
+            shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/query_plan.txt {output.query_plan}")
+            shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/source_selection.txt {output.source_selection}")
+            shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/results.txt {output.result_txt}")
+        else:
+            virtuoso_kill_all_transactions(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, LAST_BATCH)
+            shell("python rsfb/engines/{engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {output.query_plan} --batch-id {params.last_batch}")
 
 rule engines_prerequisites:
     output: "{benchDir}/{engine}/{engine}-ok.txt"

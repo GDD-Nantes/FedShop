@@ -59,7 +59,7 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
     
     fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     try:        
-        fedx_proc.wait()
+        fedx_proc.wait(timeout)
         if fedx_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
             if os.stat(out_result).st_size == 0:
@@ -71,7 +71,10 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
             write_empty_result(out_result)
             if os.path.exists(stats) and os.stat(stats).st_size == 0:
                 write_empty_stats(stats, "error_runtime")                  
-           
+    except subprocess.TimeoutExpired: 
+        logger.exception(f"{query} timed out!")
+        write_empty_stats(stats, "timeout")
+        write_empty_result(out_result)                   
     finally:
         os.system('pkill -9 -f "FedX"')
         #kill_process(fedx_proc.pid)

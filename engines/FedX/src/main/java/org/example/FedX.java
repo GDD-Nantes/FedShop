@@ -163,9 +163,12 @@ public class FedX {
                         }
                     }
                 }
+            } catch (OutOfMemoryError oom) {
+                isInterrupted = true;
+                writeEmptyStats(statPath, "oom");
             } catch (Exception exception) {
                 isInterrupted = true; 
-                if (exception.getMessage().equals("org.eclipse.rdf4j.federated.exception.OptimizationException: Source selection has run into a timeout")) {
+                if (exception.getMessage().contains("has run into a timeout")) {
                     writeEmptyStats(statPath, "timeout");
                 } else {
                     throw exception;
