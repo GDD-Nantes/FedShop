@@ -8,10 +8,11 @@ generation:
     confidence_level: 0.95
   generator: 
     #exec: "docker exec watdiv watdiv"
-    exec: "watdiv"
-    endpoint: "http://localhost:8000"
-    compose_file: "${generation.workdir}/docker/generator.yml"
-    container_name: "bsbm-watdiv"
+    dir: "generators/watdiv"
+    exec: "${generation.generator.dir}/bin/Release/watdiv"
+    # endpoint: "http://localhost:8000"
+    # compose_file: "${generation.workdir}/docker/generator.yml"
+    # container_name: "bsbm-watdiv"
   virtuoso:
     compose_file: "${generation.workdir}/docker/virtuoso.yml"
     service_name: "bsbm-virtuoso"

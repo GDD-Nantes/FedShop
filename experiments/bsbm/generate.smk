@@ -105,6 +105,7 @@ def start_generator(status_file):
     elif os.system(f"command -v {exec_cmd}") == 0:
         with open(status_file, "w") as f:
             f.write(exec_cmd + "\n")
+    else: raise RuntimeError(f"{exec_cmd} doesn't exist...")
 
     return status_file
 
