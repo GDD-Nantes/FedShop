@@ -258,14 +258,15 @@ rule evaluate_engines:
             if os.path.exists(same_file_other_attempt) and os.path.exists(same_file_other_attempt) and os.stat(same_file_other_attempt).st_size == 0:
                 skipBatch = batch_id
                 skipAttempt = attempt
-                skipReason = f"Skip evaluation because another attempt at {same_file_other_attempt} timed out or error"
+                skipReason = f"Skip evaluation because another attempt at {same_file_other_attempt} timed out"
                 canSkip = True
                 break
 
-        if canSkip:
+        skip_stats_file = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/stats.csv"
+        previous_reason = str(skip_stats_file | cat() | find_first_pattern([r"(timeout)"]))
+
+        if canSkip and previous_reason != "":
             logger.info(skipReason)
-            skip_stats_file = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/stats.csv"
-            previous_reason = skip_stats_file | cat() | find_first_pattern([r"(error.*|timeout)"])
             write_empty_stats(str(output.stats), previous_reason)
             #shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/query_plan.txt {output.query_plan}")

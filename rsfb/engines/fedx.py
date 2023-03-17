@@ -69,7 +69,7 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
         else:
             logger.error(f"{query} reported error")    
             write_empty_result(out_result)
-            if os.path.exists(stats) and os.stat(stats).st_size == 0:
+            if not os.path.exists(stats):
                 write_empty_stats(stats, "error_runtime")                  
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
