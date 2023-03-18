@@ -4,8 +4,10 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import time
 import colorlog
 import numpy as np
+import requests
 from scipy.stats import norm, truncnorm
 from omegaconf import OmegaConf
 import psutil
@@ -387,3 +389,61 @@ def kill_process(proc_pid):
     except psutil.NoSuchProcess:
         LOGGER.warning(f"Process {proc_pid} already terminated...")
         pass
+
+def wait_for_container(endpoints, outfile, logger, wait=1):
+    if isinstance(endpoints, str):
+        endpoints = [ endpoints ]
+    endpoint_ok = 0
+    attempt=1
+    logger.info(f"Waiting for all endpoints...")
+    while(endpoint_ok < len(endpoints)):
+        logger.info(f"Attempt {attempt} ...")
+        try:
+            for endpoint in endpoints:
+                status = requests.get(endpoint).status_code
+                if status == 200:
+                    logger.info(f"{endpoint} is ready!")
+                    endpoint_ok += 1   
+        except: pass
+        attempt += 1
+        time.sleep(wait)
+
+    with open(f"{outfile}", "w") as f:
+        f.write("OK")
+
+def activate_one_container(batch_id, sparql_compose_file, sparql_service_name, logger, status_file, deploy_if_not_exists=False):
+    """ Activate one container while stopping all others
+    """
+    containers = get_docker_containers(sparql_compose_file, sparql_service_name)
+    batch_id = int(batch_id)
+    container_name = containers[batch_id]
+
+    if (container_status := check_container_status(sparql_compose_file, sparql_service_name, container_name)) is None:
+        # if deploy_if_not_exists:
+        #     deploy_virtuoso(N_BATCH, container_infos_file, sparql_compose_file, sparql_service_name, restart=True)
+        # else:
+        raise RuntimeError(f"Container {container_name} does not exists!")
+
+    if container_status != "running":
+        logger.info("Stopping all containers...")
+        os.system(f"docker-compose -f {sparql_compose_file} stop {sparql_service_name}")
+            
+        logger.info(f"Starting container {container_name}...")
+        os.system(f"docker start {container_name}")
+        container_endpoint = get_docker_endpoint_by_container_name(sparql_compose_file, sparql_service_name, container_name)
+        wait_for_container(container_endpoint, status_file, logger , wait=1)
+
+def deploy_virtuoso(n_batch, container_infos_file, sparql_compose_file, sparql_service_name, restart=False):
+    if restart:
+        os.system(f"docker-compose -f {sparql_compose_file} down --remove-orphans")
+        os.system("docker volume prune --force")
+        time.sleep(2)
+    # os.system(f"docker-compose -f {sparql_compose_file} up -d --scale {sparql_service_name}={N_BATCH}")
+    # wait_for_container(CONFIG["virtuoso"]["endpoints"], f"{BENCH_DIR}/virtuoso-up.txt", wait=1)
+    
+    os.system(f"docker-compose -f {sparql_compose_file} create --no-recreate --scale {sparql_service_name}={n_batch} {sparql_service_name}") # For docker-compose version > 2.15.1
+    
+    pd.DataFrame(get_docker_containers(sparql_compose_file, sparql_service_name), columns=["Name"]).to_csv(str(container_infos_file), index=False)
+
+    os.system(f"docker-compose -f {sparql_compose_file} stop {sparql_service_name}")
+    return container_infos_file

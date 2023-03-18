@@ -115,10 +115,14 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
             if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
             
 @cli.command()
-@click.argument("level", type=click.Choice(["all", "model", "benchmark"]))
-def save(level):
-    if level == "benchmark":
-        subprocess.run("")
+@click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+def generate_statistics(configfile):
+
+    WORK_DIR = load_config(configfile)["generation"]["workdir"]
+    EVALUATION_SNAKEFILE=f"{WORK_DIR}/stats.smk"
+    SNAKEMAKE_OPTS = f"-p --cores 1 --config configfile={configfile}"
+
+    if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE}") != 0 : exit(1)
 
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=False, dir_okay=True))

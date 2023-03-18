@@ -14,7 +14,8 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import rsfb_logger, load_config, get_docker_endpoint_by_container_name, get_docker_containers, check_container_status, write_empty_result, write_empty_stats, virtuoso_kill_all_transactions
+from utils import rsfb_logger, load_config, get_docker_endpoint_by_container_name, get_docker_containers, check_container_status, write_empty_result, write_empty_stats, virtuoso_kill_all_transactions, wait_for_container
+from utils import activate_one_container as utils_activate_one_container
 
 #===============================
 # EVALUATION PHASE:
@@ -56,45 +57,10 @@ LOGGER = rsfb_logger(Path(__file__).name)
 # USEFUL FUNCTIONS
 #=================
 
-def wait_for_container(endpoints, outfile, wait=1):
-    if isinstance(endpoints, str):
-        endpoints = [ endpoints ]
-    endpoint_ok = 0
-    attempt=1
-    logger.info(f"Waiting for all endpoints...")
-    while(endpoint_ok < len(endpoints)):
-        logger.info(f"Attempt {attempt} ...")
-        try:
-            for endpoint in endpoints:
-                status = requests.get(endpoint).status_code
-                if status == 200:
-                    logger.info(f"{endpoint} is ready!")
-                    endpoint_ok += 1   
-        except: pass
-        attempt += 1
-        time.sleep(wait)
-
-    with open(f"{outfile}", "w") as f:
-        f.write("OK")
-
 def activate_one_container(batch_id):
     """ Activate one container while stopping all others
     """
-    containers = get_docker_containers(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME)
-    batch_id = int(batch_id)
-    container_name = containers[batch_id]
-
-    if (container_status := check_container_status(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)) is None:
-        raise RuntimeError(f"Container {container_name} does not exists!")
-
-    if container_status != "running":
-        logger.info("Stopping all containers...")
-        shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} stop {SPARQL_SERVICE_NAME}")
-            
-        logger.info(f"Starting container {container_name}...")
-        shell(f"docker start {container_name}")
-        container_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
-        wait_for_container(container_endpoint, f"{BENCH_DIR}/virtuoso-ok.txt", wait=1)
+    utils_activate_one_container(batch_id, SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, logger, f"{BENCH_DIR}/virtuoso-ok.txt")
 
 def generate_federation_declaration(federation_declaration_file, engine, batch_id):
     sparql_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])

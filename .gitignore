@@ -164,3 +164,5 @@ logs/
 fuseki/
 engines/ARQ/jena
 fix.py
+
+experiments/**/stats/*.stat
