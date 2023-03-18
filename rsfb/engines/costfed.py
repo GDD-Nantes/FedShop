@@ -15,7 +15,7 @@ from sklearn.preprocessing import LabelEncoder
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import get_docker_containers, kill_process, load_config, rsfb_logger, str2n3, write_empty_result, write_empty_stats
+from utils import check_container_status, get_docker_containers, kill_process, load_config, rsfb_logger, str2n3, write_empty_result, write_empty_stats
 import fedx
 
 logger = rsfb_logger(Path(__file__).name)
@@ -85,6 +85,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     app_config = config["evaluation"]["engines"]["costfed"]
     app = app_config["dir"]
     endpoint = config["generation"]["virtuoso"]["endpoints"][batch_id]
+    compose_file = config["generation"]["virtuoso"]["compose_file"]
+    service_name = config["generation"]["virtuoso"]["service_name"]
     container_name = config["generation"]["virtuoso"]["container_names"][batch_id]
     timeout = int(config["evaluation"]["timeout"])
     http_req = "N/A"
@@ -96,14 +98,11 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     logger.debug(cmd)
     logger.debug("============")
 
-    #os.chdir(Path(app))
-    #costfed_proc = subprocess.Popen(cmd, shell=True)
-    #os.chdir(oldcwd)
+    os.chdir(Path(app))
+    costfed_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    os.chdir(oldcwd)
     try:        
-        #costfed_proc.wait(timeout=timeout)
-        os.chdir(Path(app))
-        costfed_proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        os.chdir(oldcwd)
+        costfed_proc.wait(timeout=timeout)
         if costfed_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
             
@@ -134,6 +133,12 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             write_empty_result(out_result)
             write_empty_result(stats)
             write_empty_stats(stats, "error")
+    except subprocess.TimeoutExpired: 
+        logger.exception(f"{query} timed out!")
+        if check_container_status(compose_file, service_name, container_name) != "running":
+            raise RuntimeError("Backend is terminated!")
+        write_empty_stats(stats, "timeout")
+        write_empty_result(out_result)    
     finally:
         os.system('pkill -9 -f "CostFed"')
         #kill_process(fedx_proc.pid)        
