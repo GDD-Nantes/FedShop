@@ -14,13 +14,16 @@ def cli():
 
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("category", type=click.Choice(["data", "queries"]))
 @click.option("--debug", is_flag=True, default=False)
 @click.option("--clean", type=click.STRING, help="[all, model, benchmark] + db + [metrics|metrics_batchk]")
 @click.option("--cores", type=click.INT, default=1, help="The number of cores used allocated. -1 if use all cores.")
 @click.option("--rerun-incomplete", is_flag=True, default=False)
 @click.option("--touch", is_flag=True, default=False)
+@click.option("--no-cache", is_flag=True, default=False)
+
 @click.pass_context
-def generate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomplete, touch):
+def generate(ctx: click.Context, configfile, category, debug, clean, cores, rerun_incomplete, touch, no_cache):
     """Run the benchmark
 
     Args:
@@ -35,7 +38,7 @@ def generate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
 
     N_BATCH=CONFIG["n_batch"]
 
-    GENERATION_SNAKEFILE=f"{WORK_DIR}/generate.smk"
+    GENERATION_SNAKEFILE=f"{WORK_DIR}/generate-{category}.smk"
 
     WORKFLOW_DIR = f"{WORK_DIR}/rulegraph"
     os.makedirs(name=WORKFLOW_DIR, exist_ok=True)
