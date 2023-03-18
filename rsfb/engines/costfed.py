@@ -106,6 +106,22 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         os.chdir(oldcwd)
         if costfed_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
+            
+            # Write stats
+            logger.info(f"Writing stats to {stats}")
+             
+            stats_df = pd.read_csv(stats).rename({
+                "Result #0": "query",
+                "Result #1": "engine",
+                "Result #2": "instance",
+                "Result #3": "batch",
+                "Result #4": "attempt",
+                "Result #5": "exec_time",
+                "Result #6": "http_req"
+            }, axis=1)
+                
+            stats_df.to_csv(stats, index=False)
+            
             results_df = pd.read_csv(out_result).replace("null", None)
             
             if results_df.dropna().empty or os.stat(out_result).st_size == 0:            
@@ -120,31 +136,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             write_empty_stats(stats, "error")
     finally:
         os.system('pkill -9 -f "CostFed"')
-        #kill_process(fedx_proc.pid)
-    
-    # Write stats
-    logger.info(f"Writing stats to {stats}")
-    basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
-    queryName = basicInfos.group(2)
-    instance = basicInfos.group(3)
-    batch = basicInfos.group(4)
-    attempt = basicInfos.group(5)
-    
-    stats_df = pd.read_csv(stats) \
-        .replace("Result #0","query") \
-        .replace("Result #1","engine") \
-        .replace("Result #2","instance") \
-        .replace("Result #3","batch") \
-        .replace("Result #4","attempt") \
-        .replace("Result #5","exec_time") \
-        .replace("Result #6","http_req") \
-        .replace('injected.sparql',str(queryName)) \
-        .replace('instance_id',str(instance)) \
-        .replace('batch_id',str(batch)) \
-        .replace('attempt_id',str(attempt))
-    
-    stats_df.to_csv(stats, index=False)
-        
+        #kill_process(fedx_proc.pid)        
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
