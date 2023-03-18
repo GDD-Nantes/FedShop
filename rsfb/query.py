@@ -213,6 +213,7 @@ def __get_uninjected_placeholders(queryfile, exclusive=False):
     
     consts = set()
     for const, resource in parse_result.items():
+        if const == "@skip": continue
         c = const if (resource["type"] is None or resource.get("src") is None ) else resource["src"]
         if c.startswith("?"):
             if exclusive and resource.get("exclusive"):
@@ -985,7 +986,10 @@ def create_workload_value_selection(queryfile, value_selection, workload_value_s
     _, parse_result = __parse_query_from_file(queryfile)
     filter_query_clauses = []
 
-    for const, resource in parse_result.items():                
+    for const, resource in parse_result.items():   
+        
+        if const == "@skip": continue
+                     
         # Replace all tokens in subDict
         isOpUnary = (resource["type"] is None or resource.get("src") is None)
         left = right = const[1:] if isOpUnary else resource.get("src")[1:]        

@@ -32,10 +32,6 @@ CONFIG = load_config(CONFIGFILE)["generation"]
 SPARQL_COMPOSE_FILE = CONFIG["virtuoso"]["compose_file"]
 SPARQL_SERVICE_NAME = CONFIG["virtuoso"]["service_name"]
 
-GENERATOR_ENDPOINT = CONFIG["generator"]["endpoint"]
-GENERATOR_COMPOSE_FILE = CONFIG["generator"]["compose_file"]
-GENERATOR_CONTAINER_NAME = CONFIG["generator"]["container_name"]
-
 CONTAINER_PATH_TO_ISQL = "/opt/virtuoso-opensource/bin/isql"
 CONTAINER_PATH_TO_DATA = "/usr/share/proj/" 
 
@@ -99,10 +95,7 @@ def deploy_virtuoso(container_infos_file, restart=False):
 
 def start_generator(status_file):
     exec_cmd = CONFIG["generator"]["exec"]
-    if "docker exec" in exec_cmd:
-        shell(f"docker-compose -f {GENERATOR_COMPOSE_FILE} up -d {GENERATOR_CONTAINER_NAME}")
-        wait_for_container(GENERATOR_ENDPOINT, status_file, wait=1)
-    elif os.system(f"command -v {exec_cmd}") == 0:
+    if os.system(f"command -v {exec_cmd}") == 0:
         with open(status_file, "w") as f:
             f.write(exec_cmd + "\n")
     else: raise RuntimeError(f"{exec_cmd} doesn't exist...")

@@ -128,7 +128,6 @@ def wipe(configfile, level: str):
     WORK_DIR = CONFIG["workdir"]
     
     SPARQL_COMPOSE_FILE = CONFIG["virtuoso"]["compose_file"]
-    GENERATOR_COMPOSE_FILE = CONFIG["generator"]["compose_file"]
 
     def remove_model():
         shutil.rmtree(f"{WORK_DIR}/model/dataset", ignore_errors=True)
@@ -143,7 +142,6 @@ def wipe(configfile, level: str):
         
     if "db" in args:
         logger.info("Cleaning all databases...")
-        if os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)
         if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)  
         if os.system("docker volume prune --force") != 0: exit(1)
         os.system(f"{WORK_DIR}/benchmark/generation/virtuoso_batch*.csv")
@@ -177,7 +175,6 @@ def wipe(configfile, level: str):
 
     if "all" in args:
         logger.info("Cleaning all databases...")
-        if os.system(f"docker-compose -f {GENERATOR_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)
         if os.system(f"docker-compose -f {SPARQL_COMPOSE_FILE} down --remove-orphans --volumes") != 0 : exit(1)  
         if os.system("docker volume prune --force") != 0: exit(1)
         Path(f"{WORK_DIR}/generator-ok.txt").unlink(missing_ok=True)
