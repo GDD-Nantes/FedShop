@@ -118,6 +118,18 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                 "Result #5": "exec_time",
                 "Result #6": "http_req"
             }, axis=1)
+            
+            basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
+            queryName = basicInfos.group(2)
+            instance = basicInfos.group(3)
+            batch = basicInfos.group(4)
+            attempt = basicInfos.group(5)
+    
+            stats_df = stats_df \
+                .replace('injected.sparql',str(queryName)) \
+                .replace('instance_id',str(instance)) \
+                .replace('batch_id',str(batch)) \
+                .replace('attempt_id',str(attempt))
                 
             stats_df.to_csv(stats, index=False)
             
