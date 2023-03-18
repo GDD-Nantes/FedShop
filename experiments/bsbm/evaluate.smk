@@ -14,7 +14,7 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import rsfb_logger, load_config, get_docker_endpoint_by_container_name, check_container_status, write_empty_result, write_empty_stats, virtuoso_kill_all_transactions
+from utils import rsfb_logger, load_config, get_docker_endpoint_by_container_name, get_docker_containers, check_container_status, write_empty_result, write_empty_stats, virtuoso_kill_all_transactions
 
 #===============================
 # EVALUATION PHASE:
@@ -77,13 +77,12 @@ def wait_for_container(endpoints, outfile, wait=1):
     with open(f"{outfile}", "w") as f:
         f.write("OK")
 
-def activate_one_container(container_infos_file, batch_id):
+def activate_one_container(batch_id):
     """ Activate one container while stopping all others
     """
-    container_infos_file = str(container_infos_file)
-    container_infos = pd.read_csv(container_infos_file)
+    containers = get_docker_containers(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME)
     batch_id = int(batch_id)
-    container_name = container_infos.loc[batch_id, "Name"]
+    container_name = containers[batch_id]
 
     if (container_status := check_container_status(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)) is None:
         raise RuntimeError(f"Container {container_name} does not exists!")
@@ -108,7 +107,6 @@ def generate_federation_declaration(federation_declaration_file, engine, batch_i
 
     if is_endpoint_updated or not is_file_exists:
         logger.info(f"Rewriting {engine} configfile as it is updated!")
-        container_infos_file = f"{WORK_DIR}/benchmark/generation/container_infos.csv"
         ratingsite_data_files = [ f"{MODEL_DIR}/dataset/ratingsite{i}.nq" for i in range(N_RATINGSITE) ]
         vendor_data_files = [ f"{MODEL_DIR}/dataset/vendor{i}.nq" for i in range(N_VENDOR) ]
 
@@ -117,7 +115,7 @@ def generate_federation_declaration(federation_declaration_file, engine, batch_i
         vendorSliceId = np.histogram(np.arange(N_VENDOR), N_BATCH)[1][1:].astype(int)[batch_id]
         batch_files = ratingsite_data_files[:ratingsiteSliceId+1] + vendor_data_files[:vendorSliceId+1]
 
-        activate_one_container(container_infos_file, LAST_BATCH)
+        activate_one_container(LAST_BATCH)
         shell(f"python rsfb/engines/{engine}.py generate-config-file {' '.join(batch_files)} {federation_declaration_file} {CONFIGFILE} --endpoint {sparql_endpoint}")
 
 #=================
@@ -227,7 +225,6 @@ rule evaluate_engines:
         engine_source_selection=ancient(expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/batch_{{batch_id}}/provenance.csv", workDir=WORK_DIR)),
         virtuoso_last_batch=ancient(expand("{workDir}/benchmark/generation/virtuoso_batch{batch_n}-ok.txt", workDir=WORK_DIR, batch_n=N_BATCH-1)),
         engine_status=ancient("{benchDir}/{engine}/{engine}-ok.txt"),
-        container_infos=ancient(expand("{workDir}/benchmark/generation/container_infos.csv", workDir=WORK_DIR))
     output: 
         stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/stats.csv",
         query_plan="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/query_plan.txt",
@@ -238,7 +235,7 @@ rule evaluate_engines:
         engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
         last_batch=LAST_BATCH
     run: 
-        activate_one_container(input.container_infos, LAST_BATCH)
+        activate_one_container(LAST_BATCH)
 
         engine = str(wildcards.engine)
         batch_id = int(wildcards.batch_id)

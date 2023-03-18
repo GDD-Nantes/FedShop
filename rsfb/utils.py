@@ -305,7 +305,7 @@ def check_container_status(compose_file, service_name, container_name):
             
         return result
     
-def get_virtuoso_containers(compose_file, service_name):    
+def get_docker_containers(compose_file, service_name):    
     json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
     
     with BytesIO(json_bytes) as json_bs:
@@ -321,7 +321,7 @@ OmegaConf.register_new_resolver("multiply", lambda *args: np.prod(args).item())
 OmegaConf.register_new_resolver("sum", lambda *args: np.sum(args).item())
 OmegaConf.register_new_resolver("divide", divide)
 OmegaConf.register_new_resolver("get_docker_endpoints", get_docker_endpoints)
-OmegaConf.register_new_resolver("get_virtuoso_containers", get_virtuoso_containers)
+OmegaConf.register_new_resolver("get_virtuoso_containers", get_docker_containers)
 OmegaConf.register_new_resolver("get_product_type_n", lambda nbProd: len(create_product_type_hierarchy(nbProd)[0]))
 OmegaConf.register_new_resolver("get_product_type_c", lambda nbProd: get_product_producers(nbProd)[1])
 OmegaConf.register_new_resolver("get_product_feature_n", lambda nbProd: get_product_features(nbProd)[0])
@@ -370,7 +370,7 @@ def write_empty_result(outfile):
     Path(outfile).touch()
     
 def __exec_virtuoso_command(cmd, compose_file, service_name, batch_id):
-    container_name = get_virtuoso_containers(compose_file, service_name)[batch_id]
+    container_name = get_docker_containers(compose_file, service_name)[batch_id]
     os.system(f"docker exec {container_name} /opt/virtuoso-opensource/bin/isql \"EXEC={cmd};\"")
     
 def virtuoso_kill_all_transactions(compose_file, service_name, batch_id):

@@ -15,7 +15,7 @@ from sklearn.preprocessing import LabelEncoder
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import kill_process, load_config, rsfb_logger, str2n3, write_empty_result, write_empty_stats
+from utils import get_docker_containers, kill_process, load_config, rsfb_logger, str2n3, write_empty_result, write_empty_stats
 import fedx
 
 logger = rsfb_logger(Path(__file__).name)
@@ -85,6 +85,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     app_config = config["evaluation"]["engines"]["costfed"]
     app = app_config["dir"]
     endpoint = config["generation"]["virtuoso"]["endpoints"][batch_id]
+    container_name = config["generation"]["virtuoso"]["container_names"][batch_id]
     timeout = int(config["evaluation"]["timeout"])
     http_req = "N/A"
 
@@ -105,10 +106,13 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         os.chdir(oldcwd)
         if costfed_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
-            if os.stat(out_result).st_size == 0:
-                logger.error(f"{input.query} yield no results!")
+            results_df = pd.read_csv(out_result).replace("null", None)
+            
+            if results_df.dropna().empty or os.stat(out_result).st_size == 0:            
+                logger.error(f"{query} yield no results!")
                 write_empty_result(out_result)
-                raise RuntimeError(f"{input.query} yield no results!")
+                os.system(f"docker stop {container_name}")
+                raise RuntimeError(f"{query} yield no results!")
         else:
             logger.error(f"{query} reported error")    
             write_empty_result(out_result)
