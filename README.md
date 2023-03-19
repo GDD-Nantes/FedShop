@@ -1,10 +1,11 @@
 # FedShop : The Federated Shop Benchmark
 
-FedShop is a synthetic RDF Federated Benchmark designed for scalability. It evaluates the performances of SPARQL federated query engines  such as [FedX](https://rdf4j.org/documentation/programming/federation/) ,CostFed, Semagrow, Splendid (etc) when the number of sources grows. FedShop is based on a E-commerce scenario with e-shops and e-rating-sites as in [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/). Compared to  BSBM, each shop and rating-site of FedShop has its own SPARQL endpoint and share a common catalog of products. Following the BSBM idea, the FedShop queries simulates a user  navigating the Federated shop as a single virtual shop. The scaling factor is obtained by adding more and more shops and rating-sites within the federation. In FedShop, we are able to observe the performances of federated queries when the number of source is increasing.
+FedShop is a synthetic RDF Federated Benchmark designed for scalability. It evaluates the performances of SPARQL federated query engines  such as [FedX](https://rdf4j.org/documentation/programming/federation/), CostFed, Semagrow, Splendid, etc, when the number of sources grows. FedShop is built around an E-commerce scenario with e-shops and e-rating-sites as in [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/). Compared to  BSBM, each shop, and rating-site of FedShop has its own SPARQL endpoint and shares a standard catalog of products. Following the BSBM idea, the FedShop queries simulate a user navigating the Federated shop as a single virtual shop. The scaling factor is obtained by adding more and more shops and rating-sites within the federation. In FedShop, we are can observe the performances of federated queries when the number of sources is increasing.
 
-FedShop includes a data generator, a template query instanciator and a running environment able to collect statististic on the benchmark itself and on federated query engines running over FedShop.
+FedShop consists of three components: the data generator, the query (and template) generator, and the running environment able to collect statistics on the benchmark itself and on federated query engines running over FedShop.
 
-# FedShop Datasets and Queries
+## FedShop Datasets and Queries
+
 
 If you just want to reuse our generated datasets and queries, we release our datasets and queries [here](https://drive.google.com/drive/folders/1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ). To get all the archive (1,6Go) from Google Drive:
 
@@ -15,9 +16,10 @@ gdown 1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ -O fedshop.zip # large dataset
 You can grab just main parts of FedShop:
 * [All the quads](https://drive.google.com/file/d/1ZpQWztExR7uuGaVWZ4iD0xP9lbNfVnoz/view?usp=share_link) for the 200 sources.
 * The final [Virtuoso database](https://drive.google.com/file/d/1XL49DiYkzSlXVVaPXLaLJTNesfF5wFNR/view?usp=share_link) with all 200 sources
-* [All the queries](https://drive.google.com/file/d/1mQl8yy3ZKJP7WIncUkvlZW3sKlnpg-w2/view?usp=share_link) with results for all batches
+* [The FedShop Workload](https://docs.google.com/document/d/1gB5rkq5iySbiQJ_jzKjyDCbZ3DwLPEmPuIv45T834gI/edit?usp=share_link) 
+* The [Fedshop Workload as SPARQL 1.1 queries](https://docs.google.com/document/d/1Ihf1oIuF9cGTgMwC7y7byQlRstdfQBvfohyf73jW3mQ/edit?usp=share_link) with optimal source selection.
 
-# Install from source
+## Install from source
 
 - Install [Docker](https://docs.docker.com/get-docker/), Maven 3.6.3 with OpenJDK 11
  and [Compose (`>= 2.16.0`)](https://github.com/docker/compose)
@@ -35,10 +37,17 @@ conda install python=3.8
 pip install -r requirements.txt
 ```
 
-# Generate datasets and queries
+## FedShop Data Generator
+
+The Fedshop Data Generator is defined as three  [WatDiv](https://dsg.uwaterloo.ca/watdiv/) template models in [experiments/bsbm/model](experiments/bsbm/model/). These models follows the [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/) specification as close as possible. Using WatDiv models allows to change the schema easily through the configuration file [`experiments/bsbm/config.yaml`](experiments/bsbm/config.yaml)
 
 Most of the parameters of FedShop are set in [`experiments/bsbm/config.yaml`](experiments/bsbm/config.yaml). It includes the number of products to generate, the number of vendors and rating sites. 
-Once set, you can launch the generation of the FedShop benchmark with:
+
+Basic statistics about the default configuration of FedShop are available in the [jupyter notebook](Realistic_Synthetic_Federated.ipynb)
+
+## Generate datasets and queries
+
+Once `config.yaml` properly set, you can launch the generation of the FedShop benchmark with:
 
 ```bash
 python rsfb/benchmark.py generate experiments/bsbm/config.yaml  [OPTIONS]
@@ -66,7 +75,7 @@ Please note:
 * The generation of queries and the computation of optimal source selection requires [Virtuoso](https://github.com/openlink/virtuoso-opensource)
 * The dataset generation is realized with many calls to [Watdiv](https://dsg.uwaterloo.ca/watdiv/). WatDiv has been marginaly updated is available [here](https://github.com/mhoangvslev/watdiv/tree/e50cc38a28c79b73706ab3ee6f4d0340eedeee3f). It has been integrated into this github repository as a submodule.
 
-# Evaluate federated engines over FedShop
+## Evaluate federated engines over FedShop
 
 As the number of sources can be high, it becomes hard to have one SPARQL endpoint per source. We ingested all shops and rating-sites over a single Virtuoso server as Virtual Endpoints ie. each shop and rating-site has it own Virtual SPARQL endpoint. The different configurations relatives to Batch(i) are available to configure a given Federated Query Engine. It is possible at this stage to run all FedShop Benchmark with [Kobe](https://github.com/semagrow/kobe). However, we also provide a benchmark runner based on Snakemake that is convenient for managing failures during execution of the benchmark.
 
@@ -85,7 +94,7 @@ This launch the evaluation the  fedshop Workload over the different federations 
 
 Our [jupyter notebook](Realistic_Synthetic_Federated.ipynb) is already written to read results and computes the diverse metrics.
 
-# Benchmark your engine:
+## Benchmark your engine:
 
 - [Load](https://github.com/mhoangvslev/RSFB/wiki/Quick-tutorial#saveload-model) our [basic model]() and mark both the generation and evaluation phases as "completed":
 ```bash
@@ -130,7 +139,7 @@ python rsfb/benchmark.py evaluate experiments/bsbm/config.yaml --clean metrics
 - Compare to other engines using our Jupyter Notebook.
 
 
-# Most used commands:
+## Most used commands:
 
 ```bash
 # Remove Snakemake log directory
@@ -150,7 +159,7 @@ python rsfb/benchmark.py generate experiments/bsbm/config.yaml --rerun-incomplet
 
 ```
 
-# Save/load eval-model
+## Save/load eval-model
 - The eval-model, i.e, every artefact generated during data generation or engine evaluation phase can be packaged and shared.
 - To save a model:
 ```bash
@@ -165,7 +174,7 @@ cd experiments/bsbm/
 unzip benchmark.zip
 ```
 
-# FedShop Contributors
+## FedShop Contributors
 
 * Minh-Hoang DANG ([Nantes University](https://english.univ-nantes.fr/))
 * [Pascal Molli](https://sites.google.com/view/pascal-molli) ([Nantes University](https://english.univ-nantes.fr/))
