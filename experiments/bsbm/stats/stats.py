@@ -70,7 +70,7 @@ def get_endpoint_distribution():
     endpoints["batch_id"] = endpoints["g"].apply(get_batch_id)
     result = endpoints.groupby("batch_id").aggregate(list).cumsum().to_dict()
 
-    with open(f"{WORKDIR}/endpoint_distribution.json", "w") as json_fs:
+    with open(f"{WORKDIR}/endpoint_distribution.stat", "w") as json_fs:
         json.dump(result, json_fs)
     
 @cli.command()
@@ -83,7 +83,14 @@ def get_class_distribution():
         results.append(tmp)
     
     result = pd.concat(results, axis=1)
-    result.to_csv(f"{WORKDIR}/class_distribution.csv", index=True)
+    result.to_csv(f"{WORKDIR}/class_distribution.stat", index=True)
+
+def human_readable(bytesize):
+    size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+    i = int(math.log(bytesize, 1024))
+    p = math.pow(1024, i)
+    s = round(bytesize / p, 2)
+    return f"{s} {size_name[i]}"
 
 @cli.command()  
 def get_vendor_stats():
@@ -114,17 +121,10 @@ def get_vendor_stats():
 
         result["size"][f"batch{batch_id}"] += fsize
         
-    result_df = pd.DataFrame.from_dict(result, orient="index").sort_index(axis=1)
-    
-    def human_readable(bytesize):
-        size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
-        i = int(math.log(bytesize, 1024))
-        p = math.pow(1024, i)
-        s = round(bytesize / p, 2)
-        return f"{s} {size_name[i]}"
+    result_df = pd.DataFrame.from_dict(result, orient="index").sort_index(axis=1).cumsum(axis=1)
     
     result_df.loc["size_simplified", :] = result_df.loc["size", :].apply(human_readable)
-    result_df.to_csv(f"{Path(__file__).parent}/vendor_stats.csv", index=True)
+    result_df.to_csv(f"{Path(__file__).parent}/vendor_stats.stat", index=True)
     
 
 @cli.command()  
@@ -156,18 +156,22 @@ def get_ratingsite_stats():
 
         result["size"][f"batch{batch_id}"] += fsize
         
-    result_df = pd.DataFrame.from_dict(result, orient="index").sort_index(axis=1)
+    result_df = pd.DataFrame.from_dict(result, orient="index").sort_index(axis=1).cumsum(axis=1)
+        
+    result_df.loc["size_simplified", :] = result_df.loc["size", :].apply(human_readable)
+    result_df.to_csv(f"{Path(__file__).parent}/ratingsite_stats.stat", index=True)
+
+@cli.command()
+def get_overall_stats():
+    vendor_stats = pd.read_csv(f"{Path(__file__).parent}/vendor_stats.stat", index_col=0).loc[["nquads", "size"], :].astype(float)
+    ratingsite_stats = pd.read_csv(f"{Path(__file__).parent}/ratingsite_stats.stat", index_col=0).loc[["nquads", "size"], :].astype(float)
     
-    def human_readable(bytesize):
-        size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
-        i = int(math.log(bytesize, 1024))
-        p = math.pow(1024, i)
-        s = round(bytesize / p, 2)
-        return f"{s} {size_name[i]}"
+    result_df = vendor_stats + ratingsite_stats
+    
+    print(result_df)
     
     result_df.loc["size_simplified", :] = result_df.loc["size", :].apply(human_readable)
-    result_df.to_csv(f"{Path(__file__).parent}/ratingsite_stats.csv", index=True)
-        
+    result_df.to_csv(f"{Path(__file__).parent}/overall_stats.stat", index=True)
         
 if __name__ == "__main__":
     cli()

@@ -145,6 +145,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             write_empty_result(out_result)
             write_empty_result(stats)
             write_empty_stats(stats, "error")
+            
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
         if check_container_status(compose_file, service_name, container_name) != "running":
