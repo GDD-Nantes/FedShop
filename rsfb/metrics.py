@@ -34,7 +34,29 @@ def compute_metrics(configfile, outfile, workload):
         workload (_type_): List of all results obtained by executing provenance queries.
     """
     
-    def get_distinct_sources(df):
+    def get_rwss(df: pd.DataFrame, agg, is_evaluation_mode):
+        """Result-wise source-selection. Only has meaning on ideal source-selection, i.e, the source-selection calculated in generation
+
+        Args:
+            df (pd.DataFrame): _description_
+        """
+        
+        if is_evaluation_mode:
+            return None
+        
+        result = df.apply(pd.Series.nunique, axis=1).describe()
+        return result[agg]
+    
+    def get_tpwss(df: pd.DataFrame):
+        """The quantity relevant sources found for each triple pattern
+
+        Args:
+            df (_type_): _description_
+        """
+        
+        return df.apply(pd.Series.nunique).sum()
+    
+    def get_distinct_sources(df: pd.DataFrame):
         return pd.Series(df.values.flatten()).nunique()
 
     def get_relevant_sources_selectivity(df: pd.DataFrame, total_number_sources):
@@ -92,23 +114,31 @@ def compute_metrics(configfile, outfile, workload):
         results_file = f"{Path(provenance_file).parent}/results.csv"
         nb_results = np.nan if os.stat(results_file).st_size == 0 else len(pd.read_csv(results_file))
         
-        record = {
+        is_evaluation_mode = ( (engine in CONFIG["evaluation"]["engines"]) and (attempt is not None) )
+        
+        record = dict()
+        
+        if is_evaluation_mode:
+            record.update({
+                "attempt": int(attempt),
+                "engine": engine
+            })
+        
+        record.update({
             "query": query,
             "instance": instance,
             "batch": batch,
             "nb_results": nb_results,
             "nb_distinct_sources": get_distinct_sources(source_selection_result),
-            "relevant_sources_selectivity": get_relevant_sources_selectivity(source_selection_result, total_nb_sources)
+            "relevant_sources_selectivity": get_relevant_sources_selectivity(source_selection_result, total_nb_sources),
+            "tpwss": get_tpwss(source_selection_result),
+            "avg_rwss": get_rwss(source_selection_result, "mean", is_evaluation_mode),
+            "min_rwss": get_rwss(source_selection_result, "min", is_evaluation_mode),
+            "max_rwss": get_rwss(source_selection_result, "max", is_evaluation_mode)
             #"tp_specific_relevant_sources_selectivity": get_tp_specific_relevant_sources(source_selection_result),
             #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(source_selection_result),
             #"xfed_join_restricted_source_level_tp_selectivity": get_xfed_join_restricted_source_level_tp_selectivity(source_selection_result)
-        }
-        
-        if attempt is not None:
-            record.update({"attempt": int(attempt)})
-        
-        if engine in CONFIG["evaluation"]["engines"]:
-            record.update({"engine": engine})
+        })
         
         records.append(record)
     

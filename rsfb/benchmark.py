@@ -30,6 +30,9 @@ def generate(ctx: click.Context, configfile, category, debug, clean, cores, reru
         mode (_type_): Either "generate" or "evaluate"
         op (_type_): Either "debug" or "clean"
     """
+    
+    if no_cache:
+        shutil.rmtree(".snakemake")
 
     if cores == -1: cores = "all"
 
@@ -74,8 +77,9 @@ def generate(ctx: click.Context, configfile, category, debug, clean, cores, reru
 @click.option("--cores", type=click.INT, default=1, help="The number of cores used allocated. -1 if use all cores.")
 @click.option("--rerun-incomplete", is_flag=True, default=False)
 @click.option("--touch", is_flag=True, default=False)
+@click.option("--no-cache", is_flag=True, default=False)
 @click.pass_context
-def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomplete, touch):
+def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomplete, touch, no_cache):
 
     CONFIG = load_config(configfile)
     GEN_CONFIG = CONFIG["generation"]
@@ -89,6 +93,9 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
 
     SNAKEMAKE_OPTS = f"-p --cores {cores} --config configfile={configfile}"
     if rerun_incomplete: SNAKEMAKE_OPTS += " --rerun-incomplete"
+    
+    if no_cache:
+        shutil.rmtree(".snakemake")
     
     if touch:
         logger.info("Marking files as completed...")
