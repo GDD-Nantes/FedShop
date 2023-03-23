@@ -17,6 +17,8 @@ public class FedXContainer {
     private Map<Integer, Set<String>> triplePatternSources;
     private AtomicInteger httpReqCount;
     private ConcurrentLinkedQueue<String> httpReqList;
+    private long sourceSelectionTime;
+    private long planningTime;
 
     public FedXContainer(){
         this.stmtToSources = new ConcurrentHashMap<>();
@@ -24,6 +26,7 @@ public class FedXContainer {
         this.triplePatternSources = new ConcurrentHashMap<>();
         this.httpReqCount = new AtomicInteger();
         this.httpReqList = new ConcurrentLinkedQueue<>();
+        this.sourceSelectionTime = 0;
     }
 
     public Map<StatementPattern, List<StatementSource>> getStmtToSources() {
@@ -57,4 +60,22 @@ public class FedXContainer {
     public void setTriplePatternSources(Map<Integer, Set<String>> triplePatternSources) {
         this.triplePatternSources = triplePatternSources;
     }
+
+    public void setSourceSelectionTime(long sourceSelectionTime) {
+        this.sourceSelectionTime = sourceSelectionTime;
+    }
+
+    public long getSourceSelectionTime() {
+        return this.sourceSelectionTime;
+    }
+
+    public void setPlanningTime(long planningTime) {
+        this.planningTime = planningTime;
+    }
+
+    public long getPlanningTime() {
+        return this.planningTime;
+    }
+
+
 }

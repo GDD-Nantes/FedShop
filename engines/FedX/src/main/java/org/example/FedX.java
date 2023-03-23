@@ -35,7 +35,7 @@ public class FedX {
     public static final FedXContainer CONTAINER = new FedXContainer();
 
     private static void createSourceSelectionFile(String sourceSelectionPath) throws Exception {
-        
+
     }
 
     private static void parseSourceSelection(String path) throws Exception {
@@ -123,33 +123,35 @@ public class FedX {
 
         try (RepositoryConnection conn = repo.getConnection()) {
             TupleQuery tq = conn.prepareTupleQuery(rawQuery);
-            try (TupleQueryResult res = tq.evaluate()) {
-                log.info("# Optimized Query Plan: ");
-                String queryPlan = QueryPlanLog.getQueryPlan();
-                // log.info(queryPlan);
-                
-                if (!outQueryPlanFile.equals("/dev/null")) {
-                    try (BufferedWriter queryPlanWriter = new BufferedWriter(new FileWriter(outQueryPlanFile))) {
-                        queryPlanWriter.write(queryPlan);
-                    }
-                }
 
-                
-                if (!outSourceSelectionPath.equals("/dev/null")) {
-                    try (BufferedWriter sourceSelectionWriter = new BufferedWriter(new FileWriter(outSourceSelectionPath))) {
-                        sourceSelectionWriter.write("triple,source_selection\n");
-                        Map<StatementPattern, List<StatementSource>> stmt = FedX.CONTAINER.getStmtToSources();
-                        if (stmt != null) {
-                            // String jsonString = new Gson().toJson(stmt);
-                            // sourceSelectionWriter.write(jsonString);
-                            for (StatementPattern pattern : stmt.keySet()) {
-                                sourceSelectionWriter.write(
-                                        ("\"" + pattern + "\"," + "\"" + stmt.get(pattern).toString()).replace("\n", " ") + "\"\n");
-                            }
+            log.info("# Optimized Query Plan: ");
+            String queryPlan = QueryPlanLog.getQueryPlan();
+            // log.info(queryPlan);
+
+            if (!outQueryPlanFile.equals("/dev/null")) {
+                try (BufferedWriter queryPlanWriter = new BufferedWriter(new FileWriter(outQueryPlanFile))) {
+                    queryPlanWriter.write(queryPlan);
+                }
+            }
+
+            if (!outSourceSelectionPath.equals("/dev/null")) {
+                try (BufferedWriter sourceSelectionWriter = new BufferedWriter(
+                        new FileWriter(outSourceSelectionPath))) {
+                    sourceSelectionWriter.write("triple,source_selection\n");
+                    Map<StatementPattern, List<StatementSource>> stmt = FedX.CONTAINER.getStmtToSources();
+                    if (stmt != null) {
+                        // String jsonString = new Gson().toJson(stmt);
+                        // sourceSelectionWriter.write(jsonString);
+                        for (StatementPattern pattern : stmt.keySet()) {
+                            sourceSelectionWriter.write(
+                                    ("\"" + pattern + "\"," + "\"" + stmt.get(pattern).toString()).replace("\n", " ")
+                                            + "\"\n");
                         }
                     }
                 }
-
+            }
+            
+            try (TupleQueryResult res = tq.evaluate()) {
                 try (BufferedWriter queryResultWriter = new BufferedWriter(new FileWriter(outResultPath))) {
 
                     // The execution of hasNext() yield null exception error
@@ -167,7 +169,7 @@ public class FedX {
                 isInterrupted = true;
                 writeEmptyStats(statPath, "oom");
             } catch (Exception exception) {
-                isInterrupted = true; 
+                isInterrupted = true;
                 if (exception.getMessage().contains("has run into a timeout")) {
                     writeEmptyStats(statPath, "timeout");
                 } else {
@@ -184,6 +186,8 @@ public class FedX {
 
         long durationTime = endTime - startTime;
         int nbHttpQueries = CONTAINER.getHttpReqCount().get();
+        long sourceSelectionTime = CONTAINER.getSourceSelectionTime();
+        long planningTime = CONTAINER.getPlanningTime();
 
         if (!statPath.equals("/dev/null") && !isInterrupted) {
             File statFile = new File(statPath);
@@ -208,10 +212,17 @@ public class FedX {
             String batch = basicInfos.group(4);
             String attempt = basicInfos.group(5);
 
-            String[] header = { "query", "engine", "instance", "batch", "attempt", "exec_time", "http_req" };
+            String[] header = { 
+                "query", "engine", "instance", "batch", "attempt", "exec_time", "http_req",
+                "source_selection_time", "planning_time"
+            };
             statWriter.writeNext(header);
 
-            String[] content = { query, engine, instance, batch, attempt, Long.toString(durationTime), Integer.toString(nbHttpQueries) };
+            String[] content = { 
+                query, engine, instance, batch, attempt, Long.toString(durationTime),
+                    Integer.toString(nbHttpQueries), Long.toString(sourceSelectionTime), 
+                    Long.toString(planningTime)
+                };
             statWriter.writeNext(content);
             statWriter.close();
         }
