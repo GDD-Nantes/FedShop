@@ -4,10 +4,14 @@ FedShop is a synthetic RDF Federated Benchmark designed for scalability. It eval
 
 FedShop consists of three components: the data generator, the query (and template) generator, and the running environment able to collect statistics on the benchmark itself and on federated query engines running over FedShop.
 
+## FedShop Results
+
+All the results are available through the [Jupyter Notebook](Realistic_Synthetic_Federated.ipynb)
+
 ## FedShop Datasets and Queries
 
 
-If you just want to reuse our generated datasets and queries, we release our datasets and queries [here](https://drive.google.com/drive/folders/1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ). To get all the archive (1,6Go) from Google Drive:
+All generated datasets and queries are available [here](https://drive.google.com/drive/folders/1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ). The following command allows downloading the archive (1,6Go) from Google Drive:
 
 ```bash
 # !pip install --quiet gdown==4.5.4 --no-cache-dir
@@ -19,7 +23,7 @@ You can grab just main parts of FedShop:
 * [The FedShop Workload](https://docs.google.com/document/d/1gB5rkq5iySbiQJ_jzKjyDCbZ3DwLPEmPuIv45T834gI/edit?usp=share_link) 
 * The [Fedshop Workload as SPARQL 1.1 queries](https://docs.google.com/document/d/1Ihf1oIuF9cGTgMwC7y7byQlRstdfQBvfohyf73jW3mQ/edit?usp=share_link) with optimal source selection.
 
-## Install from source
+## Install from the source
 
 - Install [Docker](https://docs.docker.com/get-docker/), Maven 3.6.3 with OpenJDK 11
  and [Compose (`>= 2.16.0`)](https://github.com/docker/compose)
@@ -39,15 +43,15 @@ pip install -r requirements.txt
 
 ## FedShop Data Generator
 
-The Fedshop Data Generator is defined as three  [WatDiv](https://dsg.uwaterloo.ca/watdiv/) template models in [experiments/bsbm/model](experiments/bsbm/model/). These models follows the [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/) specification as close as possible. Using WatDiv models allows to change the schema easily through the configuration file [`experiments/bsbm/config.yaml`](experiments/bsbm/config.yaml)
+The FedShop Data Generator is defined as three  [WatDiv](https://dsg.uwaterloo.ca/watdiv/) template models in [experiments/bsbm/model](experiments/bsbm/model/). These models follow the [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/) specification as closely as possible. Using WatDiv models allows to changing the schema easily through the configuration file [`experiments/bsbm/config.yaml`](experiments/bsbm/config.yaml).
 
 Most of the parameters of FedShop are set in [`experiments/bsbm/config.yaml`](experiments/bsbm/config.yaml). It includes the number of products to generate, the number of vendors and rating sites. 
 
 Basic statistics about the default configuration of FedShop are available in the [jupyter notebook](Realistic_Synthetic_Federated.ipynb)
 
-## Generate datasets and queries
+## Generate Datasets and Queries
 
-Once `config.yaml` properly set, you can launch the generation of the FedShop benchmark with:
+Once `config.yaml` properly set, you can launch the generation of the FedShop benchmark with the following command:
 
 ```bash
 python rsfb/benchmark.py generate experiments/bsbm/config.yaml  [OPTIONS]
@@ -57,38 +61,38 @@ OPTIONS:
 --touch : mark a phase as "terminated" so snakemake would not rerun it.
 ```
 
-Such process is very long and complex. All the artefacts produced during generation is created under experiment/bsbm. Datasets are created under experiments/bsbm/model/dataset, and queries under experiments/bsbm/benchmark/generation
+Such a process is very long and complex. All the artifacts produced during generation is created under experiment/bsbm. Datasets are created under experiments/bsbm/model/dataset, and queries under experiments/bsbm/benchmark/generation.
 
-The overall workflow for FedShop generation is the following:
+The overall workflow for FedShop generation is as follows:
 * Create the catalog of products (200000 by default)
-* Batch(0)= Create 10 autonomous vendors and 10 autonomous rating-sites sharing products from the catalog (products are replicated with local URL per vendors and rating sites). The distibution law can be controled with parameters declared in experiments/bsbm/config.yaml 
-* Workload= Instanciate the 12 template queries with 10 different random place-holders such that each query return results.
+* Batch(0)= Create 10 autonomous vendors and 10 autonomous rating-sites sharing products from the catalog (products are replicated with local URL per vendors and rating sites). The distribution law can be controled with parameters declared in experiments/bsbm/config.yaml 
+* Workload= Instantiate the 12 template queries with 10 different random place-holders, such that each query return results.
 * Compute the optimal source selection of each of the 120 queries of the Workload on Batch(0)
 * For i from 1 to 9
   * Batch(i)=Batch(i-1)+10 new vendors and 10 rating-sites
   * Compute the optimal source selection for each query of the Workload over Batch(i)
 
-We finished this process with a federation of 200 different sources. All information about Batch(i) are stored in ??.This overall Workflow can be changed thanks to parameters declared in experiments/bsbm/config.yaml 
+We finished this process with a federation of 200 different sources. All information about Batch(i) are stored in ??.This overall workflow can be changed thanks to parameters declared in experiments/bsbm/config.yaml 
 
 Please note:
-* The workflow is managed with the [Snakemake](https://snakemake.readthedocs.io/en/stable/) workflow management system. It allows to create reproducible and scalable data analyses. The snakemake files are located in experiments/bsbm/*.smk.
+* The workflow is managed with the [Snakemake](https://snakemake.readthedocs.io/en/stable/) workflow management system. It allows the creation of reproducible and scalable data analyses. The snakemake files are located in experiments/bsbm/*.smk.
 * The generation of queries and the computation of optimal source selection requires [Virtuoso](https://github.com/openlink/virtuoso-opensource)
-* The dataset generation is realized with many calls to [Watdiv](https://dsg.uwaterloo.ca/watdiv/). WatDiv has been marginaly updated is available [here](https://github.com/mhoangvslev/watdiv/tree/e50cc38a28c79b73706ab3ee6f4d0340eedeee3f). It has been integrated into this github repository as a submodule.
+* The dataset generation is realized with many calls to [Watdiv](https://dsg.uwaterloo.ca/watdiv/). WatDiv is marginally updated and is available [here](https://github.com/mhoangvslev/watdiv/tree/e50cc38a28c79b73706ab3ee6f4d0340eedeee3f). It has been integrated into this github repository as a submodule.
 
 ## Evaluate federated engines over FedShop
 
-As the number of sources can be high, it becomes hard to have one SPARQL endpoint per source. We ingested all shops and rating-sites over a single Virtuoso server as Virtual Endpoints ie. each shop and rating-site has it own Virtual SPARQL endpoint. The different configurations relatives to Batch(i) are available to configure a given Federated Query Engine. It is possible at this stage to run all FedShop Benchmark with [Kobe](https://github.com/semagrow/kobe). However, we also provide a benchmark runner based on Snakemake that is convenient for managing failures during execution of the benchmark.
+As the number of sources can be high, having a SPARQL endpoint per source becomes hard. We ingested all shops and rating-sites over a single Virtuoso server as Virtual Endpoints,i.e.,  each shop and rating-site has its own Virtual SPARQL endpoint. The different configurations relative to Batch(i) are available to configure a given Federated Query Engine. It is possible at this stage to run all FedShop Benchmark with [Kobe](https://github.com/semagrow/kobe). However, we also provide a benchmark runner based on Snakemake that is convenient for managing failures during the execution of the benchmark.
 
-Federated query engines have to implements a [template](rsfb/engines/TemplateEngine.py) to be integrated in the Evalution workflow. Many template are already written in [`rsfb/engines/`](rsfb/engines/). Once integrated, 
-Federated query engine have to be declared in `experiments/bsbm/config.yaml` to be run.
+Federated query engines must implement a [template](rsfb/engines/TemplateEngine.py) to be integrated in the evalution workflow. Many templates are already written in [`rsfb/engines/`](rsfb/engines/). Once integrated, 
+Federated query engine must be declared in `experiments/bsbm/config.yaml` to run.
 
-The following command allow to launch the evaluation:
+The following command allows to launch the evaluation:
 ```bash
 python rsfb/benchmark.py evaluate experiments/bsbm/config.yaml --rerun-incomplete [OPTIONS]
 
 OPTIONS:
 --clean [benchmark|metrics|instances][+db]: clean the benchmark|metrics|instances then (optional) destroy all database containers
---touch : mark a phase as "terminated" so snakemake would not rerun it.
+--touch : mark a phase as "terminated" so Snakemake would not rerun it.
 ```
 This launch the evaluation the  fedshop Workload over the different federations Batch(i) with the Federated engines declared in experiments/bsbm/config.yaml. As for the generation, this process is long and complex and is managed by Snakemake. The evaluation rules are declared in experiments/bsbm/evaluate.smk. All the results are produced under experiments/bsbm/benchmark/evaluation.
 
