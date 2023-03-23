@@ -6,14 +6,16 @@ PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 PREFIX dc: <http://purl.org/dc/elements/1.1/>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
-SELECT DISTINCT ?bgp1 ?bgp2
+SELECT DISTINCT ?bgp1 ?bgp2 ?bgp3
 WHERE { 
+    GRAPH ?bgp1 {
+        ?localProduct rdf:type bsbm:Product .
+        # const ?ProductXYZ
+        ?localProduct owl:sameAs ?ProductXYZ .
+        ?localProduct rdfs:label ?productLabel .
+    }
     OPTIONAL {
-        GRAPH ?bgp1 {
-            ?localProduct rdf:type bsbm:Product .
-            # const ?ProductXYZ
-            ?localProduct owl:sameAs ?ProductXYZ .
-            ?localProduct rdfs:label ?productLabel .
+        GRAPH ?bgp2 {
             ?offer bsbm:product ?offerProduct .
             ?offerProduct  owl:sameAs ?ProductXYZ .  
             ?offer bsbm:price ?price .
@@ -27,11 +29,7 @@ WHERE {
         }
     }
     OPTIONAL {
-        GRAPH ?bgp2 {
-            ?localProduct rdf:type bsbm:Product .
-            # const ?ProductXYZ
-            ?localProduct owl:sameAs ?ProductXYZ .
-            ?localProduct rdfs:label ?productLabel .
+        GRAPH ?bgp3 {
             ?review bsbm:reviewFor ?reviewProduct .
             ?reviewProduct owl:sameAs ?ProductXYZ .
             ?review rev:reviewer ?reviewer .

@@ -1,10 +1,8 @@
 {
     "bgp1": [
-        "?localProduct rdf:type bsbm:Product",
-        "?localProduct owl:sameAs ?ProductXYZ",
-        "?localProduct rdfs:label ?productLabel",
         "?offer bsbm:product ?offerProduct",
         "?offerProduct owl:sameAs ?ProductXYZ",
+        "?offerProduct rdfs:label ?productLabel",
         "?offer bsbm:price ?price",
         "?offer bsbm:vendor ?vendor",
         "?vendor rdfs:label ?vendorTitle",
@@ -12,11 +10,9 @@
         "?offer bsbm:validTo ?date"
     ],
     "bgp2": [
-        "?localProduct rdf:type bsbm:Product",
-        "?localProduct owl:sameAs ?ProductXYZ",
-        "?localProduct rdfs:label ?productLabel",
         "?review bsbm:reviewFor ?reviewProduct",
         "?reviewProduct owl:sameAs ?ProductXYZ",
+        "?reviewProduct rdfs:label ?productLabel",
         "?review rev:reviewer ?reviewer",
         "?reviewer foaf:name ?revName",
         "?review dc:title ?revTitle",
