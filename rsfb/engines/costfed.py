@@ -102,7 +102,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     costfed_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     os.chdir(oldcwd)
     try:        
-        costfed_proc.wait(timeout=timeout)
+        costfed_proc.wait(timeout)
         if costfed_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
             
@@ -116,7 +116,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                 "Result #3": "batch",
                 "Result #4": "attempt",
                 "Result #5": "exec_time",
-                "Result #6": "http_req"
+                "Result #6": "http_req",
+                "Result #7": "source_selection_time"
             }, axis=1)
             
             basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
@@ -148,12 +149,14 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
-        if check_container_status(compose_file, service_name, container_name) != "running":
+        if (container_status := check_container_status(compose_file, service_name, container_name)) != "running":
+            logger.debug(container_status)
             raise RuntimeError("Backend is terminated!")
+        logger.info("Writing empty stats...")
         write_empty_stats(stats, "timeout")
         write_empty_result(out_result)    
     finally:
-        os.system('pkill -9 -f "CostFed"')
+        os.system('pkill -9 -f "costfed/target"')
         #kill_process(fedx_proc.pid)        
 
 @cli.command()
