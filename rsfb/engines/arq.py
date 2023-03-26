@@ -150,6 +150,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         timeout = config["evaluation"]["timeout"]
         http_req = "N/A"
         exec_time = None
+        source_selection_time = None
+        planning_time = None
         
         arq = f'{config["evaluation"]["engines"]["arq"]["dir"]}/jena/bin/arq'
         exec_cmd = f"{arq} --query {service_query_file} --results=CSV --time"
@@ -165,6 +167,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                 result_df = pd.read_csv(BytesIO(arq_proc.stdout))
                                 
                 exec_time = float(re.search(r"Time: (\d+(\.\d+)?) sec.*", arq_proc.stderr.decode()).group(1)) * 1e3
+                source_selection_time = None
                 
                 if result_df.empty:
                     logger.error(f"{query} yield no results!")
@@ -189,14 +192,17 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         # Write stats
         logger.info(f"Writing stats to {stats}")
         with open(stats, "w") as stats_fs:
-            stats_fs.write("query,engine,instance,batch,attempt,exec_time,http_req\n")
+            stats_fs.write("query,engine,instance,batch,attempt,exec_time,http_req,source_selection_time,planning_time\n")
             basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
             engine = basicInfos.group(1)
             queryName = basicInfos.group(2)
             instance = basicInfos.group(3)
             batch = basicInfos.group(4)
             attempt = basicInfos.group(5)
-            stats_fs.write(",".join([queryName, engine, instance, batch, attempt, str(exec_time), str(http_req)])+"\n") 
+            stats_fs.write(",".join([
+                queryName, engine, instance, batch, attempt, 
+                str(exec_time), str(http_req), str(source_selection_time), str(planning_time)
+            ])+"\n") 
         
         # Write output source selection
         os.system(f"cp {force_source_selection} {out_source_selection}")
