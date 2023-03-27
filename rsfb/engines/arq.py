@@ -192,7 +192,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         # Write stats
         logger.info(f"Writing stats to {stats}")
         with open(stats, "w") as stats_fs:
-            stats_fs.write("query,engine,instance,batch,attempt,exec_time,http_req,source_selection_time,planning_time\n")
+            stats_fs.write("query,engine,instance,batch,attempt,exec_time,ask,source_selection_time,planning_time\n")
             basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
             engine = basicInfos.group(1)
             queryName = basicInfos.group(2)

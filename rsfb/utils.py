@@ -358,7 +358,7 @@ def load_config(filename, saveAs=None):
 
 def write_empty_stats(outfile, reason):
     with open(outfile, "w") as fout:
-        fout.write("query,engine,instance,batch,attempt,exec_time,http_req,source_selection_time,planning_time\n")
+        fout.write("query,engine,instance,batch,attempt,exec_time,ask,source_selection_time,planning_time\n")
         if outfile != "/dev/null":
             basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", outfile)
             engine = basicInfos.group(1)
