@@ -185,7 +185,7 @@ public class FedX {
         endTime = System.currentTimeMillis();
 
         long durationTime = endTime - startTime;
-        int nbHttpQueries = CONTAINER.getHttpReqCount().get();
+        int nbAskQueries = CONTAINER.getAskCount();
         long sourceSelectionTime = CONTAINER.getSourceSelectionTime();
         long planningTime = CONTAINER.getPlanningTime();
 
@@ -213,14 +213,14 @@ public class FedX {
             String attempt = basicInfos.group(5);
 
             String[] header = { 
-                "query", "engine", "instance", "batch", "attempt", "exec_time", "http_req",
+                "query", "engine", "instance", "batch", "attempt", "exec_time", "ask",
                 "source_selection_time", "planning_time"
             };
             statWriter.writeNext(header);
 
             String[] content = { 
                 query, engine, instance, batch, attempt, Long.toString(durationTime),
-                    Integer.toString(nbHttpQueries), Long.toString(sourceSelectionTime), 
+                    Integer.toString(nbAskQueries), Long.toString(sourceSelectionTime), 
                     Long.toString(planningTime)
                 };
             statWriter.writeNext(content);
@@ -252,7 +252,7 @@ public class FedX {
             String batch = basicInfos.group(4);
             String attempt = basicInfos.group(5);
 
-            String[] header = { "query", "engine", "instance", "batch", "attempt", "exec_time", "http_req" };
+            String[] header = { "query", "engine", "instance", "batch", "attempt", "exec_time", "ask", "source_selection_time", "planing_time" };
             statWriter.writeNext(header);
 
             String[] content = { query, engine, instance, batch, attempt, reason, reason };
