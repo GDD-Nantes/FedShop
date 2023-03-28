@@ -1,8 +1,8 @@
 # FedShop : The Federated Shop Benchmark
 
-FedShop is a synthetic RDF Federated Benchmark designed for scalability. It evaluates the performance of SPARQL query federation engines  such as [FedX](https://rdf4j.org/documentation/programming/federation/), [CostFed](https://github.com/dice-group/CostFed), [Semagrow](https://semagrow.github.io/), Splendid, [HeFQUIN](https://github.com/LiUSemWeb/HeFQUIN), etc, when the number of federation members grows. FedShop is built around an e-commerce scenario with online hops and rating Web sites as in [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/). Compared to  BSBM, each shop and rating site of FedShop has its own SPARQL endpoint and shares a standard catalog of products. Following the BSBM idea, the FedShop queries simulate a user navigating the federation of shops as if it was a single virtual shop. The scale factor corresponds to the number of shops and rating sites within the federation. Hence, with the FedShop benchmark, we can observe the performance of federated queries when the number of federation members increases.
+FedShop is a synthetic RDF Federated Benchmark designed for scalability. It evaluates the performance of SPARQL federated query engines such as [FedX](https://rdf4j.org/documentation/programming/federation/), [CostFed](https://github.com/dice-group/CostFed), [Semagrow](https://semagrow.github.io/), Splendid, [HeFQUIN](https://github.com/LiUSemWeb/HeFQUIN), etc, when the number of federation members grows. FedShop is built around an e-commerce scenario with online hops and rating Web sites as in [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/). Compared to  BSBM, each shop and rating site of FedShop has its own SPARQL endpoint and shares a standard catalog of products. Following the BSBM idea, the FedShop queries simulate a user navigating the federation of shops as if it was a single virtual shop. The scale factor corresponds to the number of shops and rating sites within the federation. Hence, with the FedShop benchmark, we can observe the performance of federated queries when the number of federation members increases.
 
-FedShop consists of three components: a data generator, a query (and template) generator, and a running environment able to collect statistics about the query federation engines under test as well as about the benchmark itself.
+FedShop consists of three components: a data generator, a query (and template) generator, and a running environment able to collect statistics about the federated query engines under test as well as about the benchmark itself.
 
 ## FedShop Results
 
@@ -79,11 +79,11 @@ Please note:
 * The generation of queries and the computation of optimal source assignments requires [Virtuoso](https://github.com/openlink/virtuoso-opensource)
 * The dataset generation is realized with many calls to [Watdiv](https://dsg.uwaterloo.ca/watdiv/). WatDiv is marginally updated and is available [here](https://github.com/mhoangvslev/watdiv/tree/e50cc38a28c79b73706ab3ee6f4d0340eedeee3f). It has been integrated into this github repository as a submodule.
 
-## Evaluate query federation engines using FedShop
+## Evaluate federated query engines using FedShop
 
-As the number of federation members can be high, having a SPARQL endpoint per federation member becomes hard. We ingested all shops and rating-sites over a single Virtuoso server as Virtual Endpoints,i.e.,  each shop and rating-site has its own Virtual SPARQL endpoint. The different configurations relative to Batch(i) are available to configure a given query federation engine. It is possible at this stage to run all FedShop Benchmark with [Kobe](https://github.com/semagrow/kobe). However, we also provide a benchmark runner based on Snakemake that is convenient for managing failures during the execution of the benchmark.
+As the number of federation members can be high, having a SPARQL endpoint per federation member becomes hard. We ingested all shops and rating-sites over a single Virtuoso server as Virtual Endpoints,i.e.,  each shop and rating-site has its own Virtual SPARQL endpoint. The different configurations relative to Batch(i) are available to configure a given federated query engine. It is possible at this stage to run all FedShop Benchmark with [Kobe](https://github.com/semagrow/kobe). However, we also provide a benchmark runner based on Snakemake that is convenient for managing failures during the execution of the benchmark.
 
-Query federation engines must implement a [template](rsfb/engines/TemplateEngine.py) to be integrated in the evaluation workflow. Many templates are already written in [`rsfb/engines/`](rsfb/engines/). Once integrated, 
+Federated query engines must implement a [template](rsfb/engines/TemplateEngine.py) to be integrated in the evaluation workflow. Many templates are already written in [`rsfb/engines/`](rsfb/engines/). Once integrated, 
 the engine to be tested must be declared in `experiments/bsbm/config.yaml` to run.
 
 The following command allows to launch the evaluation:
@@ -94,7 +94,7 @@ OPTIONS:
 --clean [benchmark|metrics|instances][+db]: clean the benchmark|metrics|instances then (optional) destroy all database containers
 --touch : mark a phase as "terminated" so Snakemake would not rerun it.
 ```
-This launches the evaluation the FedShop workload over the different federations Batch(i) with the query federation engines declared in experiments/bsbm/config.yaml. As for the generation, this process is long and complex and is managed by Snakemake. The evaluation rules are declared in experiments/bsbm/evaluate.smk. All the results are produced under experiments/bsbm/benchmark/evaluation.
+This launches the evaluation the FedShop workload over the different federations Batch(i) with the federated query engines declared in experiments/bsbm/config.yaml. As for the generation, this process is long and complex and is managed by Snakemake. The evaluation rules are declared in experiments/bsbm/evaluate.smk. All the results are produced under experiments/bsbm/benchmark/evaluation.
 
 Our [jupyter notebook](Realistic_Synthetic_Federated.ipynb) is already written to read results and computes the diverse metrics.
 
