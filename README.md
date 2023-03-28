@@ -1,27 +1,27 @@
 # FedShop : The Federated Shop Benchmark
 
-FedShop is a synthetic RDF Federated Benchmark designed for scalability. It evaluates the performances of SPARQL federated query engines  such as [FedX](https://rdf4j.org/documentation/programming/federation/), CostFed, Semagrow, Splendid, etc, when the number of sources grows. FedShop is built around an E-commerce scenario with e-shops and e-rating-sites as in [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/). Compared to  BSBM, each shop, and rating-site of FedShop has its own SPARQL endpoint and shares a standard catalog of products. Following the BSBM idea, the FedShop queries simulate a user navigating the Federated shop as a single virtual shop. The scaling factor is obtained by adding more and more shops and rating-sites within the federation. In FedShop, we are can observe the performances of federated queries when the number of sources is increasing.
+FedShop is a synthetic RDF Federated Benchmark designed for scalability. It evaluates the performance of SPARQL federated-query engines such as [FedX](https://rdf4j.org/documentation/programming/federation/), [CostFed](https://github.com/dice-group/CostFed), [Semagrow](https://semagrow.github.io/), Splendid, [HeFQUIN](https://github.com/LiUSemWeb/HeFQUIN), etc, when the number of federation members grows. FedShop is built around an e-commerce scenario with online hops and rating Web sites as in [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/). Compared to  BSBM, each shop and rating site of FedShop has its own SPARQL endpoint and shares a standard catalog of products. Following the BSBM idea, the FedShop queries simulate a user navigating the federation of shops as if it was a single virtual shop. The scale factor corresponds to the number of shops and rating sites within the federation. Hence, with the FedShop benchmark, we can observe the performance of federated queries when the number of federation members increases.
 
-FedShop consists of three components: the data generator, the query (and template) generator, and the running environment able to collect statistics on the benchmark itself and on federated query engines running over FedShop.
+FedShop consists of three components: a data generator, a query (and template) generator, and a running environment able to collect statistics about the federated-query engines under test as well as about the benchmark itself.
 
 ## FedShop Results
 
-All the results are available through the [Jupyter Notebook](Realistic_Synthetic_Federated.ipynb)
+All the results are available through a [Jupyter Notebook](Realistic_Synthetic_Federated.ipynb)
 
 ## FedShop Datasets and Queries
 
 
-All generated datasets and queries are available [here](https://drive.google.com/drive/folders/1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ). The following command allows downloading the archive (1,6Go) from Google Drive:
+All generated datasets and queries are available [here](https://drive.google.com/drive/folders/1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ). The following command allows downloading the archive (1.6GB) from Google Drive:
 
 ```bash
 # !pip install --quiet gdown==4.5.4 --no-cache-dir
 gdown 1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ -O fedshop.zip # large dataset
 ```
-You can grab just main parts of FedShop:
-* [All the quads](https://drive.google.com/file/d/1ZpQWztExR7uuGaVWZ4iD0xP9lbNfVnoz/view?usp=share_link) for the 200 sources.
-* The final [Virtuoso database](https://drive.google.com/file/d/1XL49DiYkzSlXVVaPXLaLJTNesfF5wFNR/view?usp=share_link) with all 200 sources
+Instead of downloading the complete archive, you can also download only individual parts of FedShop:
+* [All the quads](https://drive.google.com/file/d/1ZpQWztExR7uuGaVWZ4iD0xP9lbNfVnoz/view?usp=share_link) for the 200 federation members.
+* The final [Virtuoso database](https://drive.google.com/file/d/1XL49DiYkzSlXVVaPXLaLJTNesfF5wFNR/view?usp=share_link) with all 200 federation members
 * [The FedShop Workload](https://docs.google.com/document/d/1gB5rkq5iySbiQJ_jzKjyDCbZ3DwLPEmPuIv45T834gI/edit?usp=share_link) 
-* The [Fedshop Workload as SPARQL 1.1 queries](https://docs.google.com/document/d/1Ihf1oIuF9cGTgMwC7y7byQlRstdfQBvfohyf73jW3mQ/edit?usp=share_link) with optimal source selection.
+* The [Fedshop Workload as SPARQL 1.1 queries](https://docs.google.com/document/d/1Ihf1oIuF9cGTgMwC7y7byQlRstdfQBvfohyf73jW3mQ/edit?usp=share_link) with optimal source assignments.
 
 ## Install from the source
 
@@ -67,24 +67,24 @@ The overall workflow for FedShop generation is as follows:
 * Create the catalog of products (200000 by default)
 * Batch(0)= Create 10 autonomous vendors and 10 autonomous rating-sites sharing products from the catalog (products are replicated with local URL per vendors and rating sites). The distribution law can be controled with parameters declared in experiments/bsbm/config.yaml 
 * Workload= Instantiate the 12 template queries with 10 different random place-holders, such that each query return results.
-* Compute the optimal source selection of each of the 120 queries of the Workload on Batch(0)
+* Compute the optimal source assignment of each of the 120 queries of the Workload on Batch(0)
 * For i from 1 to 9
   * Batch(i)=Batch(i-1)+10 new vendors and 10 rating-sites
-  * Compute the optimal source selection for each query of the Workload over Batch(i)
+  * Compute the optimal source assignment for each query of the Workload over Batch(i)
 
-We finished this process with a federation of 200 different sources. All information about Batch(i) are stored in ??.This overall workflow can be changed thanks to parameters declared in experiments/bsbm/config.yaml 
+We finished this process with a federation of 200 different federation members. All information about Batch(i) are stored in ??.This overall workflow can be changed thanks to parameters declared in experiments/bsbm/config.yaml 
 
 Please note:
 * The workflow is managed with the [Snakemake](https://snakemake.readthedocs.io/en/stable/) workflow management system. It allows the creation of reproducible and scalable data analyses. The snakemake files are located in experiments/bsbm/*.smk.
-* The generation of queries and the computation of optimal source selection requires [Virtuoso](https://github.com/openlink/virtuoso-opensource)
+* The generation of queries and the computation of optimal source assignments requires [Virtuoso](https://github.com/openlink/virtuoso-opensource)
 * The dataset generation is realized with many calls to [Watdiv](https://dsg.uwaterloo.ca/watdiv/). WatDiv is marginally updated and is available [here](https://github.com/mhoangvslev/watdiv/tree/e50cc38a28c79b73706ab3ee6f4d0340eedeee3f). It has been integrated into this github repository as a submodule.
 
-## Evaluate federated engines over FedShop
+## Evaluate federated-query engines using FedShop
 
-As the number of sources can be high, having a SPARQL endpoint per source becomes hard. We ingested all shops and rating-sites over a single Virtuoso server as Virtual Endpoints,i.e.,  each shop and rating-site has its own Virtual SPARQL endpoint. The different configurations relative to Batch(i) are available to configure a given Federated Query Engine. It is possible at this stage to run all FedShop Benchmark with [Kobe](https://github.com/semagrow/kobe). However, we also provide a benchmark runner based on Snakemake that is convenient for managing failures during the execution of the benchmark.
+As the number of federation members can be high, having a SPARQL endpoint per federation member becomes hard. We ingested all shops and rating-sites over a single Virtuoso server as Virtual Endpoints,i.e.,  each shop and rating-site has its own Virtual SPARQL endpoint. The different configurations relative to Batch(i) are available to configure a given federated-query engine. It is possible at this stage to run all FedShop Benchmark with [Kobe](https://github.com/semagrow/kobe). However, we also provide a benchmark runner based on Snakemake that is convenient for managing failures during the execution of the benchmark.
 
-Federated query engines must implement a [template](rsfb/engines/TemplateEngine.py) to be integrated in the evalution workflow. Many templates are already written in [`rsfb/engines/`](rsfb/engines/). Once integrated, 
-Federated query engine must be declared in `experiments/bsbm/config.yaml` to run.
+Federated-query engines must implement a [template](rsfb/engines/TemplateEngine.py) to be integrated in the evaluation workflow. Many templates are already written in [`rsfb/engines/`](rsfb/engines/). Once integrated, 
+the engine to be tested must be declared in `experiments/bsbm/config.yaml` to run.
 
 The following command allows to launch the evaluation:
 ```bash
@@ -94,7 +94,7 @@ OPTIONS:
 --clean [benchmark|metrics|instances][+db]: clean the benchmark|metrics|instances then (optional) destroy all database containers
 --touch : mark a phase as "terminated" so Snakemake would not rerun it.
 ```
-This launch the evaluation the  fedshop Workload over the different federations Batch(i) with the Federated engines declared in experiments/bsbm/config.yaml. As for the generation, this process is long and complex and is managed by Snakemake. The evaluation rules are declared in experiments/bsbm/evaluate.smk. All the results are produced under experiments/bsbm/benchmark/evaluation.
+This launches the evaluation the FedShop workload over the different federations Batch(i) with the federated-query engines declared in experiments/bsbm/config.yaml. As for the generation, this process is long and complex and is managed by Snakemake. The evaluation rules are declared in experiments/bsbm/evaluate.smk. All the results are produced under experiments/bsbm/benchmark/evaluation.
 
 Our [jupyter notebook](Realistic_Synthetic_Federated.ipynb) is already written to read results and computes the diverse metrics.
 
@@ -106,7 +106,7 @@ python rsfb/benchmark.py generate experiments/bsbm/config.yaml --touch
 python rsfb/benchmark.py evaluate experiments/bsbm/config.yaml --touch
 ```
 
-- Register tour engine's repo as a submodule:
+- Register your engine's repo as a submodule:
 ```bash
 cd engines
 git submodule add <link_to_your_repo>
@@ -183,7 +183,7 @@ unzip benchmark.zip
 * Minh-Hoang DANG ([Nantes University](https://english.univ-nantes.fr/))
 * [Pascal Molli](https://sites.google.com/view/pascal-molli) ([Nantes University](https://english.univ-nantes.fr/))
 * [Hala Skaf](http://pagesperso.ls2n.fr/~skaf-h/pmwiki/pmwiki.php) ([Nantes University](https://english.univ-nantes.fr/))
-* [Olaf Hartig](https://olafhartig.de/) (Linköping University) 
+* [Olaf Hartig](https://olafhartig.de/) ([Linköping University](https://liu.se/)) 
 * Julien Aimonier-Davat ([Nantes University](https://english.univ-nantes.fr/))
 * Yotlan LeCROM ([Nantes University](https://english.univ-nantes.fr/))
 * Matthieu Gicquel ([Nantes University](https://english.univ-nantes.fr/))
