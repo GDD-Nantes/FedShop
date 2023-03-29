@@ -107,9 +107,10 @@ def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("eval-config", type=click.Path(exists=True, dir_okay=False, file_okay=True))
-@click.option("--endpoint", type=str, default="http://localhost:8890/sparql", help="URL to a SPARQL endpoint")
+@click.argument("batch_id", type=click.INT)
+@click.argument("endpoint", type=str)
 @click.pass_context
-def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, endpoint):
+def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, batch_id, endpoint):
     """Generate the config file for the engine
 
     Args:

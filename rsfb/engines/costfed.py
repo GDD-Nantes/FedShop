@@ -116,8 +116,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                 "Result #3": "batch",
                 "Result #4": "attempt",
                 "Result #5": "exec_time",
-                "Result #6": "http_req",
-                "Result #7": "source_selection_time"
+                "Result #6": "ask",
+                "Result #7": "source_selection_time",
+                "Result #8": "planning_time"
             }, axis=1)
             
             basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
@@ -294,10 +295,11 @@ def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
-@click.argument("eval_config", type=click.Path(exists=True, dir_okay=False, file_okay=True))
-@click.option("--endpoint", type=str, default="http://localhost:8890/sparql", help="URL to a SPARQL endpoint")
+@click.argument("eval-config", type=click.Path(exists=True, dir_okay=False, file_okay=True))
+@click.argument("batch_id", type=click.INT)
+@click.argument("endpoint", type=str)
 @click.pass_context
-def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, endpoint):
+def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, batch_id, endpoint):
     """Generate the config file for the engine
 
     Args:
@@ -314,12 +316,19 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, en
 
     batch = int(len(ssite)/20)-1
 
+    summary_file = f"costfed/summaries/sum_fedshop_batch{batch_id}.n3"     
     app_config = load_config(eval_config)["evaluation"]["engines"]["costfed"]
-    app = app_config["dir"]
+    app = app_config["dir"]   
 
     oldcwd = os.getcwd()
     os.chdir(Path(app))
-    os.system(f"./costfed.sh costfed/costfed.props {endpoint} ignore ignore ignore ignore ignore ignore {batch} true false")
+    
+    if not os.path.exists(summary_file):
+        logger.info(f"Generating summary for batch {batch_id}")
+        cmd = f"./costfed.sh costfed/costfed.props {endpoint} ignore ignore ignore ignore ignore ignore {batch} true false {summary_file}"
+        logger.debug(cmd)
+        os.system(cmd)
+    
     os.chdir(oldcwd)
 
     ctx.invoke(fedx.generate_config_file, datafiles=datafiles, outfile=outfile, eval_config=eval_config, endpoint=endpoint)
