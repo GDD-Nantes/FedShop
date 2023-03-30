@@ -200,7 +200,7 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
 f"""
 <{s}> a sd:Service ;
     fedx:store "SPARQLEndpoint";
-    sd:endpoint "{endpoint}?default-graph-uri={s}";
+    sd:endpoint "{endpoint}/?default-graph-uri={s}";
     fedx:supportsASKQueries false .   
 
 """

@@ -84,15 +84,17 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     config = load_config(eval_config)
     app_config = config["evaluation"]["engines"]["costfed"]
     app = app_config["dir"]
-    endpoint = config["generation"]["virtuoso"]["endpoints"][batch_id]
+    last_batch = int(config["generation"]["n_batch"]) - 1
+    
+    endpoint = config["generation"]["virtuoso"]["endpoints"][last_batch]
     compose_file = config["generation"]["virtuoso"]["compose_file"]
     service_name = config["generation"]["virtuoso"]["service_name"]
-    container_name = config["generation"]["virtuoso"]["container_names"][batch_id]
+    container_name = config["generation"]["virtuoso"]["container_names"][last_batch]
     timeout = int(config["evaluation"]["timeout"])
-    http_req = "N/A"
 
     oldcwd = os.getcwd()
-    cmd = f"./costfed.sh costfed/costfed.props {endpoint} ../../{out_result} ../../{out_source_selection} ../../{query_plan} ../../{stats} {timeout} ../../{query} {out_result.split('/')[7].split('_')[1]} false true"
+    summary_file = f"summaries/sum_fedshop_batch{batch_id}.n3"     
+    cmd = f"./costfed.sh costfed/costfed.props {endpoint} ../../{out_result} ../../{out_source_selection} ../../{query_plan} ../../{stats} {timeout} ../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file}"
 
     logger.debug("=== CostFed ===")
     logger.debug(cmd)
@@ -140,8 +142,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             if results_df.dropna().empty or os.stat(out_result).st_size == 0:            
                 logger.error(f"{query} yield no results!")
                 write_empty_result(out_result)
-                os.system(f"docker stop {container_name}")
-                raise RuntimeError(f"{query} yield no results!")
+                #os.system(f"docker stop {container_name}")
+                #raise RuntimeError(f"{query} yield no results!")
         else:
             logger.error(f"{query} reported error")    
             write_empty_result(out_result)
@@ -158,6 +160,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         write_empty_result(out_result)    
     finally:
         os.system('pkill -9 -f "costfed/target"')
+        cache_file = f"{app}/cache.db"
+        Path(cache_file).unlink(missing_ok=True)
         #kill_process(fedx_proc.pid)        
 
 @cli.command()
@@ -244,7 +248,7 @@ def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
         return result
 
     def extract_source_selection(x):
-        fex_pattern = r"StatementSource\s+\(id=sparql_localhost\:[0-9]+_sparql_sparql\?default-graph-uri=([a-z]+(\.\w+)+\.[a-z]+)_;\s+type=[A-Z]+\)"
+        fex_pattern = r"StatementSource\s+\(id=sparql_localhost\:[0-9]+_sparql_\?default-graph-uri=([a-z]+(\.\w+)+\.[a-z]+)_;\s+type=[A-Z]+\)"
         result = [ cgroup[0] for cgroup in re.findall(fex_pattern, x) ]
         return result
     
@@ -316,21 +320,27 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
 
     batch = int(len(ssite)/20)-1
 
-    summary_file = f"costfed/summaries/sum_fedshop_batch{batch_id}.n3"     
+    summary_file = f"summaries/sum_fedshop_batch{batch_id}.n3"     
     app_config = load_config(eval_config)["evaluation"]["engines"]["costfed"]
     app = app_config["dir"]   
 
     oldcwd = os.getcwd()
     os.chdir(Path(app))
     
-    if not os.path.exists(summary_file):
+    def generate_summary():
         logger.info(f"Generating summary for batch {batch_id}")
         cmd = f"./costfed.sh costfed/costfed.props {endpoint} ignore ignore ignore ignore ignore ignore {batch} true false {summary_file}"
         logger.debug(cmd)
         os.system(cmd)
     
+    if (not os.path.exists(summary_file)):
+        generate_summary()
+    else:
+        with open(summary_file) as sfs:
+            if endpoint not in sfs.read():
+                generate_summary()
+    
     os.chdir(oldcwd)
-
     ctx.invoke(fedx.generate_config_file, datafiles=datafiles, outfile=outfile, eval_config=eval_config, endpoint=endpoint)
 
 if __name__ == "__main__":

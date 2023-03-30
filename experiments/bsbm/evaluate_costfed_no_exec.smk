@@ -175,8 +175,8 @@ rule transform_results:
                 logger.debug("not equals to")
                 logger.debug(engine_results)
 
-                write_empty_result(str(output))
-                write_empty_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
+                #write_empty_result(str(output))
+                #write_empty_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
                 logger.error(f"{wildcards.engine} does not produce the expected results")
 
 rule evaluate_engines:
@@ -213,12 +213,12 @@ rule evaluate_engines:
         same_file_previous_batch = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{wildcards.attempt_id}/results.txt"
         skipAttempt = int(wildcards.attempt_id)
 
-        canSkip = batch_id > 0 and os.path.exists(same_file_previous_batch) and os.stat(same_file_previous_batch).st_size == 0
+        canSkip = False #batch_id > 0 and os.path.exists(same_file_previous_batch) and os.stat(same_file_previous_batch).st_size == 0
         skipReason = f"Skip evaluation because previous batch at {same_file_previous_batch} timed out or error"
         for attempt in range(CONFIG_EVAL["n_attempts"]):
             same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{batch_id}/attempt_{attempt}/results.txt"
             logger.info(f"Checking {same_file_other_attempt} ...")
-            if os.path.exists(same_file_other_attempt) and os.path.exists(same_file_other_attempt) and os.stat(same_file_other_attempt).st_size == 0:
+            if os.path.exists(same_file_other_attempt) and os.path.exists(same_file_other_attempt): #and os.stat(same_file_other_attempt).st_size == 0:
                 skipBatch = batch_id
                 skipAttempt = attempt
                 skipReason = f"Skip evaluation because another attempt at {same_file_other_attempt} timed out"
@@ -228,13 +228,14 @@ rule evaluate_engines:
         skip_stats_file = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/stats.csv"
         previous_reason = str(skip_stats_file | cat() | find_first_pattern([r"(timeout)"]))
 
-        if canSkip and previous_reason != "":
+        if canSkip: # and previous_reason != "":
             logger.info(skipReason)
-            write_empty_stats(str(output.stats), previous_reason)
+            #write_empty_stats(str(output.stats), previous_reason)
             #shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/query_plan.txt {output.query_plan}")
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/source_selection.txt {output.source_selection}")
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/results.txt {output.result_txt}")
+            shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/stats.csv {output.stats}")
         else:
             virtuoso_kill_all_transactions(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, LAST_BATCH)
             shell("python rsfb/engines/{engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {output.query_plan} --batch-id {batch_id}")
