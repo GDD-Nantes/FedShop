@@ -96,6 +96,8 @@ evaluation:
       dir: "engines/FedX/target"
     costfed:
       dir: "engines/CostFed"
+    costfed_fu:
+      dir: "engines/CostFed-FU"
     # semagrow:
     #   dir: "engines/semagrow"
     # fedx_ideal:

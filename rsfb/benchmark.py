@@ -85,8 +85,8 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
     GEN_CONFIG = CONFIG["generation"]
     WORK_DIR = GEN_CONFIG["workdir"]
 
-    #EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate.smk"
-    EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate_costfed_no_exec.smk"
+    EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate.smk"
+    #EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate_costfed_no_exec.smk"
     N_BATCH = GEN_CONFIG["n_batch"]
 
     WORKFLOW_DIR = f"{WORK_DIR}/rulegraph"
