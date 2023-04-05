@@ -19,3 +19,11 @@
 	path = engines/FedX
 	url = https://github.com/Yotlan/FedX.git
 	branch = master
+[submodule "engines/semagrow"]
+	path = engines/semagrow
+	url = https://github.com/Yotlan/semagrow.git
+	branch = master
+[submodule "engines/FedX-RWSS"]
+	path = engines/FedX-RWSS
+	url = https://github.com/Yotlan/FedX.git
+	branch = RWSS
