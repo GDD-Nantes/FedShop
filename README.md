@@ -185,6 +185,6 @@ unzip benchmark.zip
 * [Hala Skaf](http://pagesperso.ls2n.fr/~skaf-h/pmwiki/pmwiki.php) ([Nantes University](https://english.univ-nantes.fr/))
 * [Olaf Hartig](https://olafhartig.de/) ([Linköping University](https://liu.se/)) 
 * Julien Aimonier-Davat ([Nantes University](https://english.univ-nantes.fr/))
-* Yotlan LeCROM ([Nantes University](https://english.univ-nantes.fr/))
+* Yotlan LE CROM ([Nantes University](https://english.univ-nantes.fr/))
 * Matthieu Gicquel ([Nantes University](https://english.univ-nantes.fr/))
 
