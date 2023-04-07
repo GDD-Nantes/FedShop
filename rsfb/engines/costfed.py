@@ -313,13 +313,6 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
         endpoint (_type_): _description_
     """
 
-    ssite = set()
-    for data_file in datafiles:
-        site = str(re.search(r"(.*/)*(.*).nq", data_file).group(2))
-        ssite.add(site)
-
-    batch = int(len(ssite)/20)-1
-
     summary_file = f"summaries/sum_fedshop_batch{batch_id}.n3"     
     app_config = load_config(eval_config)["evaluation"]["engines"]["costfed"]
     app = app_config["dir"]   
@@ -329,7 +322,7 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     
     def generate_summary():
         logger.info(f"Generating summary for batch {batch_id}")
-        cmd = f"./costfed.sh costfed/costfed.props {endpoint} ignore ignore ignore ignore ignore ignore {batch} true false {summary_file}"
+        cmd = f"./costfed.sh costfed/costfed.props {endpoint} ignore ignore ignore ignore ignore ignore {batch_id} true false {summary_file}"
         logger.debug(cmd)
         os.system(cmd)
     

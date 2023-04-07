@@ -614,7 +614,10 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
         query = query_fs.read()
         initial_queryfile = queryfile
         consts = __get_uninjected_placeholders(initial_queryfile)
-        select = re.search(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", query).group(3)     
+        projection_search = re.search(r"((SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?)\s+(.*)\s+WHERE", query)
+        
+        original_projection_clause = projection_search.group(1)
+        original_projection_variables = projection_search.group(4)     
 
         qname = Path(outfile).stem
         qroot = Path(outfile).parent
@@ -686,7 +689,7 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
             itr+=1
         
         # Restore the original select
-        query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"\1\2 {select} WHERE", query)        
+        query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"{original_projection_clause} {original_projection_variables} WHERE", query)        
         write_query(query, next_queryfile)
 
 @cli.command

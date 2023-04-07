@@ -65,24 +65,17 @@ def activate_one_container(batch_id):
 def generate_federation_declaration(federation_declaration_file, engine, batch_id):
     sparql_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])
 
-    is_endpoint_updated = False
-    if is_file_exists := os.path.exists(federation_declaration_file):
-        with open(federation_declaration_file) as f:
-            search_string = f'sd:endpoint "{sparql_endpoint}'
-            is_endpoint_updated = search_string not in f.read()
+    logger.info(f"Rewriting {engine} configfile as it is updated!")
+    ratingsite_data_files = [ f"{MODEL_DIR}/dataset/ratingsite{i}.nq" for i in range(N_RATINGSITE) ]
+    vendor_data_files = [ f"{MODEL_DIR}/dataset/vendor{i}.nq" for i in range(N_VENDOR) ]
 
-    if is_endpoint_updated or not is_file_exists:
-        logger.info(f"Rewriting {engine} configfile as it is updated!")
-        ratingsite_data_files = [ f"{MODEL_DIR}/dataset/ratingsite{i}.nq" for i in range(N_RATINGSITE) ]
-        vendor_data_files = [ f"{MODEL_DIR}/dataset/vendor{i}.nq" for i in range(N_VENDOR) ]
+    batch_id = int(batch_id)
+    ratingsiteSliceId = np.histogram(np.arange(N_RATINGSITE), N_BATCH)[1][1:].astype(int)[batch_id]
+    vendorSliceId = np.histogram(np.arange(N_VENDOR), N_BATCH)[1][1:].astype(int)[batch_id]
+    batch_files = ratingsite_data_files[:ratingsiteSliceId+1] + vendor_data_files[:vendorSliceId+1]  
 
-        batch_id = int(batch_id)
-        ratingsiteSliceId = np.histogram(np.arange(N_RATINGSITE), N_BATCH)[1][1:].astype(int)[batch_id]
-        vendorSliceId = np.histogram(np.arange(N_VENDOR), N_BATCH)[1][1:].astype(int)[batch_id]
-        batch_files = ratingsite_data_files[:ratingsiteSliceId+1] + vendor_data_files[:vendorSliceId+1]
-
-        activate_one_container(LAST_BATCH)
-        shell(f"python rsfb/engines/{engine}.py generate-config-file {' '.join(batch_files)} {federation_declaration_file} {CONFIGFILE} {batch_id} {sparql_endpoint}")
+    activate_one_container(LAST_BATCH)
+    shell(f"python rsfb/engines/{engine}.py generate-config-file {' '.join(batch_files)} {federation_declaration_file} {CONFIGFILE} {batch_id} {sparql_endpoint}")
 
 #=================
 # PIPELINE

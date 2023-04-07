@@ -190,35 +190,43 @@ def transform_provenance(infile, outfile, prefix_cache):
 
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
-@click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
+@click.argument("outfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("eval-config", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 @click.argument("batch_id", type=click.INT)
 @click.argument("endpoint", type=str)
 @click.pass_context
 def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, batch_id, endpoint):
-    ssite = set()
-    #for data_file in glob.glob(f'{dir_data_file}/*.nq'):
-    for data_file in datafiles:
-        with open(data_file, "r") as file:
-            t_file = file.readlines()
-            for line in t_file:
-                site = line.rsplit()[-2]
-                site = re.search(r"<(.*)>", site).group(1)
-                ssite.add(site)
     
-    outfile = Path(outfile)
-    outfile.parent.mkdir(parents=True, exist_ok=True)
-    outfile.touch()
-    with outfile.open("w") as ffile:
-        ffile.write(
+    is_endpoint_updated = False
+    if is_file_exists := os.path.exists(outfile):
+        with open(outfile) as f:
+            search_string = f'sd:endpoint "{endpoint}'
+            is_endpoint_updated = search_string not in f.read()
+
+    if is_endpoint_updated or not is_file_exists:
+        ssite = set()
+        #for data_file in glob.glob(f'{dir_data_file}/*.nq'):
+        for data_file in datafiles:
+            with open(data_file, "r") as file:
+                t_file = file.readlines()
+                for line in t_file:
+                    site = line.rsplit()[-2]
+                    site = re.search(r"<(.*)>", site).group(1)
+                    ssite.add(site)
+        
+        outfile = Path(outfile)
+        outfile.parent.mkdir(parents=True, exist_ok=True)
+        outfile.touch()
+        with outfile.open("w") as ffile:
+            ffile.write(
 """
 @prefix sd: <http://www.w3.org/ns/sparql-service-description#> .
 @prefix fedx: <http://rdf4j.org/config/federation#> .
 
 """
-        )
-        for s in sorted(ssite):
-            ffile.write(
+            )
+            for s in sorted(ssite):
+                ffile.write(
 f"""
 <{s}> a sd:Service ;
     fedx:store "SPARQLEndpoint";
@@ -226,7 +234,7 @@ f"""
     fedx:supportsASKQueries false .   
 
 """
-            )
+                )
 
 if __name__ == "__main__":
     cli()
