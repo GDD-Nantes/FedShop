@@ -64,14 +64,16 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     config = load_config(eval_config)
     app_config = config["evaluation"]["engines"]["splendid"]
     app = app_config["dir"]
-    endpoint = config["generation"]["virtuoso"]["endpoints"][batch_id]
+    last_batch = config["generation"]["n_batch"] - 1
+    endpoint = config["generation"]["virtuoso"]["endpoints"][last_batch]
     compose_file = config["generation"]["virtuoso"]["compose_file"]
     service_name = config["generation"]["virtuoso"]["service_name"]
-    container_name = config["generation"]["virtuoso"]["container_names"][batch_id]
+    container_name = config["generation"]["virtuoso"]["container_names"][last_batch]
     timeout = int(config["evaluation"]["timeout"])
     #properties = app_config["properties"]
     properties = app+"/eval/sail-config/config.properties"
-    void_conf = app+"/eval/sail-config/config.n3"
+    #void_conf = app+"/eval/sail-config/config.n3"
+    void_conf = str(Path(engine_config).absolute())
     http_req = "N/A"
 
     lines = []
@@ -80,11 +82,12 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         lines = properties_file.readlines()
         for i in range(len(lines)):
             if lines[i].startswith("query.directory"):
-                lines[i] = re.sub(r'query\.directory=.+',r'query\.directory='+str(os.getcwd())+'/'+str(query).split("injected.sparql")[0][:-1], lines[i])
+                lines[i] = re.sub(r'query\.directory=.+','query.directory='+str(os.getcwd())+'/'+str(query).split("injected.sparql")[0][:-1], lines[i])
             elif lines[i].startswith("output.file"):
-                lines[i] = re.sub(r'output\.file=.+',r'output\.file='+provenance_stat_to_modif, lines[i])
+                lines[i] = re.sub(r'output\.file=.+','output.file='+provenance_stat_to_modif, lines[i])
             elif lines[i].startswith("sparql.endpoint"):
-                lines[i] = re.sub(r'sparql\.endpoint=.+',r'sparql\.endpoint='+endpoint, lines[i])
+                lines[i] = re.sub(r'sparql\.endpoint=.+','sparql.endpoint='+endpoint, lines[i])
+    
     with open(properties, "w") as properties_file:
         properties_file.writelines(lines)
 
@@ -192,13 +195,18 @@ def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
-@click.argument("eval_config", type=click.Path(exists=True, dir_okay=False, file_okay=True))
-@click.option("--endpoint", type=str, default="http://localhost:8890/sparql", help="URL to a SPARQL endpoint")
+@click.argument("eval-config", type=click.Path(exists=True, dir_okay=False, file_okay=True))
+@click.argument("batch_id", type=click.INT)
+@click.argument("endpoint", type=str)
 @click.pass_context
-def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, endpoint):
+def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, batch_id, endpoint):
     splended_config = load_config(eval_config)["evaluation"]["engines"]["splendid"]
+    app_dir = splended_config["dir"]
+    domain_name = str(datafiles[i]).split("/")[-1].split(".")[0]
+    void_file = f"{app_dir}/eval/void/{domain_name}.n3"
 
-    with open(str(splended_config["dir"])+'/eval/sail-config/config.n3','w+') as outputfile:
+    #with open(str(splended_config["dir"])+'/eval/sail-config/config.n3','w+') as outputfile:
+    with open(outfile, 'w+') as outputfile:
         outputfile.write("################################################################################\n")
         outputfile.write("# Sesame configuration for SPLENDID Federation.\n")
         outputfile.write("#\n")
@@ -240,8 +248,8 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, en
         outputfile.write("\t\t\tfed:member [\n")
         for i in range(len(datafiles)):
             outputfile.write("\t\t\t\trep:repositoryType \"west:VoidRepository\" ;\n")
-            outputfile.write("\t\t\t\tfed:voidDescription <../void/"+str(datafiles[i]).split("/")[-1].split(".")[0]+".n3> ;\n")
-            outputfile.write("\t\t\t\tvoid:sparqlEndpoint <http://www."+str(datafiles[i]).split("/")[-1].split(".")[0]+".fr/>\n")
+            outputfile.write(f"\t\t\t\tfed:voidDescription <{Path(void_file).absolute()}> ;\n")
+            outputfile.write("\t\t\t\tvoid:sparqlEndpoint <http://www."+domain_name+".fr/>\n")
             if i == len(datafiles)-1:
                 outputfile.write("\t\t\t]\n")
                 outputfile.write("\t\t]\n")
@@ -251,8 +259,7 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, en
 
     for file in datafiles:
         # print("Generate void description for "+str(file)+"...")
-        with open(str(splended_config["dir"])+'/eval/void/'+str(file).split('/')[-1].split('.')[0]+'.n3','w+') as outputfile:
-            outputfile.write("")
+        Path(void_file).parent.mkdir(parents=True, exist_ok=True)
         with open(file) as inputfile:
             lines = inputfile.readlines()
             pred = dict()
@@ -353,7 +360,7 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, en
                     triple_count+=int(tripl)
                 elif("T:" in value):
                     type_count+=1
-            with open(str(splended_config["dir"])+'/eval/void/'+str(file).split('/')[-1].split('.')[0]+'.n3','a') as outputfile:
+            with open(void_file, 'w') as outputfile:
                 outputfile.write("@prefix void: <http://rdfs.org/ns/void#> .\n")
                 outputfile.write("@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n")
                 outputfile.write("@prefix dc: <http://purl.org/dc/elements/1.1/> .\n")
@@ -398,7 +405,7 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, en
                         i2+=1
                 outputfile.write("\t] .\n")
 
-    ctx.invoke(fedx.generate_config_file, datafiles=datafiles, outfile=outfile, eval_config=eval_config, endpoint=endpoint)
+    #ctx.invoke(fedx.generate_config_file, datafiles=datafiles, outfile=outfile, eval_config=eval_config, endpoint=endpoint)
 
 if __name__ == "__main__":
     cli()

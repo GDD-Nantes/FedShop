@@ -190,7 +190,7 @@ def transform_provenance(infile, outfile, prefix_cache):
 
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
-@click.argument("outfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("eval-config", type=click.Path(exists=True, dir_okay=False, file_okay=True))
 @click.argument("batch_id", type=click.INT)
 @click.argument("endpoint", type=str)
