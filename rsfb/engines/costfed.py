@@ -11,11 +11,12 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from sklearn.preprocessing import LabelEncoder
+import psutil
 
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import check_container_status, get_docker_containers, kill_process, load_config, rsfb_logger, str2n3, write_empty_result, write_empty_stats
+from utils import check_container_status, load_config, rsfb_logger, str2n3, write_empty_result, create_stats, create_stats
 import fedx
 
 logger = rsfb_logger(Path(__file__).name)
@@ -94,7 +95,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 
     oldcwd = os.getcwd()
     summary_file = f"summaries/sum_fedshop_batch{batch_id}.n3"     
-    cmd = f"./costfed.sh costfed/costfed.props {endpoint} ../../{out_result} ../../{out_source_selection} ../../{query_plan} ../../{stats} {timeout} ../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file}"
+    cmd = f"./costfed.sh costfed/costfed.props {endpoint} ../../{out_result} ../../{out_source_selection} ../../{query_plan} {timeout} ../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file}"
 
     logger.debug("=== CostFed ===")
     logger.debug(cmd)
@@ -110,53 +111,60 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
             # Write stats
             logger.info(f"Writing stats to {stats}")
-             
-            stats_df = pd.read_csv(stats).rename({
-                "Result #0": "query",
-                "Result #1": "engine",
-                "Result #2": "instance",
-                "Result #3": "batch",
-                "Result #4": "attempt",
-                "Result #5": "exec_time",
-                "Result #6": "ask",
-                "Result #7": "source_selection_time",
-                "Result #8": "planning_time"
-            }, axis=1)
+                         
+            # basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
+            # queryName = basicInfos.group(2)
+            # instance = basicInfos.group(3)
+            # batch = basicInfos.group(4)
+            # attempt = basicInfos.group(5)
             
-            basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
-            queryName = basicInfos.group(2)
-            instance = basicInfos.group(3)
-            batch = basicInfos.group(4)
-            attempt = basicInfos.group(5)
+            # stats_df = pd.read_csv(stats).rename({
+            #     "Result #0": "query",
+            #     "Result #1": "engine",
+            #     "Result #2": "instance",
+            #     "Result #3": "batch",
+            #     "Result #4": "attempt",
+            #     "Result #5": "exec_time",
+            #     "Result #6": "ask",
+            #     "Result #7": "source_selection_time",
+            #     "Result #8": "planning_time"
+            # }, axis=1)
     
-            stats_df = stats_df \
-                .replace('injected.sparql',str(queryName)) \
-                .replace('instance_id',str(instance)) \
-                .replace('batch_id',str(batch)) \
-                .replace('attempt_id',str(attempt))
+            # stats_df = stats_df \
+            #     .replace('injected.sparql',str(queryName)) \
+            #     .replace('instance_id',str(instance)) \
+            #     .replace('batch_id',str(batch)) \
+            #     .replace('attempt_id',str(attempt))
                 
-            stats_df.to_csv(stats, index=False)
-            
+            # stats_df.to_csv(stats, index=False)
+                        
             results_df = pd.read_csv(out_result).replace("null", None)
             
             if results_df.dropna().empty or os.stat(out_result).st_size == 0:            
                 logger.error(f"{query} yield no results!")
                 write_empty_result(out_result)
-                #os.system(f"docker stop {container_name}")
-                #raise RuntimeError(f"{query} yield no results!")
+                os.system(f"docker stop {container_name}")
+                raise RuntimeError(f"{query} yield no results!")
+
+            create_stats(stats)
+
         else:
             logger.error(f"{query} reported error")    
             write_empty_result(out_result)
-            write_empty_result(stats)
-            write_empty_stats(stats, "error")
+            create_stats(stats, "error_runtime")
             
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
         if (container_status := check_container_status(compose_file, service_name, container_name)) != "running":
             logger.debug(container_status)
             raise RuntimeError("Backend is terminated!")
+        
+        # Counter-measure for issue #41 (https://github.com/mhoangvslev/FedShop/issues/41)
+        if psutil.virtual_memory().percent >= 60:
+            os.system(f"docker stop {container_name}")
+        
         logger.info("Writing empty stats...")
-        write_empty_stats(stats, "timeout")
+        create_stats(stats, "timeout")
         write_empty_result(out_result)    
     finally:
         os.system('pkill -9 -f "costfed/target"')
@@ -318,20 +326,22 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     app = app_config["dir"]   
 
     oldcwd = os.getcwd()
-    os.chdir(Path(app))
+    os.chdir(Path(app))        
     
-    def generate_summary():
-        logger.info(f"Generating summary for batch {batch_id}")
-        cmd = f"./costfed.sh costfed/costfed.props {endpoint} ignore ignore ignore ignore ignore ignore {batch_id} true false {summary_file}"
-        logger.debug(cmd)
-        os.system(cmd)
-    
-    if (not os.path.exists(summary_file)):
-        generate_summary()
-    else:
-        with open(summary_file) as sfs:
-            if endpoint not in sfs.read():
-                generate_summary()
+    update_summary = not os.path.exists(summary_file)
+    if not update_summary:
+        print(f"Looking for {endpoint} in {summary_file}")
+        with open(summary_file, "r") as sfs:
+            update_summary = endpoint not in sfs.read()
+
+    if update_summary:
+        try:
+            logger.info(f"Generating summary for batch {batch_id}")
+            cmd = f"./costfed.sh costfed/costfed.props {endpoint} ignore ignore ignore ignore ignore {batch_id} true false {summary_file}"
+            logger.debug(cmd)
+            if os.system(cmd) != 0: raise RuntimeError(f"Could not generate {summary_file}")
+        except InterruptedError:
+            Path(summary_file).unlink(missing_ok=True)
     
     os.chdir(oldcwd)
     ctx.invoke(fedx.generate_config_file, datafiles=datafiles, outfile=outfile, eval_config=eval_config, endpoint=endpoint)

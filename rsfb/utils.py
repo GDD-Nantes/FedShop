@@ -367,6 +367,39 @@ def write_empty_stats(outfile, reason):
             batch = basicInfos.group(4)
             attempt = basicInfos.group(5)
             fout.write(",".join([queryName, engine, instance, batch, attempt, reason, reason, reason, reason])+"\n")
+            
+def create_stats(statsfile, failed_reason=None):
+    """Create stats.csv from metrics.txt files
+    """
+    
+    baseDir = Path(statsfile).parent
+    
+    basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", statsfile)
+    result = {
+        "engine": basicInfos.group(1),
+        "query": basicInfos.group(2),
+        "instance": basicInfos.group(3),
+        "batch": basicInfos.group(4),
+        "attempt": basicInfos.group(5)
+    }
+    
+    metrics = {
+        "source_selection_time": failed_reason,
+        "planning_time": failed_reason,
+        "ask": failed_reason,
+        "exec_time": failed_reason
+    }
+    
+    for metric in metrics.keys():
+        metric_file = f"{baseDir}/{metric}.txt"
+        if os.path.exists(metric_file):
+            with open(metric_file, "r") as fs:
+                metrics[metric] = float(fs.read())
+                
+    result.update(metrics)
+    
+    stats_df = pd.DataFrame([result])
+    stats_df.to_csv(statsfile, index=False)
                 
 def write_empty_result(outfile):
     Path(outfile).touch()

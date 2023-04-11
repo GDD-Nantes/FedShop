@@ -12,7 +12,7 @@ from sklearn.preprocessing import LabelEncoder
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import load_config, rsfb_logger, str2n3, write_empty_result, write_empty_stats
+from utils import load_config, rsfb_logger, str2n3, write_empty_result, create_stats
 logger = rsfb_logger(Path(__file__).name)
 
 @click.group
@@ -47,7 +47,7 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
     lib = os.path.join(app, "lib/*")
     timeout = int(config["evaluation"]["timeout"])
 
-    args = [engine_config, query, out_result, out_source_selection, query_plan, stats, str(timeout), force_source_selection]
+    args = [engine_config, query, out_result, out_source_selection, query_plan, str(timeout), force_source_selection]
     args = " ".join(args)
     #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
     timeoutCmd = ""
@@ -66,14 +66,15 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
                 logger.error(f"{query} yield no results!")
                 write_empty_result(out_result)
                 raise RuntimeError(f"{query} yield no results!")
+            create_stats(stats)
         else:
             logger.error(f"{query} reported error")    
             write_empty_result(out_result)
             if not os.path.exists(stats):
-                write_empty_stats(stats, "error_runtime")                  
+                create_stats(stats, "error_runtime")                  
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
-        write_empty_stats(stats, "timeout")
+        create_stats(stats, "timeout")
         write_empty_result(out_result)                   
     finally:
         os.system('pkill -9 -f "FedX"')

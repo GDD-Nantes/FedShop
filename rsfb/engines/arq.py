@@ -17,7 +17,7 @@ from rdflib import URIRef
 import requests
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import load_config, rsfb_logger, str2n3, write_empty_result, write_empty_stats
+from utils import load_config, rsfb_logger, write_empty_stats, write_empty_result
 from query import write_query
 
 logger = rsfb_logger(Path(__file__).name)
@@ -167,7 +167,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                 result_df = pd.read_csv(BytesIO(arq_proc.stdout))
                                 
                 exec_time = float(re.search(r"Time: (\d+(\.\d+)?) sec.*", arq_proc.stderr.decode()).group(1)) * 1e3
-                source_selection_time = None
                 
                 if result_df.empty:
                     logger.error(f"{query} yield no results!")

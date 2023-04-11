@@ -14,7 +14,7 @@ from itertools import zip_longest
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import check_container_status, kill_process, load_config, rsfb_logger, write_empty_result, write_empty_stats
+from utils import check_container_status, kill_process, load_config, rsfb_logger, write_empty_result, create_stats
 import fedx
 
 logger = rsfb_logger(Path(__file__).name)
@@ -116,21 +116,21 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             # Write stats
             logger.info(f"Writing stats to {stats}")
              
-            stats_df = pd.read_csv(stats)
+            # stats_df = pd.read_csv(stats)
             
-            basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
-            queryName = basicInfos.group(2)
-            instance = basicInfos.group(3)
-            batch = basicInfos.group(4)
-            attempt = basicInfos.group(5)
+            # basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
+            # queryName = basicInfos.group(2)
+            # instance = basicInfos.group(3)
+            # batch = basicInfos.group(4)
+            # attempt = basicInfos.group(5)
     
-            stats_df = stats_df \
-                .replace('injected.sparql',str(queryName)) \
-                .replace('instance_id',str(instance)) \
-                .replace('batch_id',str(batch)) \
-                .replace('attempt_id',str(attempt))
+            # stats_df = stats_df \
+            #     .replace('injected.sparql',str(queryName)) \
+            #     .replace('instance_id',str(instance)) \
+            #     .replace('batch_id',str(batch)) \
+            #     .replace('attempt_id',str(attempt))
                 
-            stats_df.to_csv(stats, index=False)
+            # stats_df.to_csv(stats, index=False)
             
             results_df = pd.read_csv(out_result).replace("null", None)
             
@@ -139,18 +139,19 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                 #write_empty_result(out_result)
                 os.system(f"docker stop {container_name}")
                 raise RuntimeError(f"{query} yield no results!")
+            create_stats(stats)
         else:
             logger.error(f"{query} reported error {splendid_proc.returncode}")    
             #write_empty_result(out_result)
             #write_empty_result(stats)
-            write_empty_stats(stats, "error")
+            create_stats(stats, "error")
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
         if (container_status := check_container_status(compose_file, service_name, container_name)) != "running":
             logger.debug(container_status)
             raise RuntimeError("Backend is terminated!")
         logger.info("Writing empty stats...")
-        write_empty_stats(stats, "timeout")
+        create_stats(stats, "timeout")
         #write_empty_result(out_result)    
     finally:
         #os.system('pkill -9 -f "bin"')

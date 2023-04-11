@@ -13,7 +13,7 @@ from pathlib import Path
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import load_config, rsfb_logger, str2n3, write_empty_result, write_empty_stats
+from utils import load_config, rsfb_logger, str2n3, write_empty_result, create_stats
 logger = rsfb_logger(Path(__file__).name)
 
 import fedx
@@ -47,46 +47,6 @@ def prerequisites(ctx: click.Context, eval_config):
     os.system("mvn clean && mvn install dependency:copy-dependencies package")
     os.chdir(oldcwd)
 
-def exec_fedx(eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id):
-    config = load_config(eval_config)
-    app_config = config["evaluation"]["engines"]["fedx_tpwss"]
-    app = app_config["dir"]
-    jar = os.path.join(app, "FedX-1.0-SNAPSHOT.jar")
-    lib = os.path.join(app, "lib/*")
-    timeout = int(config["evaluation"]["timeout"])
-
-    args = [engine_config, query, out_result, out_source_selection, query_plan, stats, str(timeout), force_source_selection]
-    args = " ".join(args)
-    #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
-    timeoutCmd = ""
-    cmd = f'{timeoutCmd} java -classpath "{jar}:{lib}" org.example.FedX {args}'.strip()
-
-    logger.debug("=== FedX ===")
-    logger.debug(cmd)
-    logger.debug("============")
-    
-    fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-    try:        
-        fedx_proc.wait(timeout)
-        if fedx_proc.returncode == 0:
-            logger.info(f"{query} benchmarked sucessfully")
-            #if os.stat(out_result).st_size == 0:
-            #    logger.error(f"{query} yield no results!")
-            #    write_empty_result(out_result)
-            #    raise RuntimeError(f"{query} yield no results!")
-        else:
-            logger.error(f"{query} reported error")    
-            write_empty_result(out_result)
-            if not os.path.exists(stats):
-                write_empty_stats(stats, "error_runtime")                  
-    except subprocess.TimeoutExpired: 
-        logger.exception(f"{query} timed out!")
-        write_empty_stats(stats, "timeout")
-        write_empty_result(out_result)                   
-    finally:
-        os.system('pkill -9 -f "FedX"')
-        #kill_process(fedx_proc.pid)
-
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("engine-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
@@ -109,10 +69,10 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     3. Mesure execution time, compare the results with results.csv in generation phase
     """
             
-    exec_fedx(
+    fedx.exec_fedx(
         eval_config, engine_config, query, 
         str(out_result), "/dev/null", str(query_plan), 
-        str(stats), str(force_source_selection), batch_id
+        str(force_source_selection), batch_id
     )
     
     os.system(f"cp {force_source_selection} {out_source_selection}")

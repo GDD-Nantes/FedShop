@@ -14,7 +14,7 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import rsfb_logger, load_config, get_docker_endpoint_by_container_name, get_docker_containers, check_container_status, write_empty_result, write_empty_stats, virtuoso_kill_all_transactions, wait_for_container
+from utils import rsfb_logger, load_config, get_docker_endpoint_by_container_name, get_docker_containers, check_container_status, write_empty_result, create_stats, virtuoso_kill_all_transactions, wait_for_container
 from utils import activate_one_container as utils_activate_one_container
 
 #===============================
@@ -169,7 +169,7 @@ rule transform_results:
                 logger.debug(engine_results)
 
                 write_empty_result(str(output))
-                write_empty_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
+                create_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
                 logger.error(f"{wildcards.engine} does not produce the expected results")
 
 rule evaluate_engines:
@@ -211,7 +211,11 @@ rule evaluate_engines:
         for attempt in range(CONFIG_EVAL["n_attempts"]):
             same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{batch_id}/attempt_{attempt}/results.txt"
             logger.info(f"Checking {same_file_other_attempt} ...")
-            if os.path.exists(same_file_other_attempt) and os.path.exists(same_file_other_attempt) and os.stat(same_file_other_attempt).st_size == 0:
+            if  engine in ["fedx"] and \
+                os.path.exists(same_file_other_attempt) and \
+                os.path.exists(same_file_other_attempt) and \
+                os.stat(same_file_other_attempt).st_size == 0:
+
                 skipBatch = batch_id
                 skipAttempt = attempt
                 skipReason = f"Skip evaluation because another attempt at {same_file_other_attempt} timed out"
@@ -223,7 +227,7 @@ rule evaluate_engines:
 
         if canSkip and previous_reason != "":
             logger.info(skipReason)
-            write_empty_stats(str(output.stats), previous_reason)
+            create_stats(str(output.stats), previous_reason)
             #shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/query_plan.txt {output.query_plan}")
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/source_selection.txt {output.source_selection}")

@@ -101,15 +101,16 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result,
         odyssey_proc.wait(timeout=timeout)
         if odyssey_proc.returncode == 0:
             print(f"{query} benchmarked sucessfully") 
+            create_stats(stats)
         else:
             # print(f"{query} reported error")
-            # write_empty_stats()
+            # create_stats()
             # write_empty_result("error_runtime")
             raise RuntimeError(f"{query} reported error")
            
     except subprocess.TimeoutExpired: 
         print(f"{query} timed out!")
-        write_empty_stats()
+        create_stats()
         write_empty_result("timeout")
         kill_process(odyssey_proc.pid)
 
@@ -132,7 +133,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result,
     timeoutCmd = ""
     cmd = f'{timeoutCmd} java -classpath "{jar}:{lib}" org.example.FedX {args}'.strip() 
     
-    def write_empty_stats():
+    def create_stats():
         with open(stats, "w+") as fout:
             fout.write("query;engine;instance;batch;mode;exec_time;distinct_ss\n")
             basicInfos = re.match(r".*/(\w+)/(q\d+)/instance_(\d+)/batch_(\d+)/(\w+)/results", result)
@@ -156,13 +157,13 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, result,
             print(f"{query} benchmarked sucessfully")  
         else:
             # print(f"{query} reported error")
-            # write_empty_stats()
+            # create_stats()
             # write_empty_result("error_runtime")
             raise RuntimeError(f"{query} reported error")
            
     except subprocess.TimeoutExpired: 
         print(f"{query} timed out!")
-        write_empty_stats()
+        create_stats()
         write_empty_result("timeout")
         kill_process(fedx_proc.pid)
 
