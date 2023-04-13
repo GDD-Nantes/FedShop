@@ -43,7 +43,7 @@ def lang_detect(txt):
     result = Counter(map(lambda x: Lang(detect(text=x, low_memory=False)["lang"]).name.lower(), lines)).most_common(1)[0]
     return result
 
-def exec_query_on_endpoint(query, endpoint, error_when_timeout, timeout = None):
+def exec_query_on_endpoint(query, endpoint, error_when_timeout, timeout = None, default_graph=None):
     """Send a query to ANY endpoint
 
     Args:
@@ -56,13 +56,14 @@ def exec_query_on_endpoint(query, endpoint, error_when_timeout, timeout = None):
         _type_: _description_
     """
     
-    sparql_endpoint = SPARQLWrapper(endpoint)
+    sparql_endpoint = SPARQLWrapper(endpoint, defaultGraph=default_graph)
     if error_when_timeout and timeout is not None: 
         sparql_endpoint.setTimeout(int(timeout))
 
-    sparql_endpoint.setMethod("POST")
-    sparql_endpoint.setReturnFormat(CSV)        
+    sparql_endpoint.setMethod("GET")
+    sparql_endpoint.setReturnFormat(CSV)
     sparql_endpoint.setQuery(query)
+    
     response = sparql_endpoint.query()
     result = response.convert()
     return response, result

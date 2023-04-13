@@ -100,7 +100,7 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
     
     if touch:
         logger.info("Marking files as completed...")
-        shutil.rmtree(".snakemake", ignore_errors=False)
+        shutil.rmtree(".snakemake", ignore_errors=True)
         SNAKEMAKE_OPTS += " --touch"
 
     # if in evaluate mode
