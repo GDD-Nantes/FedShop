@@ -71,9 +71,10 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     container_name = config["generation"]["virtuoso"]["container_names"][last_batch]
     timeout = int(config["evaluation"]["timeout"])
     #properties = app_config["properties"]
-    properties = app+"/eval/sail-config/config.properties"
-    #void_conf = app+"/eval/sail-config/config.n3"
-    void_conf = str(Path(engine_config).absolute())
+    properties = f"{app}/eval/sail-config/config.properties"
+    void_conf = f"eval/sail-config/config.n3"
+    #void_conf = str(Path(engine_config).absolute())
+    os.system(f"cp {engine_config} {app}/eval/sail-config/config.n3")
     http_req = "N/A"
 
     lines = []
@@ -92,7 +93,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         properties_file.writelines(lines)
 
     oldcwd = os.getcwd()
-    cmd = f'./SPLENDID.sh ../../{void_conf} ../../{properties} {timeout} ../../{out_result} ../../{out_source_selection} ../../{query_plan} ../../{stats} ../../{query} false true'
+    cmd = f'./SPLENDID.sh {void_conf} {Path(properties).absolute()} {timeout} ../../{out_result} ../../{out_source_selection} ../../{query_plan} ../../{stats} ../../{query} false true'
 
     print("=== SPLENDID ===")
     print(cmd)
@@ -203,63 +204,78 @@ def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
 def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, batch_id, endpoint):
     splended_config = load_config(eval_config)["evaluation"]["engines"]["splendid"]
     app_dir = splended_config["dir"]
-    domain_name = str(datafiles[i]).split("/")[-1].split(".")[0]
-    void_file = f"{app_dir}/eval/void/{domain_name}.n3"
+    properties = f"{app_dir}/eval/sail-config/config.properties"
+    with open(properties, "r+") as props_fs:
+        props = props_fs.read()
+        if endpoint not in props:
+            props = re.sub(r"(sparql\.endpoint=)(.*)", rf"\1{re.escape(endpoint)}", props)
+            props_fs.write(props)
+            
+    if not os.path.exists(outfile):
+        Path(outfile).parent.mkdir(parents=True, exist_ok=True)
+        Path(outfile).touch(exist_ok=True)
+        
+        #with open(str(splended_config["dir"])+'/eval/sail-config/config.n3','w+') as outputfile:
+        with open(outfile, 'w') as outputfile:
+            outputfile.write("################################################################################\n")
+            outputfile.write("# Sesame configuration for SPLENDID Federation.\n")
+            outputfile.write("#\n")
+            outputfile.write("# ATTENTION: the Sail implementing the sail:sailType must be published\n")
+            outputfile.write("#            in META-INF/services/org.eclipse.rdf4j.sail.SailFactory\n")
+            outputfile.write("################################################################################\n")
+            outputfile.write("@prefix void: <http://rdfs.org/ns/void#>.\n")
+            outputfile.write("@prefix rep:  <http://www.openrdf.org/config/repository#>.\n")
+            outputfile.write("@prefix sr:   <http://www.openrdf.org/config/repository/sail#>.\n")
+            outputfile.write("@prefix sail: <http://www.openrdf.org/config/sail#>.\n")
+            outputfile.write("@prefix fed:  <http://west.uni-koblenz.de/config/federation/sail#>.\n")
+            # for i in range(len(files)):
+            #    outputfile.write("@prefix src"+str(i)+": <http://www."+str(files[i]).split(".")[0]+".fr>.\n")
+            outputfile.write("\n")
+            outputfile.write("[] a rep:Repository ;\n")
+            outputfile.write("\trep:repositoryTitle \"SPLENDID Federation\" ;\n")
+            outputfile.write("\trep:repositoryID \"SPLENDID\" ;\n")
+            outputfile.write("\trep:repositoryImpl [\n")
+            outputfile.write("\t\trep:repositoryType \"openrdf:SailRepository\" ;\n")
+            outputfile.write("\t\tsr:sailImpl [\n")
+            outputfile.write("\t\t\tsail:sailType \"west:FederationSail\" ;\n")
+            outputfile.write("\n")
+            outputfile.write("\t\t\tfed:sourceSelection [\n")
+            outputfile.write("\t\t\t\tfed:selectorType \"INDEX_ASK\";\n")
+            outputfile.write("\t\t\t\tfed:useTypeStats false ;\n")
+            outputfile.write("\t\t\t] ;\n")
+            outputfile.write("\n")
+            outputfile.write("\t\t\tfed:queryOptimization [\n")
+            outputfile.write("\t\t\t\tfed:optimizerType \"DYNAMIC_PROGRAMMING\" ;\n")
+            outputfile.write("\n")
+            outputfile.write("\t\t\t\tfed:cardEstimator \"VOID_PLUS\" ;\n")
+            outputfile.write("\n")
+            outputfile.write("\t\t\t\tfed:groupBySource true ;\n")
+            outputfile.write("\t\t\t\tfed:groupBySameAs false ;\n")
+            outputfile.write("\n")
+            outputfile.write("\t\t\t\tfed:useBindJoin false ;\n")
+            outputfile.write("\t\t\t\tfed:useHashJoin true ;\n")
+            outputfile.write("\t\t\t] ;\n")
+            outputfile.write("\t\t\tfed:member [\n")
+            for i in range(len(datafiles)):
+                domain_name = str(datafiles[i]).split("/")[-1].split(".")[0]
+                void_file = f"{app_dir}/eval/void/{domain_name}.n3"
 
-    #with open(str(splended_config["dir"])+'/eval/sail-config/config.n3','w+') as outputfile:
-    with open(outfile, 'w+') as outputfile:
-        outputfile.write("################################################################################\n")
-        outputfile.write("# Sesame configuration for SPLENDID Federation.\n")
-        outputfile.write("#\n")
-        outputfile.write("# ATTENTION: the Sail implementing the sail:sailType must be published\n")
-        outputfile.write("#            in META-INF/services/org.eclipse.rdf4j.sail.SailFactory\n")
-        outputfile.write("################################################################################\n")
-        outputfile.write("@prefix void: <http://rdfs.org/ns/void#>.\n")
-        outputfile.write("@prefix rep:  <http://www.openrdf.org/config/repository#>.\n")
-        outputfile.write("@prefix sr:   <http://www.openrdf.org/config/repository/sail#>.\n")
-        outputfile.write("@prefix sail: <http://www.openrdf.org/config/sail#>.\n")
-        outputfile.write("@prefix fed:  <http://west.uni-koblenz.de/config/federation/sail#>.\n")
-        # for i in range(len(files)):
-        #    outputfile.write("@prefix src"+str(i)+": <http://www."+str(files[i]).split(".")[0]+".fr>.\n")
-        outputfile.write("\n")
-        outputfile.write("[] a rep:Repository ;\n")
-        outputfile.write("\trep:repositoryTitle \"SPLENDID Federation\" ;\n")
-        outputfile.write("\trep:repositoryID \"SPLENDID\" ;\n")
-        outputfile.write("\trep:repositoryImpl [\n")
-        outputfile.write("\t\trep:repositoryType \"openrdf:SailRepository\" ;\n")
-        outputfile.write("\t\tsr:sailImpl [\n")
-        outputfile.write("\t\t\tsail:sailType \"west:FederationSail\" ;\n")
-        outputfile.write("\n")
-        outputfile.write("\t\t\tfed:sourceSelection [\n")
-        outputfile.write("\t\t\t\tfed:selectorType \"INDEX_ASK\";\n")
-        outputfile.write("\t\t\t\tfed:useTypeStats false ;\n")
-        outputfile.write("\t\t\t] ;\n")
-        outputfile.write("\n")
-        outputfile.write("\t\t\tfed:queryOptimization [\n")
-        outputfile.write("\t\t\t\tfed:optimizerType \"DYNAMIC_PROGRAMMING\" ;\n")
-        outputfile.write("\n")
-        outputfile.write("\t\t\t\tfed:cardEstimator \"VOID_PLUS\" ;\n")
-        outputfile.write("\n")
-        outputfile.write("\t\t\t\tfed:groupBySource true ;\n")
-        outputfile.write("\t\t\t\tfed:groupBySameAs false ;\n")
-        outputfile.write("\n")
-        outputfile.write("\t\t\t\tfed:useBindJoin false ;\n")
-        outputfile.write("\t\t\t\tfed:useHashJoin true ;\n")
-        outputfile.write("\t\t\t] ;\n")
-        outputfile.write("\t\t\tfed:member [\n")
-        for i in range(len(datafiles)):
-            outputfile.write("\t\t\t\trep:repositoryType \"west:VoidRepository\" ;\n")
-            outputfile.write(f"\t\t\t\tfed:voidDescription <{Path(void_file).absolute()}> ;\n")
-            outputfile.write("\t\t\t\tvoid:sparqlEndpoint <http://www."+domain_name+".fr/>\n")
-            if i == len(datafiles)-1:
-                outputfile.write("\t\t\t]\n")
-                outputfile.write("\t\t]\n")
-                outputfile.write("\t] .\n")
-            else:
-                outputfile.write("\t\t\t], [\n")
+                outputfile.write("\t\t\t\trep:repositoryType \"west:VoidRepository\" ;\n")
+                outputfile.write(f"\t\t\t\tfed:voidDescription <{Path(void_file).absolute()}> ;\n")
+                outputfile.write("\t\t\t\tvoid:sparqlEndpoint <http://www."+domain_name+".fr/>\n")
+                if i == len(datafiles)-1:
+                    outputfile.write("\t\t\t]\n")
+                    outputfile.write("\t\t]\n")
+                    outputfile.write("\t] .\n")
+                else:
+                    outputfile.write("\t\t\t], [\n")
 
-    for file in datafiles:
+    for file in datafiles:             
         # print("Generate void description for "+str(file)+"...")
+        domain_name = str(file).split("/")[-1].split(".")[0]
+        void_file = f"{app_dir}/eval/void/{domain_name}.n3"
+        if os.path.exists(void_file) and os.stat(void_file).st_size > 0: continue
+        
         Path(void_file).parent.mkdir(parents=True, exist_ok=True)
         with open(file) as inputfile:
             lines = inputfile.readlines()

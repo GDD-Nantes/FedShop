@@ -7,6 +7,7 @@
 [submodule "engines/SPLENDID"]
 	path = engines/SPLENDID
 	url = https://github.com/Yotlan/SPLENDID.git
+	branch = maven
 [submodule "generators/watdiv"]
 	path = generators/watdiv
 	url = https://github.com/mhoangvslev/watdiv.git
