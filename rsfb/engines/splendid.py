@@ -43,7 +43,7 @@ def prerequisites(ctx: click.Context, eval_config):
     #if not os.path.exists(app) or not os.path.exists(jar) or os.path.exists(lib):
     oldcwd = os.getcwd()
     os.chdir(Path(app))
-    os.system("./SPLENDID.sh ignore ignore ignore ignore ignore ignore ignore ignore true false")
+    os.system("./SPLENDID.sh ignore ignore ignore ignore ignore ignore ignore ignore true false false")
     os.chdir(oldcwd)
 
 @cli.command()
@@ -93,7 +93,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         properties_file.writelines(lines)
 
     oldcwd = os.getcwd()
-    cmd = f'./SPLENDID.sh {void_conf} {Path(properties).absolute()} {timeout} ../../{out_result} ../../{out_source_selection} ../../{query_plan} ../../{stats} ../../{query} false true'
+    cmd = f'./SPLENDID.sh {void_conf} {Path(properties).absolute()} {timeout} ../../{out_result} ../../{out_source_selection} ../../{query_plan} ../../{stats} ../../{query} false true true'
 
     print("=== SPLENDID ===")
     print(cmd)
@@ -135,7 +135,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
             results_df = pd.read_csv(out_result).replace("null", None)
             
-            if results_df.dropna().empty or os.stat(out_result).st_size == 0:            
+            if results_df.dropna(how="all").empty or os.stat(out_result).st_size == 0:            
                 logger.error(f"{query} yield no results!")
                 #write_empty_result(out_result)
                 os.system(f"docker stop {container_name}")

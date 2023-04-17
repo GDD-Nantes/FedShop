@@ -140,7 +140,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                         
             results_df = pd.read_csv(out_result).replace("null", None)
             
-            if results_df.dropna().empty or os.stat(out_result).st_size == 0:            
+            if results_df.dropna(how="all").empty or os.stat(out_result).st_size == 0:            
                 logger.error(f"{query} yield no results!")
                 write_empty_result(out_result)
                 os.system(f"docker stop {container_name}")
