@@ -28,3 +28,7 @@
 	path = engines/FedX-RWSS
 	url = https://github.com/Yotlan/FedX.git
 	branch = RWSS
+[submodule "engines/ANAPSID"]
+	path = engines/ANAPSID
+	url = https://github.com/mhoangvslev/ANAPSID.git
+	branch = master
