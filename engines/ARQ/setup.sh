@@ -1,6 +1,11 @@
 #!/bin/sh
 
+# Remove everything except this script
 find . ! -name 'setup.sh' -exec rm -rf {} +
+
+# Download fuseki docker
+# wget https://repo1.maven.org/maven2/org/apache/jena/jena-fuseki-docker/4.7.0/jena-fuseki-docker-4.7.0.zip -O jena-fuseki-docker-4.7.0.zip
+# unzip jena-fuseki-docker-4.7.0.zip
 
 # Update below according to https://jena.apache.org/download/
 # and checksum for apache-jena-3.x.x.tar.gz.sha512

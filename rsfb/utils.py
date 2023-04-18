@@ -445,8 +445,23 @@ def wait_for_container(endpoints, outfile, logger, wait=1):
         f.write("OK")
 
 def activate_one_container(batch_id, sparql_compose_file, sparql_service_name, logger, status_file, deploy_if_not_exists=False):
-    """ Activate one container while stopping all others
+    """Activate one container while stopping all others
+
+    Args:
+        batch_id (_type_): _description_
+        sparql_compose_file (_type_): _description_
+        sparql_service_name (_type_): _description_
+        logger (_type_): _description_
+        status_file (_type_): _description_
+        deploy_if_not_exists (bool, optional): _description_. Defaults to False.
+
+    Raises:
+        RuntimeError: _description_
+
+    Returns:
+        boolean: whether or not the container is re-initialized
     """
+    
     containers = get_docker_containers(sparql_compose_file, sparql_service_name)
     batch_id = int(batch_id)
     container_name = containers[batch_id]
@@ -465,6 +480,8 @@ def activate_one_container(batch_id, sparql_compose_file, sparql_service_name, l
         os.system(f"docker start {container_name}")
         container_endpoint = get_docker_endpoint_by_container_name(sparql_compose_file, sparql_service_name, container_name)
         wait_for_container(container_endpoint, status_file, logger , wait=1)
+        return True
+    return False
 
 def deploy_virtuoso(n_batch, container_infos_file, sparql_compose_file, sparql_service_name, restart=False):
     if restart:

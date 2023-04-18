@@ -60,7 +60,9 @@ LOGGER = rsfb_logger(Path(__file__).name)
 def activate_one_container(batch_id):
     """ Activate one container while stopping all others
     """
-    utils_activate_one_container(batch_id, SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, logger, f"{BENCH_DIR}/virtuoso-ok.txt")
+    is_restarted = utils_activate_one_container(batch_id, SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, logger, f"{BENCH_DIR}/virtuoso-ok.txt")
+    if is_restarted:
+        shell(f"python rsfb/engines/arq.py warmup {CONFIGFILE}")
 
 def generate_federation_declaration(federation_declaration_file, engine, batch_id):
     sparql_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])
@@ -155,12 +157,11 @@ rule transform_results:
             expected_results = expected_results \
                 .sort_values(expected_results.columns.to_list()) \
                 .reset_index(drop=True) 
-
+            
             engine_results = pd.read_csv(str(output)).dropna(how="all", axis=1)
             engine_results = engine_results.reindex(sorted(engine_results.columns), axis=1)
             engine_results = engine_results \
                 .sort_values(engine_results.columns.to_list()) \
-                .drop_duplicates() \
                 .reset_index(drop=True) 
 
             if not expected_results.equals(engine_results):
@@ -170,7 +171,7 @@ rule transform_results:
 
                 write_empty_result(str(output))
                 create_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
-                logger.error(f"{wildcards.engine} does not produce the expected results")
+                raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
 
 rule evaluate_engines:
     """Evaluate queries using each engine's source selection on FedX.
@@ -200,6 +201,7 @@ rule evaluate_engines:
         batch_id = int(wildcards.batch_id)
         engine_config = f"{WORK_DIR}/benchmark/evaluation/{engine}/config/batch_{batch_id}/{engine}.conf"
         generate_federation_declaration(engine_config, engine, batch_id)
+        virtuoso_kill_all_transactions(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, LAST_BATCH)
 
         # Early stop if earlier attempts got timed out
         skipBatch = batch_id - 1
@@ -233,7 +235,6 @@ rule evaluate_engines:
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/source_selection.txt {output.source_selection}")
             shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/results.txt {output.result_txt}")
         else:
-            virtuoso_kill_all_transactions(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, LAST_BATCH)
             shell("python rsfb/engines/{engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {output.query_plan} --batch-id {batch_id}")
 
 rule engines_prerequisites:

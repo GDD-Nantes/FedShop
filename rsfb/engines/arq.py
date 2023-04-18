@@ -20,7 +20,7 @@ import requests
 from tqdm import tqdm
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import check_container_status, load_config, rsfb_logger, write_empty_stats, write_empty_result
+from utils import check_container_status, load_config, rsfb_logger, wait_for_container
 from query import write_query, exec_query_on_endpoint
 
 logger = rsfb_logger(Path(__file__).name)
@@ -62,24 +62,25 @@ def prerequisites(ctx: click.Context, eval_config):
     if check_container_status(compose_file, service_name, container_name) != "running":
         if os.system(f"docker-compose -f {compose_file} up -d --force-recreate jena-fuseki") != 0:
             raise RuntimeError("Could not launch Jena server...")
+        
+    wait_for_container(config["generation"]["virtuoso"]["endpoints"][-1], "/dev/null", logger)
+    ctx.invoke(warmup, eval_config=eval_config)
     
+@cli.command()
+@click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.option("--engine-config", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null") # Engine config is not needed
+@click.option("--repeat", type=click.INT, default=1)
+@click.option("--batch-id", type=click.INT, default=-1)
+@click.pass_context
+def warmup(ctx: click.Context, eval_config, engine_config, repeat, batch_id):
     # Warm up the server
+    config = load_config(eval_config) 
     queries = glob.glob("experiments/bsbm/benchmark/generation/q*/instance*/injected.sparql")
     random.shuffle(queries)
     for query in tqdm(queries):
         for batch_id in range(config["generation"]["n_batch"]):
-            ctx.invoke(warmup, eval_config=eval_config, engine_config="/dev/null", query=query, repeat=1, batch_id=batch_id)
-    
-@cli.command()
-@click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.argument("engine-config", type=click.Path(exists=False, file_okay=True, dir_okay=True)) # Engine config is not needed
-@click.argument("query", type=click.Path(exists=True, file_okay=True, dir_okay=True))
-@click.option("--repeat", type=click.INT, default=1)
-@click.option("--batch-id", type=click.INT, default=-1)
-@click.pass_context
-def warmup(ctx: click.Context, eval_config, engine_config, query, repeat, batch_id):
-    for _ in range(repeat):
-        ctx.invoke(run_benchmark, eval_config=eval_config, engine_config=engine_config, query=query, batch_id=batch_id)
+            for _ in range(repeat):
+                ctx.invoke(run_benchmark, eval_config=eval_config, engine_config=engine_config, query=query, batch_id=batch_id)
 
 def __create_service_query(config, query, query_plan, force_source_selection):
     opt_source_selection_file = f"{Path(force_source_selection).parent}/{Path(force_source_selection).stem}.opt.csv"
