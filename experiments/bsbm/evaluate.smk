@@ -170,8 +170,11 @@ rule transform_results:
                 logger.debug(engine_results)
 
                 write_empty_result(str(output))
-                create_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
-                raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
+
+                if str(wildcards.engine) in ["costfed"]:
+                    create_stats(f"{Path(str(input)).parent}/stats.csv", "error_runtime")
+                else:
+                    raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
 
 rule evaluate_engines:
     """Evaluate queries using each engine's source selection on FedX.

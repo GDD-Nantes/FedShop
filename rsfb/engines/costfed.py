@@ -188,31 +188,31 @@ def transform_results(ctx: click.Context, infile, outfile):
     if os.stat(infile).st_size == 0:
         Path(outfile).touch()
         return
-            
-    with open(infile, "r") as in_fs:
-        records = []
-        c_line = 0
-        for line in in_fs.readlines():
-            if c_line > 0:
-                #print(line)
-                results = line.split(",")
-                for result in results:         
-                    bindings = re.sub(r"(\[|\])", "", result.strip()).split(";")
-                    #print(bindings)
-                    record = dict()
-                    for binding in bindings:
-                        b = binding.split("=")
-                        #print(b)
-                        key = b[0]
-                        value = "".join(b[1:])
-                        value = re.sub(r"\"(.*)\"(\^\^|@).*", r"\1", value)
-                        value = value.replace('"', "")
-                        record[key] = value
-                    records.append(record)
-            c_line+=1
-            
-        result = pd.DataFrame.from_records(records)
-        result.to_csv(outfile, index=False)
+    
+    raw_result_df = pd.read_csv(infile)
+    
+    if raw_result_df.empty:
+        Path(outfile).unlink(missing_ok=True)
+        Path(outfile).touch()
+        return
+    
+    def extract_result_col(x):
+        result = re.sub(r"[\[\]\"]", "", x)
+        return result.split(";")
+    
+    def make_columns(row):
+        colname, result = row["results"].split("=")
+        row["results"] = result
+        row["column"] = colname
+        return row
+    
+    out_df = raw_result_df.T
+    out_df.columns = ["results"]
+    out_df["results"] = out_df["results"].apply(extract_result_col)
+    out_df = out_df.explode("results")
+    out_df = out_df.apply(make_columns, axis=1)
+    out_df = out_df.pivot(columns="column", values="results").reset_index(drop=True)
+    out_df.to_csv(outfile, index=False)
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
