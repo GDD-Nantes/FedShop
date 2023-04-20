@@ -6,6 +6,7 @@ import click
 import pandas as pd
 import numpy as np
 from utils import load_config
+from tqdm import tqdm
 
 @click.group
 def cli():
@@ -102,7 +103,9 @@ def compute_metrics(configfile, outfile, workload):
     ratingsite_edges = ratingsite_edges[1:].astype(int) + 1
 
     records = []        
-    for provenance_file in workload:
+    for provenance_file in tqdm(workload):
+        if os.stat(provenance_file).st_size == 0:
+            raise RuntimeError(f"{provenance_file} is empty!")
         source_selection_result = pd.read_csv(provenance_file)
         name_search = re.search(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/(attempt_(\d+)/)?provenance.csv", provenance_file)
         engine = name_search.group(1)

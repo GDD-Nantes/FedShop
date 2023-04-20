@@ -210,9 +210,9 @@ rule evaluate_engines:
         skipBatch = batch_id - 1
         same_file_previous_batch = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{wildcards.attempt_id}/results.txt"
         skipAttempt = int(wildcards.attempt_id)
-
         canSkip = batch_id > 0 and os.path.exists(same_file_previous_batch) and os.stat(same_file_previous_batch).st_size == 0
         skipReason = f"Skip evaluation because previous batch at {same_file_previous_batch} timed out or error"
+
         for attempt in range(CONFIG_EVAL["n_attempts"]):
             same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{batch_id}/attempt_{attempt}/results.txt"
             logger.info(f"Checking {same_file_other_attempt} ...")

@@ -12,6 +12,8 @@ import csv
 from itertools import zip_longest
 
 import sys
+
+from sklearn.calibration import LabelEncoder
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
 from utils import check_container_status, kill_process, load_config, rsfb_logger, write_empty_result, create_stats
@@ -146,7 +148,13 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             logger.error(f"{query} reported error {splendid_proc.returncode}")    
             #write_empty_result(out_result)
             #write_empty_result(stats)
-            create_stats(stats, "error")
+            errorFile = f"{Path(stats).parent}/error.txt"
+            if os.path.exists(errorFile):
+                with open(errorFile, "r") as f:
+                    reason = f.read()
+                    create_stats(stats, reason)
+            else:
+                create_stats(stats, "error_runtime")
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
         if (container_status := check_container_status(compose_file, service_name, container_name)) != "running":
@@ -175,25 +183,54 @@ def transform_results(ctx: click.Context, infile, outfile):
 @click.argument("prefix-cache", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.pass_context
 def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
-    line_count=0
-    columns = []
-    with open(infile, 'r') as input_file:
-        csvreader = csv.reader(input_file, delimiter=";")
-        for line in csvreader:
-            if line_count != 0:
-                columns.append(['tp'+str(line_count),str(line[-1])])
-                line_count+=1
-            else:
-                line_count+=1
-    output = []
-    for column in columns:
-        temp_list = [str(column[0])]
-        temp_list.extend(column[1].strip('][').split(', '))
-        output.append(temp_list)
-    export_output = zip_longest(*output, fillvalue = '')
-    with open(outfile, "w", newline='') as output_file:
-        csvwriter = csv.writer(output_file)
-        csvwriter.writerows(export_output)
+    raw_source_selection = pd.read_csv(infile, sep=";")[["triples", "sources"]]
+    
+    tp_composition = f"{Path(prefix_cache).parent}/provenance.sparql.comp"
+    with    open(tp_composition, "r") as comp_fs,\
+            open(prefix_cache, "r") as prefix_cache_fs \
+    :
+        prefix_cache_dict = json.load(prefix_cache_fs)
+        
+        comp = { k: " ".join(v) for k, v in json.load(comp_fs).items() }
+        inv_comp = {}
+        for k,v in comp.items():
+            if inv_comp.get(v) is None:
+                inv_comp[v] = []
+            inv_comp[v].append(k) 
+        
+        def get_triple_id(x):
+            result = re.sub(r"[\[\]]", "", x).strip()
+            for prefix, alias in prefix_cache_dict.items():
+                result = re.sub(rf"<{re.escape(prefix)}(\w+)>", rf"{alias}:\1", result)
+                        
+            return inv_comp[result] 
+        
+        def pad(x, max_length):
+            encoder = LabelEncoder()
+            encoded = encoder.fit_transform(x)
+            result = np.pad(encoded, (0, max_length-len(x)), mode="constant", constant_values=-1)                
+            decoded = [ encoder.inverse_transform([item]).item() if item != -1 else "" for item in result ]
+            return decoded
+        
+        raw_source_selection["triples"] = raw_source_selection["triples"].apply(lambda x: re.split(r"\s*,\s*", x))
+        raw_source_selection = raw_source_selection.explode("triples")
+        raw_source_selection["triples"] = raw_source_selection["triples"].apply(get_triple_id)
+        raw_source_selection = raw_source_selection.explode("triples")
+        raw_source_selection["tp_number"] = raw_source_selection["triples"].str.replace("tp", "", regex=False).astype(int)
+        raw_source_selection.sort_values("tp_number", inplace=True)
+        raw_source_selection["sources"] = raw_source_selection["sources"].apply(lambda x: re.split(r"\s*,\s*", re.sub(r"[\[\]]", "",x)))
+        
+        # If unequal length (as in union, optional), fill with nan
+        max_length = raw_source_selection["sources"].apply(len).max()
+        raw_source_selection["sources"] = raw_source_selection["sources"].apply(lambda x: pad(x, max_length))
+               
+        out_df = raw_source_selection.set_index("triples")["sources"] \
+            .to_frame().T \
+            .apply(pd.Series.explode) \
+            .reset_index(drop=True) 
+        
+        out_df.to_csv(outfile, index=False)
+    
 
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
