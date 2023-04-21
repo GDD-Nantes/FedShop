@@ -3,6 +3,7 @@ from io import BytesIO, StringIO
 import json
 import os
 import re
+import shutil
 import psutil
 import click
 import glob
@@ -95,6 +96,11 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 
     oldcwd = os.getcwd()
     summary_file = f"metadata{batch_id}.ttl"   
+    
+    # Prepare args for semagrow
+    Path(out_result).touch()
+    out_result = f"{Path(out_result).with_suffix('.csv')}"
+    
     cmd = f"./semagrow.sh repository.ttl {endpoint} ../../{out_result} ../../{out_source_selection} ../../{query_plan} {timeout} ../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file}"
 
     logger.debug("=== Semagrow ===")
@@ -108,6 +114,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         semagrow_proc.wait(timeout)
         if semagrow_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
+            
+            shutil.copy(out_result, f"{Path(out_result).with_suffix('.txt')}")
             
             # Write stats
             logger.info(f"Writing stats to {stats}")
@@ -185,10 +193,11 @@ def transform_results(ctx: click.Context, infile, outfile):
         infile (_type_): Path to engine result file
         outfile (_type_): Path to the csv file
     """
-    with open(infile, "r") as input_file:
-        with open(outfile, "w") as output_file:
-            for line in input_file:
-                output_file.write(line)
+    # with open(infile, "r") as input_file:
+    #     with open(outfile, "w") as output_file:
+    #         for line in input_file:
+    #             output_file.write(line)
+    pass
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
@@ -305,36 +314,47 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     
     summary_file = f"metadata{batch_id}.ttl"     
     app_config = load_config(eval_config)["evaluation"]["engines"]["semagrow"]
-    app = app_config["dir"]   
+    app = app_config["dir"]  
+    
+    Path(outfile).parent.mkdir(parents=True, exist_ok=True)
+    can_create_repo = not os.path.exists(outfile)
+    
+    if not can_create_repo:
+        with open(outfile, "r") as f:
+            repo_txt = f.read()
+            can_create_repo = can_create_repo or (summary_file in repo_txt)
 
+    if can_create_repo:
+        with open(outfile, "w") as repo:
+            repo.write("################################################################################\n")
+            repo.write("# Sesame configuration for SemaGrow\n")
+            repo.write("#\n")
+            repo.write("# ATTENTION: the Sail implementing the sail:sailType must be published\n")
+            repo.write("#            in META-INF/services/org.openrdf.sail.SailFactory\n")
+            repo.write("################################################################################\n")
+            repo.write("@prefix void: <http://rdfs.org/ns/void#>.\n")
+            repo.write("@prefix rep:  <http://www.openrdf.org/config/repository#>.\n")
+            repo.write("@prefix sr:   <http://www.openrdf.org/config/repository/sail#>.\n")
+            repo.write("@prefix sail: <http://www.openrdf.org/config/sail#>.\n")
+            repo.write("@prefix semagrow: <http://schema.semagrow.eu/>.\n")
+            repo.write("@prefix quetsal: <http://quetsal.aksw.org/>.\n")
+            repo.write("\n")
+            repo.write("[] a rep:Repository ;\n")
+            repo.write("\trep:repositoryTitle \"SemaGrow Repository\" ;\n")
+            repo.write("\trep:repositoryID \"semagrow\" ;\n")
+            repo.write("\trep:repositoryImpl [\n")
+            repo.write("\t\trep:repositoryType \"semagrow:SemagrowRepository\" ;\n")
+            repo.write("\t\tsr:sailImpl [\n")
+            repo.write("\t\t\tsail:sailType \"semagrow:SemagrowSail\" ;\n")
+            repo.write(f"\t\t\tsemagrow:metadataInit \"{summary_file}\" ;\n")
+            repo.write("\t\t\tsemagrow:executorBatchSize \"8\"\n")
+            repo.write("\t\t]\n")
+            repo.write("\t] .")
+    
     oldcwd = os.getcwd()
-    os.chdir(Path(app))        
-
-    with open("repository.ttl", "w+") as repo:
-        repo.write("################################################################################\n")
-        repo.write("# Sesame configuration for SemaGrow\n")
-        repo.write("#\n")
-        repo.write("# ATTENTION: the Sail implementing the sail:sailType must be published\n")
-        repo.write("#            in META-INF/services/org.openrdf.sail.SailFactory\n")
-        repo.write("################################################################################\n")
-        repo.write("@prefix void: <http://rdfs.org/ns/void#>.\n")
-        repo.write("@prefix rep:  <http://www.openrdf.org/config/repository#>.\n")
-        repo.write("@prefix sr:   <http://www.openrdf.org/config/repository/sail#>.\n")
-        repo.write("@prefix sail: <http://www.openrdf.org/config/sail#>.\n")
-        repo.write("@prefix semagrow: <http://schema.semagrow.eu/>.\n")
-        repo.write("@prefix quetsal: <http://quetsal.aksw.org/>.\n")
-        repo.write("\n")
-        repo.write("[] a rep:Repository ;\n")
-        repo.write("\trep:repositoryTitle \"SemaGrow Repository\" ;\n")
-        repo.write("\trep:repositoryID \"semagrow\" ;\n")
-        repo.write("\trep:repositoryImpl [\n")
-        repo.write("\t\trep:repositoryType \"semagrow:SemagrowRepository\" ;\n")
-        repo.write("\t\tsr:sailImpl [\n")
-        repo.write("\t\t\tsail:sailType \"semagrow:SemagrowSail\" ;\n")
-        repo.write(f"\t\t\tsemagrow:metadataInit \"{summary_file}\" ;\n")
-        repo.write("\t\t\tsemagrow:executorBatchSize \"8\"\n")
-        repo.write("\t\t]\n")
-        repo.write("\t] .")
+    os.chdir(Path(app))   
+    
+    shutil.copy(f"../../{outfile}", "repository.ttl")
     
     update_summary = not os.path.exists(summary_file)
     if not update_summary:
@@ -345,14 +365,14 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     if update_summary:
         try:
             logger.info(f"Generating summary for batch {batch_id}")
-            cmd = f"./semagrow.sh repository.ttl {endpoint} ignore ignore ignore ignore ignore ignore {batch_id} true false {summary_file}"
+            cmd = f"./semagrow.sh repository.ttl {endpoint} ignore ignore ignore ignore ignore {batch_id} true false {summary_file}"
             logger.debug(cmd)
             if os.system(cmd) != 0: raise RuntimeError(f"Could not generate {summary_file}")
         except InterruptedError:
             Path(summary_file).unlink(missing_ok=True)
     
     os.chdir(oldcwd)
-    ctx.invoke(fedx.generate_config_file, datafiles=datafiles, outfile=outfile, eval_config=eval_config, endpoint=endpoint)
+    #ctx.invoke(fedx.generate_config_file, datafiles=datafiles, outfile=outfile, eval_config=eval_config, endpoint=endpoint)
 
 if __name__ == "__main__":
     cli()
