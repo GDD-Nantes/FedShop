@@ -4,6 +4,7 @@ import json
 import os
 import random
 import re
+import shutil
 import tempfile
 import time
 import click
@@ -20,7 +21,7 @@ import requests
 from tqdm import tqdm
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import check_container_status, load_config, rsfb_logger, wait_for_container
+from utils import check_container_status, load_config, rsfb_logger, wait_for_container, create_stats
 from query import write_query, exec_query_on_endpoint
 
 logger = rsfb_logger(Path(__file__).name)
@@ -258,21 +259,14 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     # Write stats
     if stats != "/dev/null":
         logger.info(f"Writing stats to {stats}")
-        with open(stats, "w") as stats_fs:
-            stats_fs.write("query,engine,instance,batch,attempt,exec_time,ask,source_selection_time,planning_time\n")
-            basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
-            engine = basicInfos.group(1)
-            queryName = basicInfos.group(2)
-            instance = basicInfos.group(3)
-            batch = basicInfos.group(4)
-            attempt = basicInfos.group(5)
-            stats_fs.write(",".join([
-                queryName, engine, instance, batch, attempt, 
-                str(exec_time), str(http_req), str(source_selection_time), str(planning_time)
-            ])+"\n") 
-        
+        with open(f"{Path(stats).parent}/exec_time.txt", "w") as exec_time_fs:
+            exec_time_fs.write(exec_time)
+            
     # Write output source selection
-    os.system(f"cp {force_source_selection} {out_source_selection}")
+    shutil.copy(force_source_selection, out_source_selection)
+    
+    # Write stats
+    create_stats(stats)
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
@@ -286,7 +280,7 @@ def transform_results(ctx: click.Context, infile, outfile):
         infile (_type_): Path to engine result file
         outfile (_type_): Path to the csv file
     """
-    os.system(f"cp {infile} {outfile}")
+    shutil.copy(infile, outfile)
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
@@ -302,7 +296,7 @@ def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
         outfile (_type_): _description_
         prefix_cache (_type_): _description_
     """
-    os.system(f"cp {infile} {outfile}")
+    shutil.copy(infile, outfile)
     
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)

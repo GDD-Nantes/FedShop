@@ -3,6 +3,7 @@ from io import BytesIO
 import json
 import os
 import re
+import shutil
 import click
 import glob
 import subprocess
@@ -98,7 +99,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     os.system(f"cat {' '.join(intermediate_result_files)} > {out_result}")
     os.system(f"sed -i '/^\s*$/d' {out_result}")
     os.system(f"find {Path(out_result).parent} -type f -empty -print -delete")
-    os.system(f"cp {force_source_selection} {out_source_selection}")
+    shutil.copy(force_source_selection, out_source_selection)
         
 
 @cli.command()
@@ -114,7 +115,7 @@ def transform_results(ctx: click.Context, infile, outfile):
 @click.argument("prefix-cache", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.pass_context
 def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
-    os.system(f"cp {infile} {outfile}")
+    shutil.copy(infile, outfile)
     #ctx.invoke(fedx.transform_provenance, infile=infile, outfile=outfile, prefix_cache=prefix_cache)
 
 @cli.command()

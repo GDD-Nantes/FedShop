@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import shutil
 import click
 import glob
 import subprocess
@@ -76,7 +77,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     properties = f"{app}/eval/sail-config/config.properties"
     void_conf = f"eval/sail-config/config.n3"
     #void_conf = str(Path(engine_config).absolute())
-    os.system(f"cp {engine_config} {app}/eval/sail-config/config.n3")
+    shutil.copy(engine_config,  f"{app}/eval/sail-config/config.n3")
     http_req = "N/A"
 
     lines = []
@@ -141,7 +142,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                 logger.error(f"{query} yield no results!")
                 #write_empty_result(out_result)
                 #os.system(f"docker stop {container_name}")
-                create_stats(stats, "error_mismatch_results")
+                create_stats(stats, "error_runtime")
                 #raise RuntimeError(f"{query} yield no results!")
             create_stats(stats)
         else:
@@ -172,10 +173,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.pass_context
 def transform_results(ctx: click.Context, infile, outfile):
-    with open(infile, "r") as input_file:
-        with open(outfile, "w") as output_file:
-            for line in input_file:
-                output_file.write(line)
+    shutil.copy(infile, outfile)
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))

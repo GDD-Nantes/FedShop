@@ -62,7 +62,7 @@ def activate_one_container(batch_id):
     """
     is_restarted = utils_activate_one_container(batch_id, SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, logger, f"{BENCH_DIR}/virtuoso-ok.txt")
     if is_restarted:
-        shell(f"python rsfb/engines/arq.py warmup {CONFIGFILE}")
+        shell(f"python rsfb/engines/ideal.py warmup {CONFIGFILE}")
 
 def generate_federation_declaration(federation_declaration_file, engine, batch_id):
     sparql_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])
@@ -169,12 +169,10 @@ rule transform_results:
                 logger.debug("not equals to")
                 logger.debug(engine_results)
 
-                write_empty_result(str(output))
-
-                if str(wildcards.engine) in ["costfed"]:
-                    create_stats(f"{Path(str(input)).parent}/stats.csv", "error_runtime")
-                else:
-                    raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
+                create_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
+                #raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
+            else:
+                create_stats(f"{Path(str(input)).parent}/stats.csv")
 
 rule evaluate_engines:
     """Evaluate queries using each engine's source selection on FedX.
