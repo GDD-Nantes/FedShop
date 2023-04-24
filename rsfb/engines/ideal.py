@@ -52,20 +52,20 @@ def prerequisites(ctx: click.Context, eval_config):
 
     # Download and install Jena
     current_pwd = os.getcwd()
-    os.chdir(config["evaluation"]["engines"]["arq"]["dir"])
+    os.chdir(config["evaluation"]["engines"]["ideal"]["dir"])
     os.system("sh setup.sh")
     os.chdir(current_pwd)
     
     # Start fuseki server
-    compose_file = config["evaluation"]["engines"]["arq"]["compose_file"]
-    service_name = config["evaluation"]["engines"]["arq"]["service_name"]
-    container_name = config["evaluation"]["engines"]["arq"]["container_name"]
+    compose_file = config["evaluation"]["engines"]["ideal"]["compose_file"]
+    service_name = config["evaluation"]["engines"]["ideal"]["service_name"]
+    container_name = config["evaluation"]["engines"]["ideal"]["container_name"]
     if check_container_status(compose_file, service_name, container_name) != "running":
         if os.system(f"docker-compose -f {compose_file} up -d --force-recreate jena-fuseki") != 0:
             raise RuntimeError("Could not launch Jena server...")
         
     wait_for_container(config["generation"]["virtuoso"]["endpoints"][-1], "/dev/null", logger)
-    ctx.invoke(warmup, eval_config=eval_config)
+    #ctx.invoke(warmup, eval_config=eval_config)
     
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
@@ -87,7 +87,7 @@ def __create_service_query(config, query, query_plan, force_source_selection):
     opt_source_selection_file = f"{Path(force_source_selection).parent}/{Path(force_source_selection).stem}.opt.csv"
     source_selection_df = pd.read_csv(opt_source_selection_file)
     
-    internal_endpoint_prefix=str(config["evaluation"]["engines"]["arq"]["internal_endpoint_prefix"])
+    internal_endpoint_prefix=str(config["evaluation"]["engines"]["ideal"]["internal_endpoint_prefix"])
     port = re.search(r":(\d+)", config["generation"]["virtuoso"]["endpoints"][-1]).group(1)
     
     internal_endpoint_prefix=internal_endpoint_prefix.replace("localhost", "host.docker.internal")
@@ -170,7 +170,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     
     # Explain query
     # with open(query_plan, "w") as query_plan_fs:
-    #     arq = f'{config["evaluation"]["engines"]["arq"]["dir"]}/jena/bin/arq'
+    #     arq = f'{config["evaluation"]["engines"]["ideal"]["dir"]}/jena/bin/arq'
     #     explain_cmd = f"{arq} --explain --query {service_query_file}"
             
     #     logger.debug("==== ARQ EXPLAIN ====")
@@ -185,7 +185,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     Path(query_plan).touch(exist_ok=True)
    
     # Execute results
-    endpoint = config["evaluation"]["engines"]["arq"]["endpoint"]
+    endpoint = config["evaluation"]["engines"]["ideal"]["endpoint"]
     timeout = config["evaluation"]["timeout"]
     http_req = "N/A"
     exec_time = None
@@ -208,7 +208,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     else:
         out_query_text = __create_service_query(config, query, query_plan, force_source_selection)
         
-        # arq = f'{config["evaluation"]["engines"]["arq"]["dir"]}/jena/bin/arq'
+        # arq = f'{config["evaluation"]["engines"]["ideal"]["dir"]}/jena/bin/arq'
         # exec_cmd = f"{arq} --query {service_query_file} --optimize=off --results=CSV --time"
                         
         # logger.debug("==== ARQ EXEC ====")
@@ -256,17 +256,15 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     if csvOut.empty:
         raise RuntimeError("Query yields no results")
    
-    # Write stats
-    if stats != "/dev/null":
-        logger.info(f"Writing stats to {stats}")
-        with open(f"{Path(stats).parent}/exec_time.txt", "w") as exec_time_fs:
-            exec_time_fs.write(exec_time)
-            
     # Write output source selection
     shutil.copyfile(force_source_selection, out_source_selection)
     
     # Write stats
-    create_stats(stats)
+    if stats != "/dev/null":
+        with open(f"{Path(stats).parent}/exec_time.txt", "w") as exec_time_fs:
+            exec_time_fs.write(str(exec_time))
+        logger.info(f"Writing stats to {stats}")
+        create_stats(stats)
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
