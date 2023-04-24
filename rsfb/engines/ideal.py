@@ -263,7 +263,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             exec_time_fs.write(exec_time)
             
     # Write output source selection
-    shutil.copy(force_source_selection, out_source_selection)
+    shutil.copyfile(force_source_selection, out_source_selection)
     
     # Write stats
     create_stats(stats)

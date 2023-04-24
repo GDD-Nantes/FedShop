@@ -115,46 +115,32 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         if semagrow_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
             
-            shutil.copy(out_result, f"{Path(out_result).with_suffix('.txt')}")
-            
-            # Write stats
-            logger.info(f"Writing stats to {stats}")
-                         
-            # basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
-            # queryName = basicInfos.group(2)
-            # instance = basicInfos.group(3)
-            # batch = basicInfos.group(4)
-            # attempt = basicInfos.group(5)
-            
-            # stats_df = pd.read_csv(stats).rename({
-            #     "Result #0": "query",
-            #     "Result #1": "engine",
-            #     "Result #2": "instance",
-            #     "Result #3": "batch",
-            #     "Result #4": "attempt",
-            #     "Result #5": "exec_time",
-            #     "Result #6": "ask",
-            #     "Result #7": "source_selection_time",
-            #     "Result #8": "planning_time"
-            # }, axis=1)
-    
-            # stats_df = stats_df \
-            #     .replace('injected.sparql',str(queryName)) \
-            #     .replace('instance_id',str(instance)) \
-            #     .replace('batch_id',str(batch)) \
-            #     .replace('attempt_id',str(attempt))
-                
-            # stats_df.to_csv(stats, index=False)
+            shutil.copy(out_result, Path(out_result).with_suffix('.txt'))
                         
-            results_df = pd.read_csv(out_result).replace("null", None)
-            
-            if results_df.dropna().empty or os.stat(out_result).st_size == 0:            
-                logger.error(f"{query} yield no results!")
-                write_empty_result(out_result)
-                os.system(f"docker stop {container_name}")
-                raise RuntimeError(f"{query} yield no results!")
-
+            # Write stats
+            logger.info(f"Writing stats to {stats}")           
             create_stats(stats)
+            
+            def report_error(reason):
+                logger.error(f"{query} yield no results!")
+                #write_empty_result(out_result)
+                #os.system(f"docker stop {container_name}")
+                Path(out_source_selection).touch()
+                create_stats(stats, reason)
+                #raise RuntimeError(f"{query} yield no results!")
+                
+            try: 
+                results_df = pd.read_csv(out_result).replace("null", None)
+                if results_df.empty or os.stat(out_result).st_size == 0: 
+                    errorFile = f"{Path(stats).parent}/error.txt"
+                    if os.path.exists(errorFile):
+                        with open(errorFile, "r") as f:
+                            reason = f.read()
+                            report_error(reason) 
+                    else:
+                        report_error("error_runtime")       
+            except pd.errors.EmptyDataError:
+                report_error("error_runtime")
 
         else:
             logger.error(f"{query} reported error")    
@@ -175,7 +161,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         create_stats(stats, "timeout")
         write_empty_result(out_result)    
     finally:
-        os.system('pkill -9 -f "rdf4j/target"')
+        os.system('pkill -9 -f "mvnvm.*semagrow"')
         #cache_file = f"{app}/cache.db"
         #Path(cache_file).unlink(missing_ok=True)
         #kill_process(fedx_proc.pid)    
@@ -193,11 +179,7 @@ def transform_results(ctx: click.Context, infile, outfile):
         infile (_type_): Path to engine result file
         outfile (_type_): Path to the csv file
     """
-    # with open(infile, "r") as input_file:
-    #     with open(outfile, "w") as output_file:
-    #         for line in input_file:
-    #             output_file.write(line)
-    pass
+    shutil.copy(infile, outfile)
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
@@ -360,7 +342,14 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     if not update_summary:
         print(f"Looking for {endpoint} in {summary_file}")
         with open(summary_file, "r") as sfs:
-            update_summary = endpoint not in sfs.read()
+            summary_text = sfs.read()
+            for datafile in datafiles:
+                with open(f"../../{datafile}", "r") as file:
+                    line = file.readline()
+                    source = line.rsplit()[-2]
+                    if source not in summary_text:
+                        update_summary = True
+                        break
 
     if update_summary:
         try:
