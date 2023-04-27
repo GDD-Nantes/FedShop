@@ -5,8 +5,10 @@ from typing import Dict, Tuple
 import click
 import pandas as pd
 import numpy as np
-from utils import load_config
+from utils import load_config, rsfb_logger
 from tqdm import tqdm
+
+logger = rsfb_logger(Path(__file__).name)
 
 @click.group
 def cli():
@@ -104,46 +106,63 @@ def compute_metrics(configfile, outfile, workload):
 
     records = []        
     for provenance_file in tqdm(workload):
-        if os.stat(provenance_file).st_size == 0:
-            raise RuntimeError(f"{provenance_file} is empty!")
-        source_selection_result = pd.read_csv(provenance_file)
-        name_search = re.search(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/(attempt_(\d+)/)?provenance.csv", provenance_file)
-        engine = name_search.group(1)
-        query = name_search.group(2)
-        instance = int(name_search.group(3))
-        batch = int(name_search.group(4))
-        attempt = name_search.group(6)
-        total_nb_sources = vendor_edges[batch] + ratingsite_edges[batch]
-        results_file = f"{Path(provenance_file).parent}/results.csv"
-        nb_results = np.nan if os.stat(results_file).st_size == 0 else len(pd.read_csv(results_file))
+        with open(provenance_file, "r") as ss_fs:
+            name_search = re.search(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/(attempt_(\d+)/)?provenance.csv", provenance_file)
+            engine = name_search.group(1)
+            query = name_search.group(2)
+            instance = int(name_search.group(3))
+            batch = int(name_search.group(4))
+            attempt = name_search.group(6)
+            total_nb_sources = vendor_edges[batch] + ratingsite_edges[batch]
+            results_file = f"{Path(provenance_file).parent}/results.csv"
+            
+            is_evaluation_mode = ( (engine in CONFIG["evaluation"]["engines"]) and (attempt is not None) )       
+            
+            record = dict()
+            
+            if is_evaluation_mode:
+                record.update({
+                    "attempt": int(attempt),
+                    "engine": engine
+                })
+            
+            if len(ss_fs.read().strip()) == 0:
+                logger.debug(f"{provenance_file} is empty!")
+                record.update({
+                    "query": query,
+                    "instance": instance,
+                    "batch": batch,
+                    "nb_results": "error_runtime",
+                    "nb_distinct_sources": "error_runtime",
+                    "relevant_sources_selectivity": "error_runtime",
+                    "tpwss": "error_runtime",
+                    "avg_rwss": "error_runtime",
+                    "min_rwss": "error_runtime",
+                    "max_rwss": "error_runtime"
+                    #"tp_specific_relevant_sources_selectivity": get_tp_specific_relevant_sources(source_selection_result),
+                    #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(source_selection_result),
+                    #"xfed_join_restricted_source_level_tp_selectivity": get_xfed_join_restricted_source_level_tp_selectivity(source_selection_result)
+                })
+            else:
+                source_selection_result = pd.read_csv(provenance_file)
+                nb_results = np.nan if os.stat(results_file).st_size == 0 else len(pd.read_csv(results_file))
+                record.update({
+                    "query": query,
+                    "instance": instance,
+                    "batch": batch,
+                    "nb_results": nb_results,
+                    "nb_distinct_sources": get_distinct_sources(source_selection_result),
+                    "relevant_sources_selectivity": get_relevant_sources_selectivity(source_selection_result, total_nb_sources),
+                    "tpwss": get_tpwss(source_selection_result),
+                    "avg_rwss": get_rwss(source_selection_result, "mean", is_evaluation_mode),
+                    "min_rwss": get_rwss(source_selection_result, "min", is_evaluation_mode),
+                    "max_rwss": get_rwss(source_selection_result, "max", is_evaluation_mode)
+                    #"tp_specific_relevant_sources_selectivity": get_tp_specific_relevant_sources(source_selection_result),
+                    #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(source_selection_result),
+                    #"xfed_join_restricted_source_level_tp_selectivity": get_xfed_join_restricted_source_level_tp_selectivity(source_selection_result)
+                })
         
-        is_evaluation_mode = ( (engine in CONFIG["evaluation"]["engines"]) and (attempt is not None) )
-        
-        record = dict()
-        
-        if is_evaluation_mode:
-            record.update({
-                "attempt": int(attempt),
-                "engine": engine
-            })
-        
-        record.update({
-            "query": query,
-            "instance": instance,
-            "batch": batch,
-            "nb_results": nb_results,
-            "nb_distinct_sources": get_distinct_sources(source_selection_result),
-            "relevant_sources_selectivity": get_relevant_sources_selectivity(source_selection_result, total_nb_sources),
-            "tpwss": get_tpwss(source_selection_result),
-            "avg_rwss": get_rwss(source_selection_result, "mean", is_evaluation_mode),
-            "min_rwss": get_rwss(source_selection_result, "min", is_evaluation_mode),
-            "max_rwss": get_rwss(source_selection_result, "max", is_evaluation_mode)
-            #"tp_specific_relevant_sources_selectivity": get_tp_specific_relevant_sources(source_selection_result),
-            #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(source_selection_result),
-            #"xfed_join_restricted_source_level_tp_selectivity": get_xfed_join_restricted_source_level_tp_selectivity(source_selection_result)
-        })
-        
-        records.append(record)
+            records.append(record)
     
     metrics_df = pd.DataFrame.from_records(records)
     metrics_df.to_csv(outfile, index=False)

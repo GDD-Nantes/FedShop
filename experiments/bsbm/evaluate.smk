@@ -171,8 +171,8 @@ rule transform_results:
 
                 create_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
                 #raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
-            else:
-                create_stats(f"{Path(str(input)).parent}/stats.csv")
+            # else:
+            #     create_stats(f"{Path(str(input)).parent}/stats.csv")
 
 rule evaluate_engines:
     """Evaluate queries using each engine's source selection on FedX.

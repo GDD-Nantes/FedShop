@@ -32,3 +32,11 @@
 	path = engines/ANAPSID
 	url = https://github.com/mhoangvslev/ANAPSID.git
 	branch = master
+[submodule "engines/semagrow/sevod-scraper"]
+	path = engines/semagrow/sevod-scraper
+	url = https://github.com/semagrow/sevod-scraper.git
+	branch = master
+[submodule "engines/semagrow/semagrow"]
+	path = engines/semagrow/semagrow
+	url = https://github.com/Yotlan/semagrow
+	branch = master

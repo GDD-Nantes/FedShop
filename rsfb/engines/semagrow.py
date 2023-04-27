@@ -42,13 +42,16 @@ def prerequisites(ctx: click.Context, eval_config):
         eval_config (_type_): _description_
     """
     app_config = load_config(eval_config)["evaluation"]["engines"]["semagrow"]
-    app = app_config["dir"]
     
     #if not os.path.exists(app) or not os.path.exists(jar) or os.path.exists(lib):
     oldcwd = os.getcwd()
-    os.chdir(Path(app))
-    #os.system("rm -rf **/target && mvn clean && mvn install dependency:copy-dependencies package")
-    os.system("mvn clean && mvn install dependency:copy-dependencies package")
+    
+    for build_loc in [Path(app_config["dir"]).absolute(), Path(app_config["summary_generator_dir"]).absolute()]:
+        os.chdir(build_loc)
+        os.system("mvn clean && mvn install dependency:copy-dependencies package")
+        
+    os.chdir(Path(app_config["summary_generator_dir"]).absolute() + "/assembly/target/")
+    os.system("tar xzvf sevod-scraper-3-SNAPSHOT-dist.tar.gz")
     os.chdir(oldcwd)
 
 @cli.command()
@@ -101,7 +104,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     Path(out_result).touch()
     out_result = f"{Path(out_result).with_suffix('.csv')}"
     
-    cmd = f"./semagrow.sh repository.ttl {endpoint} ../../{out_result} ../../{out_source_selection} ../../{query_plan} {timeout} ../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file}"
+    cmd = f"./semagrow.sh repository.ttl {endpoint} ../../../{out_result} ../../../{out_source_selection} ../../../{query_plan} {timeout} ../../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file}"
 
     logger.debug("=== Semagrow ===")
     logger.debug(cmd)
@@ -179,7 +182,12 @@ def transform_results(ctx: click.Context, infile, outfile):
         infile (_type_): Path to engine result file
         outfile (_type_): Path to the csv file
     """
-    shutil.copy(infile, outfile)
+    with open(infile, "r") as in_fs:
+        content = in_fs.read().strip()
+        if len(content) == 0:
+            Path(outfile).touch(exist_ok=False)
+        else:
+            shutil.copy(infile, outfile)
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
@@ -196,9 +204,9 @@ def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
         prefix_cache (_type_): _description_
     """
     def extract_triple(x):
-        fedx_pattern = r"StatementPattern\s+?Var\s+\((name=\w+;\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)"
+        fedx_pattern = r"StatementPattern\s+?Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)"
         match = re.match(fedx_pattern, x)
-        
+                
         s = match.group(2)
         if s is None: s = f"?{match.group(3)}"
         
@@ -336,24 +344,25 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     oldcwd = os.getcwd()
     os.chdir(Path(app))   
     
-    shutil.copy(f"../../{outfile}", "repository.ttl")
+    shutil.copy(f"../../../{outfile}", "repository.ttl")
     
     update_summary = not os.path.exists(summary_file)
     if not update_summary:
-        print(f"Looking for {endpoint} in {summary_file}")
         with open(summary_file, "r") as sfs:
             summary_text = sfs.read()
             for datafile in datafiles:
-                with open(f"../../{datafile}", "r") as file:
+                with open(f"../../../{datafile}", "r") as file:
                     line = file.readline()
                     source = line.rsplit()[-2]
                     if source not in summary_text:
+                        logger.debug(f"{source} not in {summary_file}")
                         update_summary = True
                         break
 
     if update_summary:
         try:
             logger.info(f"Generating summary for batch {batch_id}")
+            #cmd = f'mvn -q exec:java -pl "cli/" -Dexec.mainClass="org.semagrow.sevod.scraper.cli.Main" -Dexec.args="--rdfdump --input ../../../experiments/bsbm/model/dataset/batch_dump/batch_{batch_id}.nt --output {summary_file}"'                  
             cmd = f"./semagrow.sh repository.ttl {endpoint} ignore ignore ignore ignore ignore {batch_id} true false {summary_file}"
             logger.debug(cmd)
             if os.system(cmd) != 0: raise RuntimeError(f"Could not generate {summary_file}")
