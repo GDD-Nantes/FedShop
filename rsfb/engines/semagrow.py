@@ -347,17 +347,17 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     shutil.copy(f"../../../{outfile}", "repository.ttl")
     
     update_summary = not os.path.exists(summary_file)
-    if not update_summary:
-        with open(summary_file, "r") as sfs:
-            summary_text = sfs.read()
-            for datafile in datafiles:
-                with open(f"../../../{datafile}", "r") as file:
-                    line = file.readline()
-                    source = line.rsplit()[-2]
-                    if source not in summary_text:
-                        logger.debug(f"{source} not in {summary_file}")
-                        update_summary = True
-                        break
+    # if not update_summary:
+    #     with open(summary_file, "r") as sfs:
+    #         summary_text = sfs.read()
+    #         for datafile in datafiles:
+    #             with open(f"../../../{datafile}", "r") as file:
+    #                 line = file.readline()
+    #                 source = line.rsplit()[-2]
+    #                 if source not in summary_text:
+    #                     logger.debug(f"{source} not in {summary_file}")
+    #                     update_summary = True
+    #                     break
 
     if update_summary:
         try:
@@ -370,7 +370,6 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
             Path(summary_file).unlink(missing_ok=True)
     
     os.chdir(oldcwd)
-    #ctx.invoke(fedx.generate_config_file, datafiles=datafiles, outfile=outfile, eval_config=eval_config, endpoint=endpoint)
 
 if __name__ == "__main__":
     cli()

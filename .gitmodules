@@ -34,7 +34,7 @@
 	branch = master
 [submodule "engines/semagrow/sevod-scraper"]
 	path = engines/semagrow/sevod-scraper
-	url = https://github.com/semagrow/sevod-scraper.git
+	url = https://github.com/mhoangvslev/sevod-scraper.git
 	branch = master
 [submodule "engines/semagrow/semagrow"]
 	path = engines/semagrow/semagrow
