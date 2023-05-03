@@ -136,15 +136,28 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                 
             # stats_df.to_csv(stats, index=False)
             
-            results_df = pd.read_csv(out_result).replace("null", None)
+            create_stats(stats)
             
-            if results_df.empty or os.stat(out_result).st_size == 0:            
+            def report_error(reason):
                 logger.error(f"{query} yield no results!")
                 #write_empty_result(out_result)
                 #os.system(f"docker stop {container_name}")
-                create_stats(stats, "error_runtime")
+                create_stats(stats, reason)
                 #raise RuntimeError(f"{query} yield no results!")
-            create_stats(stats)
+                
+            try: 
+                results_df = pd.read_csv(out_result).replace("null", None)
+                if results_df.empty or os.stat(out_result).st_size == 0: 
+                    errorFile = f"{Path(stats).parent}/error.txt"
+                    if os.path.exists(errorFile):
+                        with open(errorFile, "r") as f:
+                            reason = f.read()
+                            report_error(reason) 
+                    else:
+                        report_error("error_runtime")       
+            except pd.errors.EmptyDataError:
+                report_error("error_runtime")
+                        
         else:
             logger.error(f"{query} reported error {splendid_proc.returncode}")    
             #write_empty_result(out_result)
