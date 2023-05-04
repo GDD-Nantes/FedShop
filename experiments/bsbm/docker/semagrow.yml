@@ -2,6 +2,8 @@ services:
   semagrow:
     image: semagrow/semagrow:2.2.1    
     volumes:
-      - "../../engines/semagrow:/etc/default/semagrow"
+      - "../../../engines/semagrow/semagrow/summaries:/etc/default/semagrow"
     ports:
-      - 8080
+      - 8080:8080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

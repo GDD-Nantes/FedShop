@@ -12,10 +12,6 @@
 	path = generators/watdiv
 	url = https://github.com/mhoangvslev/watdiv.git
 	branch = bsbm
-[submodule "engines/CostFed-FU"]
-	path = engines/CostFed-FU
-	url = https://github.com/Yotlan/CostFed.git
-	branch = force-update
 [submodule "engines/FedX"]
 	path = engines/FedX
 	url = https://github.com/Yotlan/FedX.git
@@ -24,10 +20,6 @@
 	path = engines/semagrow
 	url = https://github.com/Yotlan/semagrow.git
 	branch = master
-[submodule "engines/FedX-RWSS"]
-	path = engines/FedX-RWSS
-	url = https://github.com/Yotlan/FedX.git
-	branch = RWSS
 [submodule "engines/ANAPSID"]
 	path = engines/ANAPSID
 	url = https://github.com/mhoangvslev/ANAPSID.git
