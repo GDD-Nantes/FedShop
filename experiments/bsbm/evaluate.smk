@@ -101,7 +101,7 @@ rule merge_batch_metrics:
     run:
         metrics_df = pd.read_csv(f"{input.metrics}")
         stats_df = pd.read_csv(f"{input.stats}")
-        out_df = pd.merge(metrics_df, stats_df, on = ["query", "batch", "instance", "engine", "attempt"], how="left")
+        out_df = pd.merge(metrics_df, stats_df, on = ["query", "batch", "instance", "engine", "attempt"], how="inner")
         out_df.to_csv(str(output), index=False)
 
 rule merge_stats:
@@ -214,8 +214,7 @@ rule evaluate_engines:
         for attempt in range(CONFIG_EVAL["n_attempts"]):
             same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{batch_id}/attempt_{attempt}/results.txt"
             logger.info(f"Checking {same_file_other_attempt} ...")
-            if  engine in ["fedx"] and \
-                os.path.exists(same_file_other_attempt) and \
+            if  os.path.exists(same_file_other_attempt) and \
                 os.path.exists(same_file_other_attempt) and \
                 os.stat(same_file_other_attempt).st_size == 0:
 

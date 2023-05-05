@@ -179,8 +179,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         create_stats(stats, "timeout")
         #write_empty_result(out_result)    
     finally:
-        #os.system('pkill -9 -f "bin"')
-        kill_process(splendid_proc.pid)
+        os.system('pkill -9 -f "de.uni_koblenz.west.splendid.SPLENDID"')
+        #kill_process(splendid_proc.pid)
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))

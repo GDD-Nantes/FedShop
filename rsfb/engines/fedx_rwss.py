@@ -93,7 +93,7 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
         create_stats(stats, "timeout")
         #write_empty_result(out_result)                   
     finally:
-        os.system('pkill -9 -f "FedX"')
+        os.system('pkill -9 -f "FedX-1.0-SNAPSHOT.jar"')
         #kill_process(fedx_proc.pid)
 
 @cli.command()

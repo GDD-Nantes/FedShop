@@ -80,8 +80,9 @@ def warmup(ctx: click.Context, eval_config, engine_config, repeat, batch_id):
     random.shuffle(queries)
     for query in tqdm(queries):
         for batch_id in range(config["generation"]["n_batch"]):
+            force_source_selection = f"{Path(query).parent}/batch_{batch_id}/provenance.csv"
             for _ in range(repeat):
-                ctx.invoke(run_benchmark, eval_config=eval_config, engine_config=engine_config, query=query, batch_id=batch_id)
+                ctx.invoke(run_benchmark, eval_config=eval_config, engine_config=engine_config, query=query, force_source_selection=force_source_selection, batch_id=batch_id)
 
 def __create_service_query(config, query, query_plan, force_source_selection):
     opt_source_selection_file = f"{Path(force_source_selection).parent}/{Path(force_source_selection).stem}.opt.csv"
@@ -163,9 +164,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         batch_id (_type_): _description_
     """
     
-    if force_source_selection is None:
-        force_source_selection = f"{Path(query).parent}/batch_{batch_id}/provenance.csv"
-        #logger.info(f"force_source_selection = {force_source_selection}")      
+    if force_source_selection == "":
+        raise RuntimeError("You must provide reference source selection for this engine.")
     
     config = load_config(eval_config)
     

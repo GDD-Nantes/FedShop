@@ -144,8 +144,12 @@ def compute_metrics(configfile, outfile, workload):
                     #"xfed_join_restricted_source_level_tp_selectivity": get_xfed_join_restricted_source_level_tp_selectivity(source_selection_result)
                 })
             else:
+                nb_results = np.nan
                 source_selection_result = pd.read_csv(provenance_file)
-                nb_results = np.nan if os.stat(results_file).st_size == 0 else len(pd.read_csv(results_file))
+                with open(results_file, "r") as rfs:
+                    if len(rfs.read().strip()) > 0:
+                        nb_results = len(pd.read_csv(results_file))
+                        
                 record.update({
                     "query": query,
                     "instance": instance,

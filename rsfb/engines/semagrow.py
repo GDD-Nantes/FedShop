@@ -165,7 +165,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         create_stats(stats, "timeout")
         write_empty_result(out_result)    
     finally:
-        os.system('pkill -9 -f "mvnvm.*semagrow"')
+        os.system('pkill -9 -f "mainClass=org.semagrow.cli.CliMain"')
         #cache_file = f"{app}/cache.db"
         #Path(cache_file).unlink(missing_ok=True)
         #kill_process(fedx_proc.pid)    
