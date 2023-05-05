@@ -90,7 +90,7 @@ generation:
 
 evaluation:
   n_attempts: 4
-  timeout: 60
+  timeout: 600
   engines:
     fedx:
      dir: "engines/FedX/target"

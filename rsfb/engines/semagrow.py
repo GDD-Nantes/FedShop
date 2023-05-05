@@ -48,10 +48,10 @@ def prerequisites(ctx: click.Context, eval_config):
     
     for build_loc in [Path(app_config["dir"]).absolute(), Path(app_config["summary_generator_dir"]).absolute()]:
         os.chdir(build_loc)
-        os.system("mvn clean && mvn install dependency:copy-dependencies package")
+        os.system("mvn clean && mvn install dependency:copy-dependencies package -Dmaven.test.skip=true")
         
-    os.chdir(Path(app_config["summary_generator_dir"]).absolute() + "/assembly/target/")
-    os.system("tar xzvf sevod-scraper-3-SNAPSHOT-dist.tar.gz")
+    # os.chdir(Path(app_config["summary_generator_dir"]).absolute() + "/assembly/target/")
+    # os.system("tar xzvf sevod-scraper-3-SNAPSHOT-dist.tar.gz")
     os.chdir(oldcwd)
 
 @cli.command()
@@ -64,8 +64,9 @@ def prerequisites(ctx: click.Context, eval_config):
 @click.option("--stats", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="/dev/null")
 @click.option("--force-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
 @click.option("--batch-id", type=click.INT, default=-1)
+@click.option("--noexec", is_flag=True, default=False)
 @click.pass_context
-def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id):
+def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id, noexec):
     """Execute the workload instance then its associated source selection query.
     
     Expected output:
@@ -98,7 +99,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     timeout = int(config["evaluation"]["timeout"])
 
     oldcwd = os.getcwd()
-    summary_file = f"metadata{batch_id}.ttl"   
+    summary_file = f"metadata-sparql-{batch_id}.ttl"   
     
     # Prepare args for semagrow
     Path(out_result).touch()
@@ -302,7 +303,7 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
         endpoint (_type_): _description_
     """
     
-    summary_file = f"metadata{batch_id}.ttl"     
+    summary_file = f"metadata-sparql-{batch_id}.ttl"     
     app_config = load_config(eval_config)["evaluation"]["engines"]["semagrow"]
     app = app_config["dir"]  
     
@@ -358,12 +359,19 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     #                     logger.debug(f"{source} not in {summary_file}")
     #                     update_summary = True
     #                     break
+    
+    sources = set()
+    for datafile in datafiles:
+        with open(f"../../../{datafile}", "r") as file:
+            line = file.readline()
+            source = line.rsplit()[-2]
+            sources.add(source)
 
     if update_summary:
         try:
             logger.info(f"Generating summary for batch {batch_id}")
-            #cmd = f'mvn -q exec:java -pl "cli/" -Dexec.mainClass="org.semagrow.sevod.scraper.cli.Main" -Dexec.args="--rdfdump --input ../../../experiments/bsbm/model/dataset/batch_dump/batch_{batch_id}.nt --output {summary_file}"'                  
-            cmd = f"./semagrow.sh repository.ttl {endpoint} ignore ignore ignore ignore ignore {batch_id} true false {summary_file}"
+            cmd = f'mvn -q exec:java -pl "cli/" -Dexec.mainClass="org.semagrow.sevod.scraper.cli.Main" -Dexec.args="--sparql --input {endpoint} --graph={",".join(sources)} --output {summary_file}"'                  
+            # cmd = f"./semagrow.sh repository.ttl {endpoint} ignore ignore ignore ignore ignore {batch_id} true false {summary_file}"
             logger.debug(cmd)
             if os.system(cmd) != 0: raise RuntimeError(f"Could not generate {summary_file}")
         except InterruptedError:
