@@ -16,10 +16,6 @@
 	path = engines/FedX
 	url = https://github.com/Yotlan/FedX.git
 	branch = master
-[submodule "engines/semagrow"]
-	path = engines/semagrow
-	url = https://github.com/Yotlan/semagrow.git
-	branch = master
 [submodule "engines/ANAPSID"]
 	path = engines/ANAPSID
 	url = https://github.com/mhoangvslev/ANAPSID.git
