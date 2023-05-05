@@ -3,6 +3,7 @@ from io import BytesIO, StringIO
 import json
 import os
 import re
+import resource
 import shutil
 import click
 import glob
@@ -83,6 +84,14 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         batch_id (_type_): _description_
     """
     
+    if batch_id > 4:
+        # We do this because at batch 5, ANAPSID saturates re
+        Path(out_result).touch()
+        Path(out_source_selection).touch()
+        Path(query_plan).touch()
+        create_stats(stats)
+        return
+        
     in_query_file = f"{Path(out_result).parent}/injected.sparql"
     
     with    open(query, "r") as qfs, \
@@ -110,7 +119,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     timeout = int(config["evaluation"]["timeout"])
     old_dir = os.getcwd()
 
-    cmd = f"$python run_anapsid -e ../../{engine_config} -q ../../{in_query_file} -p naive -s False -o False -d SSGM -a True -r ../../{out_result} -z ../../{Path(stats).parent}/ask.txt -y ../../{Path(stats).parent}/planning_time.txt -x ../../{query_plan} -v ../../{out_source_selection} -u ../../{Path(stats).parent}/source_selection_time.txt -n ../../{Path(stats).parent}/exec_time.txt"
+    cmd = f"python scripts/run_anapsid -e ../../{engine_config} -q ../../{in_query_file} -p naive -s False -o False -d SSGM -a True -r ../../{out_result} -z ../../{Path(stats).parent}/ask.txt -y ../../{Path(stats).parent}/planning_time.txt -x ../../{query_plan} -v ../../{out_source_selection} -u ../../{Path(stats).parent}/source_selection_time.txt -n ../../{Path(stats).parent}/exec_time.txt"
 
     print("=== ANAPSID ===")
     print(cmd)
@@ -119,6 +128,11 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     #ANAPSID need to initialize following files
     Path(out_result).touch() #result.txt
     Path(query_plan).touch() #query_plan.txt
+    
+    
+    # Set the maximum amount of memory to be used by the subprocess in bytes
+    max_mem = 100000000  # 100 MB
+    resource.setrlimit(resource.RLIMIT_AS, (max_mem, max_mem))
 
     os.chdir(app_dir)
     anapsid_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -167,7 +181,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 
     finally:
         #kill_process(anapsid_proc.pid)
-        os.system('pkill -9 -f "run_anapsid"')
+        os.system('pkill -9 -f "scripts/run_anapsid"')
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
@@ -307,25 +321,45 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     old_dir = os.getcwd()
     
     ssite = set()
-    for data_file in datafiles:
-        with open(data_file, "r") as file:
-            t_file = file.readlines()
-            for line in t_file:
-                site = line.rsplit()[-2]
-                site = re.search(r"<(.*)>", site).group(1)
-                ssite.add(site)
-                    
-    Path(outfile).parent.mkdir(parents=True, exist_ok=True)
-    tmp_outfile = f"{outfile}.tmp"
-    with open(tmp_outfile, "w+") as config_fs:
-        for s in sorted(ssite):
-            config_fs.write(f"{endpoint}/?default-graph-uri={s}\n")
-
     
-    os.chdir(app_dir)
-    os.system(f"get_predicates ../../{tmp_outfile} ../../{outfile}")
-    os.chdir(old_dir)
-    os.remove(tmp_outfile)
+    endpoints=f"{Path(outfile).parent}/endpoints.txt"
+    
+    if not Path(endpoints).exists():
+        for data_file in datafiles:
+            with open(data_file, "r") as file, open(endpoints, "w") as efs:
+                t_file = file.readlines()
+                for line in t_file:
+                    site = line.rsplit()[-2]
+                    site = re.search(r"<(.*)>", site).group(1)
+                    ssite.add(site)
+                efs.write("\n".join(ssite))
+    else:
+        with open(endpoints, "r") as efs:
+            ssite = set(efs.readlines())
+         
+    update = False       
+    if not os.path.exists(outfile):
+        update = True
+    else:
+        with open(outfile, "r") as ofs:
+            content = ofs.read()
+            for source in ssite:
+                if source not in content:
+                    update = True
+                    logger.debug(f"{source} not in {outfile}")
+                    break
+        
+    if update:             
+        Path(outfile).parent.mkdir(parents=True, exist_ok=True)
+        tmp_outfile = f"{outfile}.tmp"
+        with open(tmp_outfile, "w+") as config_fs:
+            for s in sorted(ssite):
+                config_fs.write(f"{endpoint}/?default-graph-uri={s}\n")
+
+        os.chdir(app_dir)
+        os.system(f"python scripts/get_predicates ../../{tmp_outfile} ../../{outfile}")
+        os.chdir(old_dir)
+        os.remove(tmp_outfile)
 
 if __name__ == "__main__":
     cli()
