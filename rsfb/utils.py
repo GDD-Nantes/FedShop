@@ -400,9 +400,6 @@ def create_stats(statsfile, failed_reason=None):
     
     stats_df = pd.DataFrame([result])
     stats_df.to_csv(statsfile, index=False)
-                
-def write_empty_result(outfile):
-    Path(outfile).touch()
     
 def __exec_virtuoso_command(cmd, compose_file, service_name, batch_id):
     container_name = get_docker_containers(compose_file, service_name)[batch_id]

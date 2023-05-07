@@ -108,13 +108,17 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         else:
             # print(f"{query} reported error")
             # create_stats()
-            # write_empty_result("error_runtime")
+            # Path(out_result).touch()
+            # Path(out_source_selection).touch()
+            # Path(query_plan).touch()
             raise RuntimeError(f"{query} reported error")
            
     except subprocess.TimeoutExpired: 
         print(f"{query} timed out!")
         create_stats()
-        write_empty_result("timeout")
+        Path(out_result).touch()
+        Path(out_source_selection).touch()
+        Path(query_plan).touch()
         kill_process(odyssey_proc.pid)
 
     # FedX run part
@@ -147,11 +151,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             mode = basicInfos.group(5)
             fout.write(";".join([queryName, engine, instance, batch, mode, "nan", "nan"])+"\n")
             fout.close()
-    
-    def write_empty_result(msg):
-        with open(result, "w+") as fout:
-            fout.write(msg)
-            fout.close()
 
     fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try: 
@@ -161,13 +160,17 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         else:
             # print(f"{query} reported error")
             # create_stats()
-            # write_empty_result("error_runtime")
+            # Path(out_result).touch()
+            # Path(out_source_selection).touch()
+            # Path(query_plan).touch()
             raise RuntimeError(f"{query} reported error")
            
     except subprocess.TimeoutExpired: 
         print(f"{query} timed out!")
         create_stats()
-        write_empty_result("timeout")
+        Path(out_result).touch()
+        Path(out_source_selection).touch()
+        Path(query_plan).touch()
         kill_process(fedx_proc.pid)
 
 @cli.command()

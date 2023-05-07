@@ -14,7 +14,7 @@ from pathlib import Path
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import load_config, rsfb_logger, str2n3, write_empty_result, create_stats
+from utils import load_config, rsfb_logger, str2n3, create_stats
 logger = rsfb_logger(Path(__file__).name)
 
 import fedx
@@ -73,17 +73,23 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
             logger.info(f"{query} benchmarked sucessfully")
             #if os.stat(out_result).st_size == 0:
             #    logger.error(f"{query} yield no results!")
-            #    write_empty_result(out_result)
+            #    Path(out_result).touch()
+            #    Path(out_source_selection).touch()
+            #    Path(query_plan).touch()
             #    raise RuntimeError(f"{query} yield no results!")
         else:
             logger.error(f"{query} reported error")    
-            write_empty_result(out_result)
+            Path(out_result).touch()
+            Path(out_source_selection).touch()
+            Path(query_plan).touch()
             if not os.path.exists(stats):
                 create_stats(stats, "error_runtime")                  
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
         create_stats(stats, "timeout")
-        write_empty_result(out_result)                   
+        Path(out_result).touch()
+        Path(out_source_selection).touch()
+        Path(query_plan).touch()                   
     finally:
         os.system('pkill -9 -f "FedX-1.0-SNAPSHOT.jar"')
         #kill_process(fedx_proc.pid)

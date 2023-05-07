@@ -226,7 +226,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                     
         #         if result_df.empty:
         #             logger.error(f"{query} yield no results!")
-        #             write_empty_result(out_result)
+        #             Path(out_result).touch()
+        #             Path(out_source_selection).touch()
+        #             Path(query_plan).touch()
         #             raise RuntimeError(f"{query} yield no results!")
         #         else:
         #             # Some post processing
@@ -235,14 +237,18 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         #             result_df.to_csv(out_result, index=False)
         #     else:
         #         logger.error(f"{query} reported error")    
-        #         write_empty_result(out_result)
+        #         Path(out_result).touch()
+        #         Path(out_source_selection).touch()
+        #         Path(query_plan).touch()
         #         write_empty_stats(stats, "error_runtime")                  
         #         # raise RuntimeError(f"{query} reported error")
                     
         # except subprocess.TimeoutExpired: 
         #     logger.exception(f"{query} timed out!")
         #     write_empty_stats(stats, "timeout")
-        #     write_empty_result(out_result) 
+        #     Path(out_result).touch()
+        #     Path(out_source_selection).touch()
+        #     Path(query_plan).touch()
         
         response, result = exec_query_on_endpoint(out_query_text, endpoint, error_when_timeout=True, timeout=timeout)
         

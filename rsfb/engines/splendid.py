@@ -17,7 +17,7 @@ import sys
 from sklearn.calibration import LabelEncoder
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import check_container_status, kill_process, load_config, rsfb_logger, write_empty_result, create_stats
+from utils import check_container_status, kill_process, load_config, rsfb_logger, create_stats
 import fedx
 
 logger = rsfb_logger(Path(__file__).name)
@@ -104,11 +104,10 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     print("================")
 
     #SPLENDID need to have initialized path
-    write_empty_result(out_result)
-    write_empty_result(out_source_selection)
-    write_empty_result(query_plan)
-    write_empty_result(stats)
-
+    Path(out_result).touch()
+    Path(out_source_selection).touch()
+    Path(query_plan).touch()
+    
     os.chdir(Path(app))
     splendid_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     #splendid_output, splendid_error = splendid_proc.communicate()
@@ -141,7 +140,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
             def report_error(reason):
                 logger.error(f"{query} yield no results!")
-                #write_empty_result(out_result)
+                # Path(out_result).touch()
+                # Path(out_source_selection).touch()
+                # Path(query_plan).touch()
                 #os.system(f"docker stop {container_name}")
                 create_stats(stats, reason)
                 #raise RuntimeError(f"{query} yield no results!")
@@ -161,8 +162,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                         
         else:
             logger.error(f"{query} reported error {splendid_proc.returncode}")    
-            #write_empty_result(out_result)
-            #write_empty_result(stats)
+            Path(out_result).touch()
+            Path(out_source_selection).touch()
+            Path(query_plan).touch()
             errorFile = f"{Path(stats).parent}/error.txt"
             if os.path.exists(errorFile):
                 with open(errorFile, "r") as f:
@@ -177,7 +179,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             raise RuntimeError("Backend is terminated!")
         logger.info("Writing empty stats...")
         create_stats(stats, "timeout")
-        #write_empty_result(out_result)    
+        Path(out_result).touch()
+        Path(out_source_selection).touch()
+        Path(query_plan).touch()   
     finally:
         os.system('pkill -9 -f "de.uni_koblenz.west.splendid.SPLENDID"')
         #kill_process(splendid_proc.pid)

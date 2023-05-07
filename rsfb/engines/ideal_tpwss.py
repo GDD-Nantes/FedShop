@@ -22,7 +22,7 @@ import requests
 from tqdm import tqdm
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import check_container_status, load_config, rsfb_logger, wait_for_container, create_stats, write_empty_result
+from utils import check_container_status, load_config, rsfb_logger, wait_for_container, create_stats
 from query import write_query, exec_query_on_endpoint
 
 logger = rsfb_logger(Path(__file__).name)
@@ -215,8 +215,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     except TimeoutError:
         logger.exception(f"{query} timed out!")
         create_stats(stats, "timeout")
-        write_empty_result(out_result)
-        Path(query_plan).touch()     
+        Path(out_result).touch()
+        Path(out_source_selection).touch()
+        Path(query_plan).touch()
     else:
         endTime = time.time()
         exec_time = (endTime - startTime)*1e3

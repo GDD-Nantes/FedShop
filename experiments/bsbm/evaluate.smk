@@ -14,7 +14,7 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import rsfb_logger, load_config, get_docker_endpoint_by_container_name, get_docker_containers, check_container_status, write_empty_result, create_stats, virtuoso_kill_all_transactions, wait_for_container
+from utils import rsfb_logger, load_config, get_docker_endpoint_by_container_name, get_docker_containers, check_container_status, create_stats, virtuoso_kill_all_transactions, wait_for_container
 from utils import activate_one_container as utils_activate_one_container
 
 #===============================

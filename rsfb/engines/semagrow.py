@@ -16,7 +16,7 @@ from sklearn.preprocessing import LabelEncoder
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import check_container_status, load_config, rsfb_logger, str2n3, write_empty_result, create_stats, create_stats
+from utils import check_container_status, load_config, rsfb_logger, str2n3, create_stats, create_stats
 import fedx
 
 logger = rsfb_logger(Path(__file__).name)
@@ -127,7 +127,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
             def report_error(reason):
                 logger.error(f"{query} yield no results!")
-                #write_empty_result(out_result)
+                # Path(out_result).touch()
+                # Path(out_source_selection).touch()
+                # Path(query_plan).touch()
                 #os.system(f"docker stop {container_name}")
                 Path(out_source_selection).touch()
                 create_stats(stats, reason)
@@ -148,7 +150,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 
         else:
             logger.error(f"{query} reported error")    
-            write_empty_result(out_result)
+            Path(out_result).touch()
+            Path(out_source_selection).touch()
+            Path(query_plan).touch()
             create_stats(stats, "error_runtime")
             
     except subprocess.TimeoutExpired: 
@@ -163,7 +167,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         
         logger.info("Writing empty stats...")
         create_stats(stats, "timeout")
-        write_empty_result(out_result)    
+        Path(out_result).touch()
+        Path(out_source_selection).touch()
+        Path(query_plan).touch()
     finally:
         os.system('pkill -9 -f "mainClass=org.semagrow.cli.CliMain"')
         #cache_file = f"{app}/cache.db"
