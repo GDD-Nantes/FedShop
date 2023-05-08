@@ -97,6 +97,10 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     service_name = config["generation"]["virtuoso"]["service_name"]
     container_name = config["generation"]["virtuoso"]["container_names"][last_batch]
     timeout = int(config["evaluation"]["timeout"])
+    
+    if not os.path.exists(f"metadata-sparql-{batch_id}_dump.ttl"):
+        logger.info(f"Dump file does not exist, creating once...")
+        timeout = 120
 
     oldcwd = os.getcwd()
     summary_file = f"metadata-sparql-{batch_id}.ttl"   
