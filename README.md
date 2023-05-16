@@ -29,12 +29,12 @@ Instead of downloading the complete archive, you can also download only individu
 
 ## QuickStart and Documentation
 
-- The quickstart guide is available in the [Quickstart tutorial](https://github.com/GDD-Nantes/FedShop/wiki/3.-Quick-tutorial)
+- The quickstart guide is available in the [Quickstart tutorial](https://github.com/GDD-Nantes/FedShop/wiki/1.-Quick-start)
 - How to configure fedshop and how to extend fedshop is available in the [wiki](https://github.com/GDD-Nantes/FedShop/wiki)
 
 
 ## Install from the source
-We recommend using our docker image from the [Quickstart tutorial](https://github.com/GDD-Nantes/FedShop/wiki/3.-Quick-tutorial). However, it is also possible to install from source.
+We recommend using our docker image from the [Quickstart tutorial](https://github.com/GDD-Nantes/FedShop/wiki/1.-Quick-start). However, it is also possible to install from source.
 
 
 - Install [Docker](https://docs.docker.com/get-docker/), Maven 3.6.3 with OpenJDK 11
