@@ -89,7 +89,7 @@ generation:
         rating4_p: 0.7
 
 evaluation:
-  n_attempts: 4
+  n_attempts: 1
   timeout: 120
   engines:
     fedx:
