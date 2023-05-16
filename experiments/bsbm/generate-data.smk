@@ -186,70 +186,10 @@ def activate_one_container(container_infos_file, batch_id):
 #=================
 
 rule all:
-    input: 
-        expand(
-            "{benchDir}/virtuoso_batch{batch_id}-ok.txt",
-            benchDir=BENCH_DIR,
-            batch_id=range(N_BATCH)
-        )
-
-rule ingest_virtuoso:
-    priority: 4
-    threads: 1
-    input: 
-        vendor=expand("{modelDir}/virtuoso/ingest_vendor_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
-        ratingsite=expand("{modelDir}/virtuoso/ingest_ratingsite_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
-    output: "{benchDir}/virtuoso_batch{batch_id}-ok.txt"
-    run: 
-        container_infos = f"{BENCH_DIR}/container_infos.csv"
-        activate_one_container(container_infos, wildcards.batch_id)
-        check_file_presence(container_infos, wildcards.batch_id)
-        check_file_stats(container_infos, wildcards.batch_id)
-        shell(f'sh {input.vendor} bsbm && sh {input.ratingsite}')
-        
-        # Mini tests for sources number per batch
-        shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationVendor.test_vendor_nb_sources")
-        shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationRatingSite.test_ratingsite_nb_sources")
-        shell(f'echo "OK" > {output}')
-
-        # test_proc = subprocess.run(
-        #     f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v", 
-        #     capture_output=True, shell=True
-        # )
-
-        # if test_proc.returncode == 0:
-        #     with open(str(output), "w") as f:
-        #         f.write(test_proc.stdout.decode())
-        #         f.close()
-        # else: 
-        #     raise RuntimeError("The ingested data did not pass the tests. Check the output file for more information.")
-
-
-rule deploy_virtuoso:
-    priority: 5
-    threads: 1
     input:
         vendor=expand("{modelDir}/dataset/vendor{vendor_id}.nq", vendor_id=range(N_VENDOR), modelDir=MODEL_DIR),
-        ratingsite=expand("{modelDir}/dataset/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR),
-    output: "{benchDir}/container_infos.csv"
-    run: deploy_virtuoso(output)
-
-rule make_virtuoso_ingest_command_for_vendor:
-    priority: 5
-    threads: 1
-    input: 
-        container_infos = expand("{benchDir}/container_infos.csv", benchDir=BENCH_DIR)
-    output: "{modelDir}/virtuoso/ingest_vendor_batch{batch_id}.sh"
-    run: generate_virtuoso_scripts(input.container_infos, "vendor", output, wildcards.batch_id, N_VENDOR)
-
-rule make_virtuoso_ingest_command_for_ratingsite:
-    priority: 5
-    threads: 1
-    input: 
-        container_infos = expand("{benchDir}/container_infos.csv", benchDir=BENCH_DIR)
-    output: "{modelDir}/virtuoso/ingest_ratingsite_batch{batch_id}.sh"
-    run: generate_virtuoso_scripts(input.container_infos, "ratingsite", output, wildcards.batch_id, N_RATINGSITE)
-
+        ratingsite=expand("{modelDir}/dataset/ratingsite{ratingsite_id}.nq", ratingsite_id=range(N_RATINGSITE), modelDir=MODEL_DIR)
+    
 rule generate_ratingsites:
     priority: 12
     threads: 5

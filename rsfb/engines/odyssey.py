@@ -78,6 +78,10 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     script = app_config["script"]
     work_dir = app_config["work_dir"]
     properties = work_dir+properties
+    
+    Path(out_result).touch()
+    Path(out_source_selection).touch()
+    Path(query_plan).touch()
 
     lines = []
     provenance_stat_to_modif = f"{query.split('/')[4]}-{query.split('/')[5]}.out"
@@ -108,17 +112,11 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         else:
             # print(f"{query} reported error")
             # create_stats()
-            # Path(out_result).touch()
-            # Path(out_source_selection).touch()
-            # Path(query_plan).touch()
             raise RuntimeError(f"{query} reported error")
            
     except subprocess.TimeoutExpired: 
         print(f"{query} timed out!")
         create_stats()
-        Path(out_result).touch()
-        Path(out_source_selection).touch()
-        Path(query_plan).touch()
         kill_process(odyssey_proc.pid)
 
     # FedX run part
@@ -168,9 +166,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     except subprocess.TimeoutExpired: 
         print(f"{query} timed out!")
         create_stats()
-        Path(out_result).touch()
-        Path(out_source_selection).touch()
-        Path(query_plan).touch()
         kill_process(fedx_proc.pid)
 
 @cli.command()

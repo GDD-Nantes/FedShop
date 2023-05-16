@@ -399,7 +399,13 @@ def create_stats(statsfile, failed_reason=None):
     result.update(metrics)
     
     stats_df = pd.DataFrame([result])
-    stats_df.to_csv(statsfile, index=False)
+    try:
+        stats_df.to_csv(statsfile, index=False)
+    except MemoryError:
+        with open(statsfile, "w") as fs:
+            # Write the header
+            fs.write(f"{','.join(result.keys())}\n")
+            fs.write(f"{','.join(result.values())}\n")
     
 def __exec_virtuoso_command(cmd, compose_file, service_name, batch_id):
     container_name = get_docker_containers(compose_file, service_name)[batch_id]

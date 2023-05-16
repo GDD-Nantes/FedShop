@@ -17,14 +17,16 @@ WHERE {
     } .
 
     {
-        ?localProduct owl:sameAs ?product  .
-        FILTER (?ProductXYZ != ?product)        
+        ?localProduct owl:sameAs ?product  .      
         ?localProduct rdfs:label ?localProductLabel  .
         ?localProduct bsbm:productFeature ?localProdFeature  .
         ?localProdFeature owl:sameAs ?prodFeature .
         ?localProduct bsbm:productPropertyNumeric1 ?simProperty1  .
         ?localProduct bsbm:productPropertyNumeric2 ?simProperty2  .    
     } .
+
+    # @skip
+    FILTER (?ProductXYZ != ?product)  
 
     # Values are pre-determined because we knew the boundaries from the normal distribution
     # @skip

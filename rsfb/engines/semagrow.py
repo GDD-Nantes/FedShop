@@ -47,8 +47,9 @@ def prerequisites(ctx: click.Context, eval_config):
     oldcwd = os.getcwd()
     
     for build_loc in [Path(app_config["dir"]).absolute(), Path(app_config["summary_generator_dir"]).absolute()]:
-        os.chdir(build_loc)
-        os.system("mvn clean && mvn install dependency:copy-dependencies package -Dmaven.test.skip=true")
+        os.chdir(build_loc)        
+        if os.system("mvn clean && mvn install dependency:copy-dependencies package -Dmaven.test.skip=true") != 0:
+            raise RuntimeError(f"Could not compile {build_loc}")
         
     # os.chdir(Path(app_config["summary_generator_dir"]).absolute() + "/assembly/target/")
     # os.system("tar xzvf sevod-scraper-3-SNAPSHOT-dist.tar.gz")
@@ -98,24 +99,27 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     container_name = config["generation"]["virtuoso"]["container_names"][last_batch]
     timeout = int(config["evaluation"]["timeout"])
     
-    if not os.path.exists(f"metadata-sparql-{batch_id}_dump.ttl"):
-        logger.info(f"Dump file does not exist, creating once...")
-        timeout = 120
-
     oldcwd = os.getcwd()
     summary_file = f"metadata-sparql-{batch_id}.ttl"   
     
     # Prepare args for semagrow
     Path(out_result).touch()
+    Path(out_source_selection).touch()
+    Path(query_plan).touch()
     out_result = f"{Path(out_result).with_suffix('.csv')}"
     
-    cmd = f"./semagrow.sh repository.ttl {endpoint} ../../../{out_result} ../../../{out_source_selection} ../../../{query_plan} {timeout} ../../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file}"
+    cmd = f"./semagrow.sh repository.ttl {endpoint} ../../../{out_result} ../../../{out_source_selection} ../../../{query_plan} {timeout} ../../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file} {str(noexec).lower()}"
 
     logger.debug("=== Semagrow ===")
     logger.debug(cmd)
     logger.debug("============")
 
     os.chdir(Path(app))
+    
+    if not os.path.exists(f"metadata-sparql-{batch_id}_dump.ttl"):
+        logger.info(f"Dump file does not exist, creating once...")
+        timeout = 300
+        
     semagrow_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     os.chdir(oldcwd)
     try:        
@@ -131,9 +135,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
             def report_error(reason):
                 logger.error(f"{query} yield no results!")
-                # Path(out_result).touch()
-                # Path(out_source_selection).touch()
-                # Path(query_plan).touch()
                 #os.system(f"docker stop {container_name}")
                 Path(out_source_selection).touch()
                 create_stats(stats, reason)
@@ -154,9 +155,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 
         else:
             logger.error(f"{query} reported error")    
-            Path(out_result).touch()
-            Path(out_source_selection).touch()
-            Path(query_plan).touch()
             create_stats(stats, "error_runtime")
             
     except subprocess.TimeoutExpired: 
@@ -171,9 +169,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         
         logger.info("Writing empty stats...")
         create_stats(stats, "timeout")
-        Path(out_result).touch()
-        Path(out_source_selection).touch()
-        Path(query_plan).touch()
     finally:
         os.system('pkill -9 -f "mainClass=org.semagrow.cli.CliMain"')
         #cache_file = f"{app}/cache.db"

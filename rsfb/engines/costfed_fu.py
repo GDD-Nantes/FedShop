@@ -47,7 +47,8 @@ def prerequisites(ctx: click.Context, eval_config):
 
     oldcwd = os.getcwd()
     os.chdir(Path(app))
-    os.system("rm -rf costfed/target && mvn compile && mvn package --also-make")
+    if os.system("mvn clean && mvn install dependency:copy-dependencies package") != 0:
+        raise RuntimeError("Could not compile CostFed-FU")
     os.chdir(oldcwd)
 
 @cli.command()
@@ -83,6 +84,10 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         batch_id (_type_): _description_
     """
     
+    Path(out_result).touch()
+    Path(out_source_selection).touch()
+    Path(query_plan).touch()
+    
     config = load_config(eval_config)
     app_config = config["evaluation"]["engines"]["costfed"]
     app = app_config["dir"]
@@ -96,7 +101,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 
     oldcwd = os.getcwd()
     summary_file = f"summaries/sum_fedshop_batch{batch_id}.n3"     
-    cmd = f"./costfed.sh costfed/costfed.props {endpoint} ../../{out_result} ../../{out_source_selection} ../../{query_plan} {timeout} ../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file}"
+    cmd = f"./costfed.sh costfed/costfed.props {endpoint} ../../{out_result} ../../{out_source_selection} ../../{query_plan} {timeout} ../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file} {str(noexec).lower()}"
 
     logger.debug("=== CostFed ===")
     logger.debug(cmd)
@@ -143,9 +148,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
             if results_df.dropna(how="all").empty or os.stat(out_result).st_size == 0:            
                 logger.error(f"{query} yield no results!")
-                Path(out_result).touch()
-                Path(out_source_selection).touch()
-                Path(query_plan).touch()
                 os.system(f"docker stop {container_name}")
                 raise RuntimeError(f"{query} yield no results!")
 
@@ -153,9 +155,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 
         else:
             logger.error(f"{query} reported error")    
-            Path(out_result).touch()
-            Path(out_source_selection).touch()
-            Path(query_plan).touch()
             create_stats(stats, "error_runtime")
             
     except subprocess.TimeoutExpired: 
@@ -169,10 +168,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             os.system(f"docker stop {container_name}")
         
         logger.info("Writing empty stats...")
-        create_stats(stats, "timeout")
-        Path(out_result).touch()
-        Path(out_source_selection).touch()
-        Path(query_plan).touch()    
+        create_stats(stats, "timeout")  
     finally:
         os.system('pkill -9 -f "costfed/target"')
         cache_file = f"{app}/cache.db"

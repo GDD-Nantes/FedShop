@@ -153,9 +153,6 @@ saved.txt
 *.class
 *.n3
 
-engines/SPLENDID/bin/
-engines/SPLENDID/eval/
-
 .vscode/
 evaluation_failed_logs.txt
 !.vscode/launch.json

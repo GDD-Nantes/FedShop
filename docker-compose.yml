@@ -1,0 +1,18 @@
+services:
+  fedshop-amd64:
+    container_name: "fedshop"
+    image: minhhoangdang/fedshop:amd64
+    privileged: true
+    environment:
+      NO_PROXY: "auth,localhost,127.0.0.1,192.168.0.1/24"
+    volumes:
+      - /tmp/experiments:/FedShop/experiments 
+
+  fedshop-arm64:
+    container_name: "fedshop"
+    image: minhhoangdang/fedshop:arm64
+    privileged: true
+    environment:
+      NO_PROXY: "auth,localhost,127.0.0.1,192.168.0.1/24"
+    volumes:
+      - /tmp/experiments:/FedShop/experiments 

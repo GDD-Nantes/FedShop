@@ -1,0 +1,112 @@
+generation:
+  workdir: "experiments/bsbm"
+  n_batch: 2
+  n_query_instances: 2
+  n_federation_members: "${sum: ${generation.schema.vendor.params.vendor_n}, ${generation.schema.ratingsite.params.ratingsite_n}}" 
+  verbose: true
+  stats:
+    confidence_level: 0.95
+  generator: 
+    #exec: "docker exec watdiv watdiv"
+    dir: "generators/watdiv"
+    exec: "${generation.generator.dir}/bin/Release/watdiv"
+    # endpoint: "http://localhost:8000"
+    # compose_file: "${generation.workdir}/docker/generator.yml"
+    # container_name: "bsbm-watdiv"
+  virtuoso:
+    compose_file: "${generation.workdir}/docker/virtuoso.yml"
+    service_name: "bsbm-virtuoso"
+    endpoints: "${get_docker_endpoints: ${generation.virtuoso.compose_file}, ${generation.virtuoso.service_name}}" 
+    container_names: "${get_virtuoso_containers: ${generation.virtuoso.compose_file}, ${generation.virtuoso.service_name}}" 
+  schema:
+    # Configuration for ONE batch
+    product:
+      is_source: false
+      provenance: http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/
+      # Products are generated once, independant from vendor and person
+      template: "${generation.workdir}/model/watdiv/bsbm-product.template"
+      scale_factor: 1
+      export_output_dir: "${generation.workdir}/model/tmp/product"
+      params:
+        # type
+        product_n: 20000
+        producer_n: "${get_product_producer_n: ${generation.schema.product.params.product_n}}"
+        feature_n: "${get_product_feature_n: ${generation.schema.product.params.product_n}}"
+        #feature_c: "${get_product_feature_c: ${generation.schema.product.params.product_n}}"
+        feature_c: 9
+        type_n: "${get_product_type_n: ${generation.schema.product.params.product_n}}"
+        #type_c: "${get_product_type_c: ${generation.schema.product.params.product_n}}"
+        type_c: 9
+        # pgroup
+        productPropertyTextual4_p: 0.7
+        productPropertyTextual5_p: 0.8
+        productPropertyNumeric4_p: 0.7
+        productPropertyNumeric5_p: 0.8
+        textual_wc: "${normal_truncated: 9, 3, 3, 15}"
+        label_wc: "${normal_truncated: 2, 1, 1, 3}"
+        comment_wc: "${normal_truncated: 100, 20, 50, 150}"
+        type_comment_wc: "${normal_truncated: 35, 10, 20, 50}"
+        feature_comment_wc: "${normal_truncated: 35, 10, 20, 50}"
+        producer_comment_wc: "${normal_truncated: 35, 10, 20, 50}"
+
+    vendor:
+      is_source: true
+      provenance: http://www.{%vendor_id}.fr/
+      template: "${generation.workdir}/model/watdiv/bsbm-vendor.template"
+      export_output_dir: "${generation.workdir}/model/dataset"
+      export_dep_output_dir: "${generation.schema.product.export_output_dir}"
+      scale_factor: 1
+      params:
+        vendor_n: "${multiply: 10, ${generation.n_batch}}"
+        offer_n: "${normal_dist: 3, 1, 20}" # specs: 100 productsVendorsRatio * 20 avgOffersPerProduct, ref: bsbmtools
+        product_n: "${generation.schema.product.params.product_n}"
+        label_wc: "${normal_truncated: 2, 1, 1, 3}"
+        comment_wc: "${normal_truncated: 35, 10, 20, 50}"
+
+    ratingsite:
+      is_source: true
+      provenance: http://www.{%ratingsite_id}.fr/
+      template: "${generation.workdir}/model/watdiv/bsbm-ratingsite.template"
+      export_output_dir: "${generation.workdir}/model/dataset"
+      export_dep_output_dir: "${generation.schema.product.export_output_dir}"
+      scale_factor: 1
+      params:
+        #type
+        ratingsite_n: "${multiply: 10, ${generation.n_batch}}"
+        product_n: "${generation.schema.product.params.product_n}"
+        review_n: "${normal_dist: 3, 1, 100}" # specs: 10000
+        person_n: "${divide: ${generation.schema.ratingsite.params.review_n}, 20}"
+        person_name_wc: "${normal_truncated: 3, 1, 2, 4}"
+        # person_c: "${uniform_range: 2, 37}"
+        label_wc: "${normal_truncated: 2, 1, 1, 3}"
+        text_wc: "${normal_truncated: 125, 20, 50, 200}"
+        title_wc: "${normal_truncated: 9, 3, 4, 15}"
+
+        #pgroup
+        rating1_p: 0.7
+        rating2_p: 0.7
+        rating3_p: 0.7
+        rating4_p: 0.7
+
+evaluation:
+  n_attempts: 4
+  timeout: 120
+  engines:
+    fedx:
+     dir: "engines/FedX/target"
+    # costfed:
+    #  dir: "engines/CostFed"
+    # splendid:
+    #   dir: "engines/SPLENDID"
+    # semagrow:
+    #   dir: "engines/semagrow/semagrow"
+    #   summary_generator_dir: "engines/semagrow/sevod-scraper"
+    # anapsid:
+    #   dir: "engines/ANAPSID"
+    ideal:
+     dir: "engines/ARQ"
+     internal_endpoint_prefix: "http://localhost:8890/sparql/?default-graph-uri="
+     compose_file: "${generation.workdir}/docker/jena.yml"
+     service_name: "jena-fuseki"
+     endpoint: "http://localhost:3030/FedShop/query"
+     container_name: "docker-jena-fuseki-1"

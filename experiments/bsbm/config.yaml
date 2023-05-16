@@ -90,26 +90,20 @@ generation:
 
 evaluation:
   n_attempts: 4
-  timeout: 600
+  timeout: 120 # 60s + With overhead (jvm + startup + summary)
   engines:
     fedx:
-     dir: "engines/FedX/target"
-    #fedx_tpwss:
-    #  dir: "engines/FedX/target"
-    #fedx_rwss:
-    #  dir: "engines/FedX-RWSS/target"
+      dir: "engines/FedX/target"
     costfed:
-     dir: "engines/CostFed"
-    #costfed_fu:
-    #  dir: "engines/CostFed-FU"
-    # splendid:
-    #   dir: "engines/SPLENDID"
+      dir: "engines/CostFed"
+    splendid:
+      dir: "engines/SPLENDID"
     semagrow:
       dir: "engines/semagrow/semagrow"
       summary_generator_dir: "engines/semagrow/sevod-scraper"
       #summary_generator: "${evaluation.engines.semagrow.summary_generator_dir}/assembly/target/bin/sevod-scraper.sh"
-    # anapsid:
-    #   dir: "engines/ANAPSID"
+    anapsid:
+      dir: "engines/ANAPSID"
     ideal:
      dir: "engines/ARQ"
      internal_endpoint_prefix: "http://localhost:8890/sparql/?default-graph-uri="

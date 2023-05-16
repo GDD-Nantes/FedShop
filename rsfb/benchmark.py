@@ -13,8 +13,8 @@ def cli():
     pass
 
 @cli.command()
-@click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("category", type=click.Choice(["data", "queries"]))
+@click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.option("--debug", is_flag=True, default=False)
 @click.option("--clean", type=click.STRING, help="[all, model, benchmark] + db + [metrics|metrics_batchk]")
 @click.option("--cores", type=click.INT, default=1, help="The number of cores used allocated. -1 if use all cores.")
@@ -23,7 +23,7 @@ def cli():
 @click.option("--no-cache", is_flag=True, default=False)
 
 @click.pass_context
-def generate(ctx: click.Context, configfile, category, debug, clean, cores, rerun_incomplete, touch, no_cache):
+def generate(ctx: click.Context, category, configfile, debug, clean, cores, rerun_incomplete, touch, no_cache):
     """Run the benchmark
 
     Args:
@@ -78,8 +78,9 @@ def generate(ctx: click.Context, configfile, category, debug, clean, cores, reru
 @click.option("--rerun-incomplete", is_flag=True, default=False)
 @click.option("--touch", is_flag=True, default=False)
 @click.option("--no-cache", is_flag=True, default=False)
+@click.option("--noexec", is_flag=True, default=False)
 @click.pass_context
-def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomplete, touch, no_cache):
+def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomplete, touch, no_cache, noexec):
 
     CONFIG = load_config(configfile)
     GEN_CONFIG = CONFIG["generation"]
@@ -87,11 +88,16 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
 
     EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate.smk"
     #EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate_costfed_no_exec.smk"
+    
+    if noexec:
+        EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate_noexec.smk"
+    
     N_BATCH = GEN_CONFIG["n_batch"]
 
     WORKFLOW_DIR = f"{WORK_DIR}/rulegraph"
     os.makedirs(name=WORKFLOW_DIR, exist_ok=True)
 
+    if cores == -1: cores = "all"
     SNAKEMAKE_OPTS = f"-p --cores {cores} --config configfile={configfile}"
     if rerun_incomplete: SNAKEMAKE_OPTS += " --rerun-incomplete"
     
@@ -175,6 +181,11 @@ def wipe(configfile, level: str):
                 logger.info(f"Cleaning metrics for batch {batch}")
                 os.system(f"rm {WORK_DIR}/benchmark/generation/metrics_batch{batch}.csv")
                 
+    if "instances-root" in args:
+        logger.info("Cleaning all te...")
+        Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   
+        os.system(f"rm -r {WORK_DIR}/benchmark/generation/q*/")
+    
     if "instances" in args:
         logger.info("Cleaning all instances...")
         Path(f"{WORK_DIR}/benchmark/generation/metrics.csv").unlink(missing_ok=True)   

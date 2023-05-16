@@ -46,23 +46,24 @@ def prerequisites(ctx: click.Context, eval_config):
     #if not os.path.exists(app) or not os.path.exists(jar) or os.path.exists(lib):
     oldcwd = os.getcwd()
     os.chdir(Path(app).parent)
-    os.system("mvn clean && mvn install dependency:copy-dependencies package")
+    if os.system("mvn clean && mvn install dependency:copy-dependencies package") != 0:
+        raise RuntimeError("Could not compile FedX")
     os.chdir(oldcwd)
 
-def exec_fedx(eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id):
+def exec_fedx(eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id, noexec):
     config = load_config(eval_config)
     app_config = config["evaluation"]["engines"]["fedx_rwss"]
     app = app_config["dir"]
     jar = os.path.join(app, "FedX-1.0-SNAPSHOT.jar")
     lib = os.path.join(app, "lib/*")
     timeout = int(config["evaluation"]["timeout"])
-
+    
     out_result_path = str(out_result).split("results.txt")[0]
     query_plan_path = str(query_plan).split("query_plan.txt")[0]
     stats_path = str(stats).split("stats.csv")[0]
 
     print(force_source_selection)
-    args = [engine_config, query, out_result_path, out_source_selection, query_plan_path, stats_path, str(timeout)]+ force_source_selection
+    args = [engine_config, query, out_result_path, out_source_selection, query_plan_path, stats_path, str(timeout), str(noexec).lower()]+ force_source_selection
     print(args)
     args = " ".join(args)
     #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
@@ -80,24 +81,15 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
             logger.info(f"{query} benchmarked sucessfully")
             #if os.stat(out_result).st_size == 0:
             #    logger.error(f"{query} yield no results!")
-            #    Path(out_result).touch()
-            #    Path(out_source_selection).touch()
-            #    Path(query_plan).touch()
             #    raise RuntimeError(f"{query} yield no results!")
             create_stats(stats)
         else:
             logger.error(f"{query} reported error")    
-            Path(out_result).touch()
-            Path(out_source_selection).touch()
-            Path(query_plan).touch()
             if not os.path.exists(stats):
                 create_stats(stats, "error_runtime")                  
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
-        create_stats(stats, "timeout")
-        Path(out_result).touch()
-        Path(out_source_selection).touch()
-        Path(query_plan).touch()             
+        create_stats(stats, "timeout")          
     finally:
         os.system('pkill -9 -f "FedX-1.0-SNAPSHOT.jar"')
         #kill_process(fedx_proc.pid)
@@ -168,7 +160,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     exec_fedx(
         eval_config, engine_config, query, 
         str(out_result), "/dev/null", str(query_plan), 
-        str(stats), intermediate_provenance_files, batch_id
+        str(stats), intermediate_provenance_files, batch_id, noexec
     )
 
     stats_df = pd.concat([ pd.read_csv(f) for f in intermediate_stats_files ], ignore_index=True)

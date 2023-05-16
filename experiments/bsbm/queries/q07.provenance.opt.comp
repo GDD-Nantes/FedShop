@@ -3,13 +3,16 @@
         "?offer bsbm:product ?offerProduct",
         "?offerProduct owl:sameAs ?ProductXYZ",
         "?offerProduct rdfs:label ?productLabel",
+        
+    ],
+    "bgp2": [
         "?offer bsbm:price ?price",
         "?offer bsbm:vendor ?vendor",
         "?vendor rdfs:label ?vendorTitle",
         "?vendor bsbm:country <http://downlode.org/rdf/iso-3166/countries#FR>",
         "?offer bsbm:validTo ?date"
     ],
-    "bgp2": [
+    "bgp3": [
         "?review bsbm:reviewFor ?reviewProduct",
         "?reviewProduct owl:sameAs ?ProductXYZ",
         "?reviewProduct rdfs:label ?productLabel",

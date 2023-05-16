@@ -291,6 +291,12 @@ def build_value_selection_query(queryfile, outfile):
     Returns:
         _type_: a csv file at outfile containing values for placeholders
     """
+    
+    optimized = f"{Path(queryfile).parent}/{Path(queryfile).stem}.injected.opt"
+    if os.path.exists(optimized):
+        logger.info(f"Use optimized version {optimized} instead...")
+        queryfile = optimized
+    
     consts = __get_uninjected_placeholders(queryfile, exclusive=True)
     if len(consts) == 0:
         consts = __get_uninjected_placeholders(queryfile, exclusive=False)
@@ -321,8 +327,9 @@ def write_query(query, outfile):
     
     # Restore every disabled line if marked
     for skipline in parse_result["@skip"]:
-        query = re.sub(rf"(#)*({re.escape(skipline)})", r"\2", query)
-    
+        skipline_sub = re.sub(r"(#)*", r"", skipline)
+        query = re.sub(re.escape(skipline), skipline_sub, query)
+
     # If there is a ORDER BY, make it ORDER BY (all projected columns)
     if "ORDER BY" in query:
         if (projection_search := re.search(r"SELECT([\S\s]+)WHERE", query)) is not None:
@@ -344,7 +351,6 @@ def write_query(query, outfile):
 @click.argument("cache-file", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("outputfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 def inject_from_cache(queryfile, cache_file, outputfile):
-    
     with open(queryfile, "r") as qf:
         query = qf.read()
         injection_cache = pd.read_json(cache_file, convert_dates=True, typ="series")
@@ -433,7 +439,7 @@ def inject_constant(queryfile, value_selection, ignore_errors, instance_id):
                 if ignore_errors: 
                     logger.debug(msg)
                     continue
-                else: raise ValueError(msg)
+                else: raise RuntimeError(msg)
             
             # When not using workload value_selection_query, i.e, filling partially injected queries
             placeholder_chosen_values = value_selection_values.query(f"`{right}` == `{right}`")
@@ -633,11 +639,13 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
             
             # First iteration, inject value using initial value_selection of the workload
             if itr == 0:
-                ctx.invoke(build_value_selection_query, queryfile=initial_queryfile, outfile=next_queryfile)
-                #shutil.copy(initial_queryfile, next_queryfile)
-                next_value_selection = value_selection
-                query, injection_cache = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=True, instance_id=instance_id)
-            
+                try:
+                    ctx.invoke(build_value_selection_query, queryfile=initial_queryfile, outfile=next_queryfile)
+                    #shutil.copy(initial_queryfile, next_queryfile)
+                    next_value_selection = value_selection
+                    query, injection_cache = ctx.invoke(inject_constant, queryfile=next_queryfile, value_selection=next_value_selection, ignore_errors=True, instance_id=instance_id)
+                except:
+                    continue
             # Execute the partially injected query to find the rest of constants
             else:                
                 # Option 1: Exclude the partialy injected query to refill
@@ -692,6 +700,13 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
         
         # Restore the original select
         query = re.sub(r"(SELECT|CONSTRUCT|DESCRIBE)(\s+DISTINCT)?\s+(.*)\s+WHERE", rf"{original_projection_clause} {original_projection_variables} WHERE", query)        
+        
+        # Disable explicit join order
+        query = re.sub(r"(DEFINE)", r"##\1", query)
+        
+        # Restore FILTER/LIMIT/ORDER...
+        query = re.sub(r"(#)*(LIMIT|FILTER|ORDER)", r"\2", query)
+        
         write_query(query, next_queryfile)
 
 @cli.command

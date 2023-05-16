@@ -7,7 +7,9 @@
         "?localProduct bsbm:productFeature ?localProductFeature1",
         "?localProductFeature1 owl:sameAs ?ProductFeature1",
         "?localProduct bsbm:productPropertyNumeric1 ?p1",
-        "?localProduct bsbm:productPropertyNumeric3 ?p3",
+        "?localProduct bsbm:productPropertyNumeric3 ?p3"
+    ], 
+    "bgp2": [
         "?localProduct bsbm:productFeature ?localProductFeature2",
         "?localProductFeature2 owl:sameAs ?ProductFeature2",
         "?localProduct rdfs:label ?testVar"

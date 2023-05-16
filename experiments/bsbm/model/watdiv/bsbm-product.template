@@ -5,6 +5,7 @@
 #namespace  __provenance={%provenance}
 #namespace  __output_org=fragmented
 #namespace  __output_dir={%export_output_dir}
+#namespace  __replicated=true
 
 // ===== ENTITIES & LITERAL PROPERTIES ===== //
 

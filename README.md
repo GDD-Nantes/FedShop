@@ -1,4 +1,4 @@
-# FedShop : The Federated Shop Benchmark
+# FedShop: The Federated Shop Benchmark
 
 FedShop is a synthetic RDF Federated Benchmark designed for scalability. It evaluates the performance of SPARQL federated-query engines such as [FedX](https://rdf4j.org/documentation/programming/federation/), [CostFed](https://github.com/dice-group/CostFed), [Semagrow](https://semagrow.github.io/), Splendid, [HeFQUIN](https://github.com/LiUSemWeb/HeFQUIN), etc, when the number of federation members grows. FedShop is built around an e-commerce scenario with online hops and rating Web sites as in [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/). Compared to  BSBM, each shop and rating site of FedShop has its own SPARQL endpoint and shares a standard catalog of products. Following the BSBM idea, the FedShop queries simulate a user navigating the federation of shops as if it was a single virtual shop. The scale factor corresponds to the number of shops and rating sites within the federation. Hence, with the FedShop benchmark, we can observe the performance of federated queries when the number of federation members increases.
 
@@ -6,7 +6,11 @@ FedShop consists of three components: a data generator, a query (and template) g
 
 ## FedShop Results
 
-All the results are available through a [Jupyter Notebook](Realistic_Synthetic_Federated.ipynb)
+All the results are available through Jupyter Notebooks:
+-   [Jupyter Evaluation](FedShop_Evaluation.ipynb)
+<!-- -   [Jupyter Generation](FedShop_Generation.ipynb)
+-   [Jupyter (old)](Realistic_Synthetic_Federated.ipynb) -->
+
 
 ## FedShop Datasets and Queries
 
@@ -23,7 +27,15 @@ Instead of downloading the complete archive, you can also download only individu
 * [The FedShop Workload](https://docs.google.com/document/d/1gB5rkq5iySbiQJ_jzKjyDCbZ3DwLPEmPuIv45T834gI/edit?usp=share_link) 
 * The [Fedshop Workload as SPARQL 1.1 queries](https://docs.google.com/document/d/1Ihf1oIuF9cGTgMwC7y7byQlRstdfQBvfohyf73jW3mQ/edit?usp=share_link) with optimal source assignments.
 
+## QuickStart and Documentation
+
+- The quickstart guide is available in the [Quickstart tutorial](https://github.com/GDD-Nantes/FedShop/wiki/0.-Quick-start)
+- How to configure fedshop and how to extend fedshop is available in the [wiki](https://github.com/GDD-Nantes/FedShop/wiki)
+
+
 ## Install from the source
+We recommend using our docker image from the [Quickstart tutorial](https://github.com/GDD-Nantes/FedShop/wiki/0.-Quick-start). However, it is also possible to install from source.
+
 
 - Install [Docker](https://docs.docker.com/get-docker/), Maven 3.6.3 with OpenJDK 11
  and [Compose (`>= 2.16.0`)](https://github.com/docker/compose)
@@ -54,7 +66,7 @@ Basic statistics about the default configuration of FedShop are available in the
 Once `config.yaml` properly set, you can launch the generation of the FedShop benchmark with the following command:
 
 ```bash
-python rsfb/benchmark.py generate experiments/bsbm/config.yaml  [OPTIONS]
+python rsfb/benchmark.py generate data|queries experiments/bsbm/config.yaml  [OPTIONS]
 
 OPTIONS:
 --clean [benchmark|metrics|instances][+db]: clean the benchmark|metrics|instances then (optional) destroy all database containers
@@ -96,13 +108,13 @@ OPTIONS:
 ```
 This launches the evaluation the FedShop workload over the different federations Batch(i) with the federated-query engines declared in experiments/bsbm/config.yaml. As for the generation, this process is long and complex and is managed by Snakemake. The evaluation rules are declared in experiments/bsbm/evaluate.smk. All the results are produced under experiments/bsbm/benchmark/evaluation.
 
-Our [jupyter notebook](Realistic_Synthetic_Federated.ipynb) is already written to read results and computes the diverse metrics.
+Our [jupyter notebook](FedShop_Evaluation.ipynb) is already written to read results and computes the diverse metrics.
 
 ## Benchmark your engine:
 
 - [Load](https://github.com/mhoangvslev/RSFB/wiki/Quick-tutorial#saveload-model) our [basic model]() and mark both the generation and evaluation phases as "completed":
 ```bash
-python rsfb/benchmark.py generate experiments/bsbm/config.yaml --touch
+python rsfb/benchmark.py generate data|queries experiments/bsbm/config.yaml --touch
 python rsfb/benchmark.py evaluate experiments/bsbm/config.yaml --touch
 ```
 
@@ -156,10 +168,10 @@ python rsfb/benchmark.py generate|evaluate experiments/bsbm/config.yaml --rerun-
 python rsfb/benchmark.py generate|evaluate experiments/bsbm/config.yaml --rerun-incomplete --clean all
 
 # Keep the data but remove the intermediary artefacts and db containers.
-python rsfb/benchmark.py generate experiments/bsbm/config.yaml --rerun-incomplete --clean benchmark+db
+python rsfb/benchmark.py generate data|queries experiments/bsbm/config.yaml --rerun-incomplete --clean benchmark+db
 
 # Only remove the metrics files, applicable when you need to rerun some of the steps
-python rsfb/benchmark.py generate experiments/bsbm/config.yaml --rerun-incomplete --clean metrics
+python rsfb/benchmark.py generate data|queries experiments/bsbm/config.yaml --rerun-incomplete --clean metrics
 
 ```
 

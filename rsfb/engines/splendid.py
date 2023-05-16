@@ -46,7 +46,9 @@ def prerequisites(ctx: click.Context, eval_config):
     #if not os.path.exists(app) or not os.path.exists(jar) or os.path.exists(lib):
     oldcwd = os.getcwd()
     os.chdir(Path(app))
-    os.system("./SPLENDID.sh ignore ignore ignore ignore ignore ignore ignore ignore true false false")
+    #os.system("./SPLENDID.sh ignore ignore ignore ignore ignore ignore ignore ignore true false false")
+    if os.system("mvn clean && mvn install dependency:copy-dependencies package") != 0:
+        raise RuntimeError("Could not compile SPLENDID")
     os.chdir(oldcwd)
 
 @cli.command()
@@ -97,7 +99,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         properties_file.writelines(lines)
 
     oldcwd = os.getcwd()
-    cmd = f'./SPLENDID.sh {void_conf} {Path(properties).absolute()} {timeout} ../../{out_result} ../../{out_source_selection} ../../{query_plan} ../../{stats} ../../{query} false true true'
+    cmd = f'./SPLENDID.sh {void_conf} {Path(properties).absolute()} {timeout} ../../{out_result} ../../{out_source_selection} ../../{query_plan} ../../{stats} ../../{query} false true true {str(noexec).lower()}'
 
     print("=== SPLENDID ===")
     print(cmd)
@@ -140,9 +142,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
             def report_error(reason):
                 logger.error(f"{query} yield no results!")
-                # Path(out_result).touch()
-                # Path(out_source_selection).touch()
-                # Path(query_plan).touch()
                 #os.system(f"docker stop {container_name}")
                 create_stats(stats, reason)
                 #raise RuntimeError(f"{query} yield no results!")
@@ -162,9 +161,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
                         
         else:
             logger.error(f"{query} reported error {splendid_proc.returncode}")    
-            Path(out_result).touch()
-            Path(out_source_selection).touch()
-            Path(query_plan).touch()
             errorFile = f"{Path(stats).parent}/error.txt"
             if os.path.exists(errorFile):
                 with open(errorFile, "r") as f:
@@ -178,10 +174,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             logger.debug(container_status)
             raise RuntimeError("Backend is terminated!")
         logger.info("Writing empty stats...")
-        create_stats(stats, "timeout")
-        Path(out_result).touch()
-        Path(out_source_selection).touch()
-        Path(query_plan).touch()   
+        create_stats(stats, "timeout") 
     finally:
         os.system('pkill -9 -f "de.uni_koblenz.west.splendid.SPLENDID"')
         #kill_process(splendid_proc.pid)

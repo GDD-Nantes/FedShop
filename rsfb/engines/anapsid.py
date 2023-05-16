@@ -48,7 +48,8 @@ def prerequisites(ctx: click.Context, eval_config):
     
     old_dir = os.getcwd()
     os.chdir(app_dir)
-    os.system("rm -rf build && python setup.py install")
+    if os.system("rm -rf build && python setup.py install") != 0:
+        raise RuntimeError("Could not compile ANAPSID")
     os.chdir(old_dir)
 
 @cli.command()
@@ -119,16 +120,16 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     timeout = int(config["evaluation"]["timeout"])
     old_dir = os.getcwd()
 
-    cmd = f"python scripts/run_anapsid -e ../../{engine_config} -q ../../{in_query_file} -p naive -s False -o False -d SSGM -a True -r ../../{out_result} -z ../../{Path(stats).parent}/ask.txt -y ../../{Path(stats).parent}/planning_time.txt -x ../../{query_plan} -v ../../{out_source_selection} -u ../../{Path(stats).parent}/source_selection_time.txt -n ../../{Path(stats).parent}/exec_time.txt"
+    cmd = f"python scripts/run_anapsid -e ../../{engine_config} -q ../../{in_query_file} -p naive -s False -o False -d SSGM -a True -r ../../{out_result} -z ../../{Path(stats).parent}/ask.txt -y ../../{Path(stats).parent}/planning_time.txt -x ../../{query_plan} -v ../../{out_source_selection} -u ../../{Path(stats).parent}/source_selection_time.txt -n ../../{Path(stats).parent}/exec_time.txt -c {str(noexec)}"
 
     print("=== ANAPSID ===")
     print(cmd)
     print("================")      
 
     #ANAPSID need to initialize following files
-    Path(out_result).touch() #result.txt
-    Path(query_plan).touch() #query_plan.txt
-    
+    Path(out_result).touch()
+    Path(out_source_selection).touch()
+    Path(query_plan).touch()   
     
     # Set the maximum amount of memory to be used by the subprocess in bytes
     max_mem = 100000000  # 100 MB
@@ -145,9 +146,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 
             # Write stats
             logger.info(f"Writing stats to {stats}")
-            
-            create_stats(stats)
-            
+                        
             def report_error(reason):
                 logger.error(f"{query} yield no results!")
                 create_stats(stats, reason)
@@ -335,7 +334,7 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
                 efs.write("\n".join(ssite))
     else:
         with open(endpoints, "r") as efs:
-            ssite = set(efs.readlines())
+            ssite = set([x.strip() for x in efs.readlines()])
          
     update = False       
     if not os.path.exists(outfile):
@@ -352,12 +351,14 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     if update:             
         Path(outfile).parent.mkdir(parents=True, exist_ok=True)
         tmp_outfile = f"{outfile}.tmp"
-        with open(tmp_outfile, "w+") as config_fs:
+        with open(tmp_outfile, "w") as config_fs:
             for s in sorted(ssite):
                 config_fs.write(f"{endpoint}/?default-graph-uri={s}\n")
 
         os.chdir(app_dir)
-        os.system(f"python scripts/get_predicates ../../{tmp_outfile} ../../{outfile}")
+        cmd = f"python scripts/get_predicates ../../{tmp_outfile} ../../{outfile}"
+        logger.debug(cmd)
+        os.system(cmd)
         os.chdir(old_dir)
         os.remove(tmp_outfile)
 

@@ -45,10 +45,11 @@ def prerequisites(ctx: click.Context, eval_config):
     #if not os.path.exists(app) or not os.path.exists(jar) or os.path.exists(lib):
     oldcwd = os.getcwd()
     os.chdir(Path(app).parent)
-    os.system("mvn clean && mvn install dependency:copy-dependencies package")
+    if os.system("mvn clean && mvn install dependency:copy-dependencies package") != 0:
+        raise RuntimeError("Could not compile FedX")
     os.chdir(oldcwd)
 
-def exec_fedx(eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id):
+def exec_fedx(eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id, noexec):
     config = load_config(eval_config)
     app_config = config["evaluation"]["engines"]["fedx_tpwss"]
     app = app_config["dir"]
@@ -56,7 +57,7 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
     lib = os.path.join(app, "lib/*")
     timeout = int(config["evaluation"]["timeout"])
 
-    args = [engine_config, query, out_result, out_source_selection, query_plan, stats, str(timeout), force_source_selection]
+    args = [engine_config, query, out_result, out_source_selection, query_plan, stats, str(timeout), str(noexec).lower(), force_source_selection]
     args = " ".join(args)
     #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
     timeoutCmd = ""
@@ -73,23 +74,14 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
             logger.info(f"{query} benchmarked sucessfully")
             #if os.stat(out_result).st_size == 0:
             #    logger.error(f"{query} yield no results!")
-            #    Path(out_result).touch()
-            #    Path(out_source_selection).touch()
-            #    Path(query_plan).touch()
             #    raise RuntimeError(f"{query} yield no results!")
         else:
             logger.error(f"{query} reported error")    
-            Path(out_result).touch()
-            Path(out_source_selection).touch()
-            Path(query_plan).touch()
             if not os.path.exists(stats):
                 create_stats(stats, "error_runtime")                  
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
-        create_stats(stats, "timeout")
-        Path(out_result).touch()
-        Path(out_source_selection).touch()
-        Path(query_plan).touch()                   
+        create_stats(stats, "timeout")                  
     finally:
         os.system('pkill -9 -f "FedX-1.0-SNAPSHOT.jar"')
         #kill_process(fedx_proc.pid)
@@ -116,11 +108,15 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     2. Execute the transformed query in virtuoso
     3. Mesure execution time, compare the results with results.csv in generation phase
     """
+    
+    Path(out_result).touch()
+    Path(out_source_selection).touch()
+    Path(query_plan).touch()
             
     exec_fedx(
         eval_config, engine_config, query, 
         str(out_result), "/dev/null", str(query_plan), 
-        str(stats), str(force_source_selection), batch_id
+        str(stats), str(force_source_selection), batch_id, noexec
     )
     
     shutil.copy(force_source_selection, out_source_selection)

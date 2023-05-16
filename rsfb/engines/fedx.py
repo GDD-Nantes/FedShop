@@ -36,10 +36,11 @@ def prerequisites(eval_config):
     #if not os.path.exists(app) or not os.path.exists(jar) or os.path.exists(lib):
     oldcwd = os.getcwd()
     os.chdir(Path(app).parent)
-    os.system("mvn clean && mvn install dependency:copy-dependencies package")
+    if os.system("mvn clean && mvn install dependency:copy-dependencies package") != 0:
+        raise RuntimeError("Could not compile FedX")
     os.chdir(oldcwd)
         
-def exec_fedx(eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id):
+def exec_fedx(eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id, noexec):
     config = load_config(eval_config)
     app_config = config["evaluation"]["engines"]["fedx"]
     app = app_config["dir"]
@@ -47,7 +48,7 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
     lib = os.path.join(app, "lib/*")
     timeout = int(config["evaluation"]["timeout"])
 
-    args = [engine_config, query, out_result, out_source_selection, query_plan, str(timeout), force_source_selection]
+    args = [engine_config, query, out_result, out_source_selection, query_plan, str(timeout), str(noexec).lower(), force_source_selection]
     args = " ".join(args)
     #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
     timeoutCmd = ""
@@ -62,26 +63,18 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
         fedx_proc.wait(timeout)
         if fedx_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
-            if os.stat(out_result).st_size == 0:
+
+            def report_error(reason):
                 logger.error(f"{query} yield no results!")
-                Path(out_result).touch()
-                Path(out_source_selection).touch()
-                Path(query_plan).touch()
                 raise RuntimeError(f"{query} yield no results!")
             create_stats(stats)
         else:
             logger.error(f"{query} reported error")    
-            Path(out_result).touch()
-            Path(out_source_selection).touch()
-            Path(query_plan).touch()
             if not os.path.exists(stats):
                 create_stats(stats, "error_runtime")                  
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
-        create_stats(stats, "timeout")
-        Path(out_result).touch()
-        Path(out_source_selection).touch()
-        Path(query_plan).touch()                  
+        create_stats(stats, "timeout")            
     finally:
         os.system('pkill -9 -f "FedX-1.0-SNAPSHOT.jar"')
         #kill_process(fedx_proc.pid)
@@ -99,7 +92,10 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
 @click.option("--noexec", is_flag=True, default=False)
 @click.pass_context
 def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id, noexec):
-    exec_fedx(eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, "", batch_id)
+    Path(out_result).touch()
+    Path(out_source_selection).touch()
+    Path(query_plan).touch()
+    exec_fedx(eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, "", batch_id, noexec)
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
@@ -131,6 +127,12 @@ def transform_results(infile, outfile):
 @click.argument("outfile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.argument("prefix-cache", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 def transform_provenance(infile, outfile, prefix_cache):
+    
+    with open(infile, "r") as ifs:
+        if len(ifs.read().strip()) == 0:
+            Path(outfile).touch()
+            logger.debug(f"{infile} is empty!")
+            return
     
     def extract_triple(x):
         fedx_pattern = r"StatementPattern\s+(\(new scope\)\s+)?Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)"

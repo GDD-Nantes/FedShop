@@ -84,7 +84,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         fedx.exec_fedx(
             eval_config, engine_config, query, 
             str(intermediate_result_file), "/dev/null", str(query_plan), 
-            str(intermediate_stats_file), str(intermediate_provenance_file), batch_id
+            str(intermediate_stats_file), str(intermediate_provenance_file), batch_id, noexec
         )
              
         os.system(f"rm {intermediate_provenance_file}")

@@ -29,7 +29,6 @@ WHERE {
             ?localProduct rdfs:label ?testVar 
         }
 
-        # @skip
         FILTER (!bound(?testVar)) 
     }
 }

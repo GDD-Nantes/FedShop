@@ -9,7 +9,7 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 SELECT ?productLabel ?offer ?price ?vendor ?vendorTitle ?review ?revTitle ?reviewer ?revName ?rating1 ?rating2
 WHERE { 
     ?localProduct rdf:type bsbm:Product .
-    # const ?ProductXYZ
+    # const! ?ProductXYZ
     ?localProduct owl:sameAs ?ProductXYZ .
     ?localProduct rdfs:label ?productLabel .
 

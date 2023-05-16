@@ -47,7 +47,8 @@ def prerequisites(ctx: click.Context, eval_config):
 
     oldcwd = os.getcwd()
     os.chdir(Path(app))
-    os.system("rm -rf costfed/target && mvn compile && mvn package --also-make")
+    if os.system("mvn clean && mvn install dependency:copy-dependencies package") != 0:
+        raise RuntimeError("Could not compile CostFed")
     os.chdir(oldcwd)
 
 @cli.command()
@@ -95,8 +96,14 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     timeout = int(config["evaluation"]["timeout"])
 
     oldcwd = os.getcwd()
-    summary_file = f"summaries/sum_fedshop_batch{batch_id}.n3"     
-    cmd = f"./costfed.sh costfed/costfed.props {endpoint} ../../{out_result} ../../{out_source_selection} ../../{query_plan} {timeout} ../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file}"
+    summary_file = f"summaries/sum_fedshop_batch{batch_id}.n3"   
+
+    # Prepare args for semagrow
+    Path(out_result).touch()
+    Path(out_source_selection).touch()
+    Path(query_plan).touch()
+
+    cmd = f"./costfed.sh costfed/costfed.props {endpoint} ../../{out_result} ../../{out_source_selection} ../../{query_plan} {timeout} ../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file} {str(noexec).lower()}"
 
     logger.debug("=== CostFed ===")
     logger.debug(cmd)
@@ -138,14 +145,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             #     .replace('attempt_id',str(attempt))
                 
             # stats_df.to_csv(stats, index=False)
-                        
-            results_df = pd.read_csv(out_result).replace("null", None)
-            
-            if results_df.dropna(how="all").empty or os.stat(out_result).st_size == 0:            
+
+            def report_error(reason):
                 logger.error(f"{query} yield no results!")
-                Path(out_result).touch()
-                Path(out_source_selection).touch()
-                Path(query_plan).touch()
                 os.system(f"docker stop {container_name}")
                 raise RuntimeError(f"{query} yield no results!")
 
@@ -153,9 +155,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 
         else:
             logger.error(f"{query} reported error")    
-            Path(out_result).touch()
-            Path(out_source_selection).touch()
-            Path(query_plan).touch()
             create_stats(stats, "error_runtime")
             
     except subprocess.TimeoutExpired: 
@@ -170,9 +169,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         
         logger.info("Writing empty stats...")
         create_stats(stats, "timeout")
-        Path(out_result).touch()
-        Path(out_source_selection).touch()
-        Path(query_plan).touch()    
     finally:
         os.system('pkill -9 -f "costfed/target"')
         cache_file = f"{app}/cache.db"
@@ -235,6 +231,12 @@ def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
         outfile (_type_): _description_
         prefix_cache (_type_): _description_
     """
+    
+    with open(infile, "r") as ifs:
+        if len(ifs.read().strip()) == 0:
+            Path(outfile).touch()
+            logger.debug(f"{infile} is empty!")
+            return
 
     def extract_triple(x):
         fedx_pattern = r"{StatementPattern\s+?Var\s+\((name=\w+;\s+value=(.*);\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+;\s+value=(.*);\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+;\s+value=(.*);\s+anonymous|name=(\w+))\)"

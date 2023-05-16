@@ -21,7 +21,7 @@ if [ "$reset_database" = true ]; then
     echo "Removing database..."
     docker-compose -f experiments/bsbm/docker/virtuoso.yml down --remove-orphans &&
     docker volume prune --force &&
-    docker-compose -f experiments/bsbm/docker/virtuoso.yml create --no-recreate --scale bsbm-virtuoso=10
+    docker-compose -f experiments/bsbm/docker/virtuoso.yml create --no-recreate --scale bsbm-virtuoso=$n_containers
     docker volume ls | awk 'NR > 1 {print $2}' | xargs docker volume rm
 fi
 
@@ -33,8 +33,7 @@ do
 
     echo "Starting $container_name ..."
     docker start $container_name
-    container_infos=$(docker ps --all --format '{{.Names}} {{.Ports}}')
-    container_port=$(echo "$container_infos" | grep "$container_name " | awk '{print $4}' | sed -E "s#0\.0\.0\.0:([0-9]+).*#\1#g")
+    container_port=$(docker port $container_name 8890 | sed -E "s#0\.0\.0\.0:([0-9]+).*#\1#g")
     container_endpoint="http://localhost:$container_port/sparql"
 
     if [ -z "$container_port" ]; then
