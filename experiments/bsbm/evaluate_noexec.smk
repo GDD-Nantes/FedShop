@@ -192,7 +192,6 @@ rule evaluate_engines:
         source_selection="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/source_selection.txt",
         result_txt="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.txt",
     params:
-        eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR),
         engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
         last_batch=LAST_BATCH
     run: 
@@ -210,11 +209,9 @@ rule evaluate_engines:
         skipAttempt = int(wildcards.attempt_id)
         canSkip = batch_id > 0 and os.path.exists(same_file_previous_batch) and os.stat(same_file_previous_batch).st_size == 0
         skipReason = f"Skip evaluation because previous batch at {same_file_previous_batch} timed out or error"
-        shell("python rsfb/engines/{engine}.py run-benchmark {params.eval_config} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {output.query_plan} --batch-id {batch_id} --noexec")
+        shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {output.query_plan} --batch-id {batch_id} --noexec")
 
 rule engines_prerequisites:
     output: "{benchDir}/{engine}/{engine}-ok.txt"
-    params:
-        eval_config=expand("{workDir}/config.yaml", workDir=WORK_DIR)
-    shell: "python rsfb/engines/{wildcards.engine}.py prerequisites {params.eval_config} && echo 'OK' > {output}"
+    shell: "python rsfb/engines/{wildcards.engine}.py prerequisites {CONFIGFILE} && echo 'OK' > {output}"
 
