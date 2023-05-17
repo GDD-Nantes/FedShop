@@ -71,6 +71,35 @@ def generate(ctx: click.Context, category, configfile, debug, clean, cores, reru
             if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {GENERATION_SNAKEFILE} --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
 
 @cli.command()
+@click.argument("experiment-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.option("--update", is_flag=True, default=False)
+def save_model(experiment_dir, update):
+    oldir = os.getcwd()
+    os.chdir(experiment_dir)
+    
+    if not update:
+        Path("eval-model.zip").unlink(missing_ok=True)
+        Path("gen-model.zip").unlink(missing_ok=True)
+    
+    logger.info(f"Packaging {experiment_dir}/benchmark/evaluation/")
+    os.system("zip -r eval-model.zip benchmark/evaluation")
+    logger.info(f"Packaging {experiment_dir}/benchmark/generation/")
+    os.system("zip -r gen-model.zip benchmark/generation")
+    os.chdir(oldir)
+    
+@cli.command()
+@click.argument("modelfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.argument("experiment-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.option("--clean", is_flag=True, default=False)
+def load_model(modelfile, experiment_dir, clean):
+    
+    if clean:
+        shutil.rmtree(f"{experiment_dir}/benchmark/evaluation/")
+        shutil.rmtree(f"{experiment_dir}/benchmark/generation/")
+        
+    os.system(f"unzip {modelfile} -d {experiment_dir}")
+
+@cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.option("--debug", is_flag=True, default=False)
 @click.option("--clean", type=click.STRING, help="[all, model, benchmark] + db")
