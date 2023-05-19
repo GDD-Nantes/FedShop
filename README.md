@@ -67,7 +67,7 @@ The overall workflow for FedShop generation is as follows:
 * Compute the optimal source assignment of each of the 120 queries of the Workload on Batch(0)
 * For i from 1 to 9
   * Batch(i)=Batch(i-1)+10 new vendors and 10 rating-sites
-  * Compute the optimal source assignment for each query of the Workload over Batch(i)
+  * Compute the Reference Source Assignment (RSA) for each query of the Workload over Batch(i)
 
 We finished this process with a federation of 200 different federation members. This overall workflow can be changed thanks to parameters declared in experiments/bsbm/config.yaml 
 
