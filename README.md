@@ -15,7 +15,7 @@ All the results are available through Jupyter Notebooks:
 ## FedShop Datasets and Queries
 
 
-All generated datasets and queries are available [here](https://drive.google.com/drive/folders/1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ). The following command allows downloading the archive (1.6GB) from Google Drive:
+All generated datasets and queries are available at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7919872.svg)](https://doi.org/10.5281/zenodo.7919872) and [here](https://drive.google.com/drive/folders/1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ). The following command allows downloading the archive (1.6GB) from Google Drive:
 
 ```bash
 # !pip install --quiet gdown==4.5.4 --no-cache-dir
