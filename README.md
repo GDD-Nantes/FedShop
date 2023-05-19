@@ -4,6 +4,12 @@ FedShop is a synthetic RDF Federated Benchmark designed for scalability. It eval
 
 FedShop consists of three components: a data generator, a query (and template) generator, and a running environment able to collect statistics about the federated-query engines under test as well as about the benchmark itself.
 
+## QuickStart and Documentation
+
+- The quickstart guide is available in the [Quickstart tutorial](https://github.com/GDD-Nantes/FedShop/wiki/1.-Quick-start)
+- How to configure fedshop and how to extend fedshop is available in the [wiki](https://github.com/GDD-Nantes/FedShop/wiki)
+
+
 ## FedShop Results
 
 All the results are available through Jupyter Notebooks:
@@ -27,10 +33,6 @@ Instead of downloading the complete archive, you can also download only individu
 * [The FedShop Workload](https://docs.google.com/document/d/1gB5rkq5iySbiQJ_jzKjyDCbZ3DwLPEmPuIv45T834gI/edit?usp=share_link) 
 * The [Fedshop Workload as SPARQL 1.1 queries](https://docs.google.com/document/d/1Ihf1oIuF9cGTgMwC7y7byQlRstdfQBvfohyf73jW3mQ/edit?usp=share_link) with optimal source assignments.
 
-## QuickStart and Documentation
-
-- The quickstart guide is available in the [Quickstart tutorial](https://github.com/GDD-Nantes/FedShop/wiki/1.-Quick-start)
-- How to configure fedshop and how to extend fedshop is available in the [wiki](https://github.com/GDD-Nantes/FedShop/wiki)
 
 
 ## Install from the source
