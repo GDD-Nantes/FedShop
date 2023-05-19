@@ -3,9 +3,9 @@
 FedShop is a synthetic RDF Federated Benchmark designed for scalability. It evaluates the performance of SPARQL federated-query engines such as [FedX](https://rdf4j.org/documentation/programming/federation/), [CostFed](https://github.com/dice-group/CostFed), [Semagrow](https://semagrow.github.io/), Splendid, [HeFQUIN](https://github.com/LiUSemWeb/HeFQUIN), etc, when the number of federation members grows. FedShop is built around an e-commerce scenario with online hops and rating Web sites as in [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/). Compared to  BSBM, each shop and rating site of FedShop has its own SPARQL endpoint and shares a standard catalog of products. Following the BSBM idea, the FedShop queries simulate a user navigating the federation of shops as if it was a single virtual shop. The scale factor corresponds to the number of shops and rating sites within the federation. Hence, with the FedShop benchmark, we can observe the performance of federated queries when the number of federation members increases.
 
 FedShop consists of three components: 
-- a data generator, 
-- a query generator based on templates, 
-- a running environment able to collect statistics about the federated-query engines under test as well as about the benchmark itself.
+- **the FedShop data generator** to generate data,
+- **the FedShop query generator** to instantiate template queries, along with a Reference Source Assignment (RSA) queries ie. fedshop queries expressed as SPARQL 1.1 queries with service clauses,
+- **the FedShop runner** to evaluate federated-query engines with FedShop queries on FedShop data.
 
 ## QuickStart and Documentation
 
@@ -13,18 +13,13 @@ FedShop consists of three components:
 - How to configure fedshop and how to extend fedshop is available in the [wiki](https://github.com/GDD-Nantes/FedShop/wiki)
 
 
-## FedShop Results
-
-All the results are available through Jupyter Notebooks:
--   [Jupyter Evaluation](FedShop_Evaluation.ipynb)
-<!-- -   [Jupyter Generation](FedShop_Generation.ipynb)
--   [Jupyter (old)](Realistic_Synthetic_Federated.ipynb) -->
 
 
-## FedShop Datasets and Queries
+## FedShop200 Datasets and Queries
 
+**FedShop200** is a basic set of datasets and queries generated with FedShop. It contains 120 SPARQL queries and datasets to populate a federation up to 200 endpoints. It is available at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7919872.svg)](https://doi.org/10.5281/zenodo.7919872) and [here](https://drive.google.com/drive/folders/1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ). 
 
-All generated datasets and queries are available at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7919872.svg)](https://doi.org/10.5281/zenodo.7919872) and [here](https://drive.google.com/drive/folders/1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ). The following command allows downloading the archive (1.6GB) from Google Drive:
+The following command allows downloading the archive (1.6GB) from Google Drive:
 
 ```bash
 # !pip install --quiet gdown==4.5.4 --no-cache-dir
@@ -36,8 +31,12 @@ Instead of downloading the complete archive, you can also download only individu
 * [The FedShop Workload](https://docs.google.com/document/d/1gB5rkq5iySbiQJ_jzKjyDCbZ3DwLPEmPuIv45T834gI/edit?usp=share_link) 
 * The [Fedshop Workload as SPARQL 1.1 queries](https://docs.google.com/document/d/1Ihf1oIuF9cGTgMwC7y7byQlRstdfQBvfohyf73jW3mQ/edit?usp=share_link) with optimal source assignments.
 
+## FedShop200 Results
 
-
+A first evaluation of existing SPARQL Federation engines on **FedShop200** computed by the FedShop runner is available through a Jupyter Notebook:
+-   [Jupyter Evaluation](FedShop_Evaluation.ipynb)
+<!-- -   [Jupyter Generation](FedShop_Generation.ipynb)
+-   [Jupyter (old)](Realistic_Synthetic_Federated.ipynb) -->
 
 ## FedShop Data Generator
 
