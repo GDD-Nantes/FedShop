@@ -177,20 +177,7 @@ python rsfb/benchmark.py generate data|queries experiments/bsbm/config.yaml --re
 
 ```
 
-## Save/load eval-model
-- The eval-model, i.e, every artefact generated during data generation or engine evaluation phase can be packaged and shared.
-- To save a model:
-```bash
-# Save eval-model
-cd experiments/bsbm/
-zip -r benchmark benchmark.zip
-```
-- To load a eval-model:
-```bash
-# Load model
-cd experiments/bsbm/
-unzip benchmark.zip
-```
+
 
 ## FedShop Contributors
 
