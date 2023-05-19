@@ -69,14 +69,14 @@ The overall workflow for FedShop generation is as follows:
   * Batch(i)=Batch(i-1)+10 new vendors and 10 rating-sites
   * Compute the optimal source assignment for each query of the Workload over Batch(i)
 
-We finished this process with a federation of 200 different federation members. All information about Batch(i) are stored in ??.This overall workflow can be changed thanks to parameters declared in experiments/bsbm/config.yaml 
+We finished this process with a federation of 200 different federation members. This overall workflow can be changed thanks to parameters declared in experiments/bsbm/config.yaml 
 
 Please note:
 * The workflow is managed with the [Snakemake](https://snakemake.readthedocs.io/en/stable/) workflow management system. It allows the creation of reproducible and scalable data analyses. The snakemake files are located in experiments/bsbm/*.smk.
 * The generation of queries and the computation of optimal source assignments requires [Virtuoso](https://github.com/openlink/virtuoso-opensource)
 * The dataset generation is realized with many calls to [Watdiv](https://dsg.uwaterloo.ca/watdiv/). WatDiv is marginally updated and is available [here](https://github.com/mhoangvslev/watdiv/tree/e50cc38a28c79b73706ab3ee6f4d0340eedeee3f). It has been integrated into this github repository as a submodule.
 
-## Evaluate federated-query engines using FedShop
+## Evaluate federated-query engines using FedShop Runner
 
 As the number of federation members can be high, having a SPARQL endpoint per federation member becomes hard. We ingested all shops and rating-sites over a single Virtuoso server as Virtual Endpoints,i.e.,  each shop and rating-site has its own Virtual SPARQL endpoint. The different configurations relative to Batch(i) are available to configure a given federated-query engine. It is possible at this stage to run all FedShop Benchmark with [Kobe](https://github.com/semagrow/kobe). However, we also provide a benchmark runner based on Snakemake that is convenient for managing failures during the execution of the benchmark.
 
