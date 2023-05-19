@@ -2,7 +2,10 @@
 
 FedShop is a synthetic RDF Federated Benchmark designed for scalability. It evaluates the performance of SPARQL federated-query engines such as [FedX](https://rdf4j.org/documentation/programming/federation/), [CostFed](https://github.com/dice-group/CostFed), [Semagrow](https://semagrow.github.io/), Splendid, [HeFQUIN](https://github.com/LiUSemWeb/HeFQUIN), etc, when the number of federation members grows. FedShop is built around an e-commerce scenario with online hops and rating Web sites as in [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/). Compared to  BSBM, each shop and rating site of FedShop has its own SPARQL endpoint and shares a standard catalog of products. Following the BSBM idea, the FedShop queries simulate a user navigating the federation of shops as if it was a single virtual shop. The scale factor corresponds to the number of shops and rating sites within the federation. Hence, with the FedShop benchmark, we can observe the performance of federated queries when the number of federation members increases.
 
-FedShop consists of three components: a data generator, a query (and template) generator, and a running environment able to collect statistics about the federated-query engines under test as well as about the benchmark itself.
+FedShop consists of three components: 
+- a data generator, 
+- a query generator based on templates, 
+- a running environment able to collect statistics about the federated-query engines under test as well as about the benchmark itself.
 
 ## QuickStart and Documentation
 
