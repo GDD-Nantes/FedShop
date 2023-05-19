@@ -29,7 +29,7 @@ Instead of downloading the complete archive, you can also download only individu
 * [All the quads](https://drive.google.com/file/d/1ZpQWztExR7uuGaVWZ4iD0xP9lbNfVnoz/view?usp=share_link) for the 200 federation members.
 * The final [Virtuoso database](https://drive.google.com/file/d/1XL49DiYkzSlXVVaPXLaLJTNesfF5wFNR/view?usp=share_link) with all 200 federation members
 * [The FedShop Workload](https://docs.google.com/document/d/1gB5rkq5iySbiQJ_jzKjyDCbZ3DwLPEmPuIv45T834gI/edit?usp=share_link) 
-* The [Fedshop Workload as SPARQL 1.1 queries](https://docs.google.com/document/d/1Ihf1oIuF9cGTgMwC7y7byQlRstdfQBvfohyf73jW3mQ/edit?usp=share_link) with optimal source assignments.
+* The [RSA Fedshop Workload](https://docs.google.com/document/d/1Ihf1oIuF9cGTgMwC7y7byQlRstdfQBvfohyf73jW3mQ/edit?usp=share_link) ie the Reference Source Assignement for FedShop queries as SPARQL 1.1 queries with Service clauses.
 
 ## FedShop200 Results
 
