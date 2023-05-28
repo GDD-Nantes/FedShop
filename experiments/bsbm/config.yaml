@@ -101,7 +101,6 @@ evaluation:
     semagrow:
       dir: "engines/semagrow/semagrow"
       summary_generator_dir: "engines/semagrow/sevod-scraper"
-      #summary_generator: "${evaluation.engines.semagrow.summary_generator_dir}/assembly/target/bin/sevod-scraper.sh"
     anapsid:
       dir: "engines/ANAPSID"
     ideal:

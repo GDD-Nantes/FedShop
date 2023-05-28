@@ -192,6 +192,13 @@ def transform_results(ctx: click.Context, infile, outfile):
 @click.argument("prefix-cache", type=click.Path(exists=False, file_okay=True, dir_okay=False))
 @click.pass_context
 def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
+    
+    with open(infile, "r") as ifs:
+        if len(ifs.read().strip()) == 0:
+            Path(outfile).touch()
+            logger.debug(f"{infile} is empty!")
+            return
+    
     raw_source_selection = pd.read_csv(infile, sep=";")[["triples", "sources"]]
     
     tp_composition = f"{Path(prefix_cache).parent}/provenance.sparql.comp"
