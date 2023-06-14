@@ -26,17 +26,15 @@ The following command allows downloading the archive (1.6GB) from Google Drive:
 gdown 1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ -O fedshop.zip # large dataset
 ```
 Instead of downloading the complete archive, you can also download only individual parts of FedShop:
-* [All the quads](https://drive.google.com/file/d/1ZpQWztExR7uuGaVWZ4iD0xP9lbNfVnoz/view?usp=share_link) for the 200 federation members.
-* The final [Virtuoso database](https://drive.google.com/file/d/1XL49DiYkzSlXVVaPXLaLJTNesfF5wFNR/view?usp=share_link) with all 200 federation members
-* [The FedShop Workload](https://docs.google.com/document/d/1gB5rkq5iySbiQJ_jzKjyDCbZ3DwLPEmPuIv45T834gI/edit?usp=share_link) 
-* The [RSA Fedshop Workload](https://docs.google.com/document/d/1Ihf1oIuF9cGTgMwC7y7byQlRstdfQBvfohyf73jW3mQ/edit?usp=share_link) ie the Reference Source Assignement for FedShop queries as SPARQL 1.1 queries with Service clauses.
+* `fedshop-dataset.zip`: All the quads for the 200 federation members.
+* `fedshop-virtuoso.db`: The final Virtuoso database with all 200 federation members.
+* `fedshop-workload.txt`: The FedShop Workload
+* `fedshop-service.txt`: RSA Fedshop Workload, i.e. the Reference Source Assignement for FedShop queries as SPARQL 1.1 queries with Service clauses.
 
 ## FedShop200 Results
 
 A first evaluation of existing SPARQL Federation engines on **FedShop200** computed by the FedShop runner is available through a Jupyter Notebook:
 -   [Jupyter Evaluation](FedShop_Evaluation.ipynb)
-<!-- -   [Jupyter Generation](FedShop_Generation.ipynb)
--   [Jupyter (old)](Realistic_Synthetic_Federated.ipynb) -->
 
 ## FedShop Data Generator
 
