@@ -17,7 +17,7 @@ FedShop consists of three components:
 
 ## FedShop200 Datasets and Queries
 
-**FedShop200** is a basic set of datasets and queries generated with FedShop. It contains 120 SPARQL queries and datasets to populate a federation up to 200 endpoints. It is available at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7919872.svg)](https://doi.org/10.5281/zenodo.7919872) and [here](https://drive.google.com/drive/folders/1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ). 
+**FedShop200** is a basic set of datasets and queries generated with FedShop. It contains 120 SPARQL queries and datasets to populate a federation up to 200 endpoints. It is available at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7919872.svg)](https://doi.org/10.5281/zenodo.7919872) and [![Google Drive](https://img.shields.io/badge/Google%20Drive-4285F4?style=for-the-badge&logo=googledrive&logoColor=white)](https://drive.google.com/drive/folders/1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ). 
 
 The following command allows downloading the archive (1.6GB) from Google Drive:
 
