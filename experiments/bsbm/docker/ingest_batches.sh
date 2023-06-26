@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function probe(){
-    response_code=$(curl -o /dev/null --silent --head --write-out '%{http_code}\n' $1)
+    response_code=$(curl -o /dev/null --noproxy '*' --silent --head --write-out '%{http_code}\n' $1)
     echo "$response_code"
 }
 
@@ -33,7 +33,7 @@ do
 
     echo "Starting $container_name ..."
     docker start $container_name
-    container_port=$(docker port $container_name 8890 | sed -E "s#0\.0\.0\.0:([0-9]+).*#\1#g")
+    container_port=$(docker port $container_name 8890 | grep -oP '0\.0\.0\.0:\K([0-9]+)')
     container_endpoint="http://localhost:$container_port/sparql"
 
     if [ -z "$container_port" ]; then

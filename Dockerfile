@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:experimental
-#FROM minhhoangdang/ubuntu2004-dind:amd64
-FROM minhhoangdang/ubuntu2004-dind:arm64
+FROM minhhoangdang/ubuntu2004-dind:amd64
+#FROM minhhoangdang/ubuntu2004-dind:arm64
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update && apt-get install -y git libboost-all-dev openjdk-11-jdk \
