@@ -183,6 +183,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     force_source_selection_df = pd.read_csv(force_source_selection).dropna(axis=1, how="all")
     response, result = None, None
     
+    # Reset the proxy stats
     if requests.get(proxy_server + "reset").status_code != 200:
         raise RuntimeError("Could not reset statistics on proxy!")
     
@@ -222,7 +223,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             exec_time_fs.write(str(exec_time))
         logger.info(f"Writing stats to {stats}")
         create_stats(stats)
-        
+    
+    # Write proxy stats
     with open(f"{Path(stats).parent}/http_req.txt", "w") as http_req_fs:
         http_req = requests.get(proxy_server + "total_request").json()["total_http_request"]
         http_req_fs.write(str(http_req))
