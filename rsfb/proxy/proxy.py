@@ -117,8 +117,4 @@ def reset_statistics():
     return "RESET_OK"
 
 if __name__ == '__main__':
-    target_port = int(sys.argv[1])
-    if len(sys.argv) > 2:
-        global VIRTUOSO_PORT
-        VIRTUOSO_URL = str(sys.argv[2])
-    app.run(host='0.0.0.0', port=target_port)
+    app.run(host='0.0.0.0', threaded=True)

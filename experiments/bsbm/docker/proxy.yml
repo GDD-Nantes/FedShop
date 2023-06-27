@@ -7,4 +7,4 @@ services:
       - 5555:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    entrypoint: "python /fedshop-proxy/proxy.py 8080"
+    entrypoint: "gunicorn wsgi:app -b 0.0.0.0:5555"
