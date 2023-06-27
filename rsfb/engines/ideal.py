@@ -21,7 +21,7 @@ import requests
 from tqdm import tqdm
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import check_container_status, load_config, rsfb_logger, wait_for_container, create_stats
+from utils import activate_one_container, check_container_status, load_config, rsfb_logger, wait_for_container, create_stats
 from query import write_query, exec_query_on_endpoint
 
 logger = rsfb_logger(Path(__file__).name)
@@ -60,10 +60,11 @@ def prerequisites(ctx: click.Context, eval_config):
     compose_file = config["evaluation"]["engines"]["ideal"]["compose_file"]
     service_name = config["evaluation"]["engines"]["ideal"]["service_name"]
     container_name = config["evaluation"]["engines"]["ideal"]["container_name"]
+    batch_id = config["generation"]["n_batch"] - 1
     if check_container_status(compose_file, service_name, container_name) != "running":
         if os.system(f"docker-compose -f {compose_file} up -d --force-recreate jena-fuseki") != 0:
             raise RuntimeError("Could not launch Jena server...")
-        
+    
     wait_for_container(config["generation"]["virtuoso"]["endpoints"][-1], "/dev/null", logger)
     #ctx.invoke(warmup, eval_config=eval_config)
     
@@ -89,7 +90,9 @@ def __create_service_query(config, query, query_plan, force_source_selection):
     source_selection_df = pd.read_csv(opt_source_selection_file)
     
     internal_endpoint_prefix=str(config["evaluation"]["engines"]["ideal"]["internal_endpoint_prefix"])
-    port = re.search(r":(\d+)", config["generation"]["virtuoso"]["endpoints"][-1]).group(1)
+    # port = re.search(r":(\d+)", config["generation"]["virtuoso"]["endpoints"][-1]).group(1)
+    proxy_server = config["evaluation"]["proxy"]["endpoint"]
+    port = re.search(r":(\d+)", proxy_server).group(1)
     
     internal_endpoint_prefix=internal_endpoint_prefix.replace("localhost", "host.docker.internal")
     internal_endpoint_prefix=internal_endpoint_prefix.replace("8890", port, 1)
@@ -168,33 +171,20 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         raise RuntimeError("You must provide reference source selection for this engine.")
     
     config = load_config(eval_config)
-    
-    # Explain query
-    # with open(query_plan, "w") as query_plan_fs:
-    #     arq = f'{config["evaluation"]["engines"]["ideal"]["dir"]}/jena/bin/arq'
-    #     explain_cmd = f"{arq} --explain --query {service_query_file}"
-            
-    #     logger.debug("==== ARQ EXPLAIN ====")
-    #     logger.debug(explain_cmd)
-    #     logger.debug("=====================")
-            
-    #     arq_proc = subprocess.run(explain_cmd, shell=True, capture_output=True)
-    #     if arq_proc.returncode == 0:
-    #         query_plan_fs.write(arq_proc.stderr.decode())
-    #     else:
-    #         raise RuntimeError("ARQ explain reported error!")
     Path(query_plan).touch(exist_ok=True)
    
     # Execute results
     endpoint = config["evaluation"]["engines"]["ideal"]["endpoint"]
     timeout = config["evaluation"]["timeout"]
-    http_req = "N/A"
+    proxy_server = config["evaluation"]["proxy"]["endpoint"]
+    proxy_port = re.search(r":(\d+)", proxy_server).group(1)
     exec_time = None
-    source_selection_time = None
-    planning_time = None
     
     force_source_selection_df = pd.read_csv(force_source_selection).dropna(axis=1, how="all")
     response, result = None, None
+    
+    if requests.get(proxy_server + "reset").status_code != 200:
+        raise RuntimeError("Could not reset statistics on proxy!")
     
     startTime = time.time()
 
@@ -202,45 +192,14 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     # In such case, it doesn't make sense to send a federated version of the query, i.e, with SERVICE clause.
     if len(force_source_selection_df) == 1 and force_source_selection_df.iloc[0, :].nunique() == 1 : 
         virtuoso_endpoint = config["generation"]["virtuoso"]["endpoints"][-1]
+        virtuoso_endpoint = re.sub(r":\d+", f":{proxy_port}", virtuoso_endpoint)
         default_graph = force_source_selection_df.iloc[0, :].unique().item()
         with open(query, "r") as qfs:
             query_text = qfs.read()
             response, result = exec_query_on_endpoint(query_text, virtuoso_endpoint, error_when_timeout=True, timeout=timeout, default_graph=default_graph)
     else:
         out_query_text = __create_service_query(config, query, query_plan, force_source_selection)
-        
-        # arq = f'{config["evaluation"]["engines"]["ideal"]["dir"]}/jena/bin/arq'
-        # exec_cmd = f"{arq} --query {service_query_file} --optimize=off --results=CSV --time"
-                        
-        # logger.debug("==== ARQ EXEC ====")
-        # logger.debug(exec_cmd)
-        # logger.debug("==================")
-                
-        # try: 
-        #     arq_proc = subprocess.run(exec_cmd, shell=True, capture_output=True, timeout=timeout)
-        #     if arq_proc.returncode == 0:
-        #         logger.info(f"{query} benchmarked sucessfully")
-        #         result_df = pd.read_csv(BytesIO(arq_proc.stdout))
-                                    
-        #         exec_time = float(re.search(r"Time: (\d+(\.\d+)?) sec.*", arq_proc.stderr.decode()).group(1)) * 1e3
-                    
-        #         if result_df.empty:
-        #             logger.error(f"{query} yield no results!")
-        #             raise RuntimeError(f"{query} yield no results!")
-        #         else:
-        #             # Some post processing
-        #             if "*" in select_clause:
-        #                 result_df = result_df[[col for col in result_df.columns if "bgp" not in col]]
-        #             result_df.to_csv(out_result, index=False)
-        #     else:
-        #         logger.error(f"{query} reported error")    
-        #         write_empty_stats(stats, "error_runtime")                  
-        #         # raise RuntimeError(f"{query} reported error")
-                    
-        # except subprocess.TimeoutExpired: 
-        #     logger.exception(f"{query} timed out!")
-        #     write_empty_stats(stats, "timeout")
-        
+        print(endpoint)
         response, result = exec_query_on_endpoint(out_query_text, endpoint, error_when_timeout=True, timeout=timeout)
         
     endTime = time.time()
@@ -263,6 +222,18 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             exec_time_fs.write(str(exec_time))
         logger.info(f"Writing stats to {stats}")
         create_stats(stats)
+        
+    with open(f"{Path(stats).parent}/http_req.txt", "w") as http_req_fs:
+        http_req = requests.get(proxy_server + "total_request").json()["total_http_request"]
+        http_req_fs.write(str(http_req))
+        
+    with open(f"{Path(stats).parent}/ask.txt", "w") as http_ask_fs:
+        http_ask = requests.get(proxy_server + "total_ask").json()["total_ask"]
+        http_ask_fs.write(str(http_ask))
+        
+    with open(f"{Path(stats).parent}/data_transfer.txt", "w") as data_transfer_fs:
+        data_transfer = requests.get(proxy_server + "total_data_transfer").json()["total_data_transfer"]
+        data_transfer_fs.write(str(data_transfer))
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))

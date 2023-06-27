@@ -91,18 +91,23 @@ generation:
 evaluation:
   n_attempts: 4
   timeout: 120 # 60s + With overhead (jvm + startup + summary)
+  proxy: 
+    compose_file: "${generation.workdir}/docker/proxy.yml"
+    service_name: "fedshop-proxy"
+    endpoint: "http://localhost:5555/"
+    container_name: "docker-fedshop-proxy-1"
   engines:
-    fedx:
-      dir: "engines/FedX/target"
-    costfed:
-      dir: "engines/CostFed"
-    splendid:
-      dir: "engines/SPLENDID"
-    semagrow:
-      dir: "engines/semagrow/semagrow"
-      summary_generator_dir: "engines/semagrow/sevod-scraper"
-    anapsid:
-      dir: "engines/ANAPSID"
+    # fedx:
+    #   dir: "engines/FedX/target"
+    # costfed:
+    #   dir: "engines/CostFed"
+    # splendid:
+    #   dir: "engines/SPLENDID"
+    # semagrow:
+    #   dir: "engines/semagrow/semagrow"
+    #   summary_generator_dir: "engines/semagrow/sevod-scraper"
+    # anapsid:
+    #   dir: "engines/ANAPSID"
     ideal:
      dir: "engines/ARQ"
      internal_endpoint_prefix: "http://localhost:8890/sparql/?default-graph-uri="

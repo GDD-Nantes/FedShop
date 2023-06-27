@@ -1,0 +1,10 @@
+services:
+  fedshop-proxy:
+    image: minhhoangdang/fedshop-proxy:latest
+    environment:
+      - NO_PROXY=host.docker.internal,localhost,127.0.0.0/8
+    ports:
+      - 5555:8080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    entrypoint: "python /fedshop-proxy/proxy.py 8080"

@@ -308,7 +308,8 @@ def check_container_status(compose_file, service_name, container_name):
         return result
     
 def get_docker_containers(compose_file, service_name):    
-    json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
+    cmd = f"docker-compose -f {compose_file} ps --all --format json {service_name}"
+    json_bytes = subprocess.run(cmd, capture_output=True, shell=True).stdout
     
     with BytesIO(json_bytes) as json_bs:
         result = pd.read_json(json_bs)
@@ -425,6 +426,14 @@ def kill_process(proc_pid):
     except psutil.NoSuchProcess:
         LOGGER.warning(f"Process {proc_pid} already terminated...")
         pass
+    
+def ping(endpoint):
+    proxies = {
+        "http": "",
+        "https": "",
+    }
+    try: return requests.get(endpoint, proxies=proxies).status_code
+    except: return -1
 
 def wait_for_container(endpoints, outfile, logger, wait=1):
     if isinstance(endpoints, str):
@@ -436,7 +445,7 @@ def wait_for_container(endpoints, outfile, logger, wait=1):
         logger.info(f"Attempt {attempt} ...")
         try:
             for endpoint in endpoints:
-                status = requests.get(endpoint).status_code
+                status = ping(endpoint)
                 if status == 200:
                     logger.info(f"{endpoint} is ready!")
                     endpoint_ok += 1   
@@ -447,7 +456,7 @@ def wait_for_container(endpoints, outfile, logger, wait=1):
     with open(f"{outfile}", "w") as f:
         f.write("OK")
 
-def activate_one_container(batch_id, sparql_compose_file, sparql_service_name, logger, status_file, deploy_if_not_exists=False):
+def activate_one_container(batch_id, compose_file, service_name, logger, status_file, deploy_if_not_exists=False):
     """Activate one container while stopping all others
 
     Args:
@@ -465,11 +474,14 @@ def activate_one_container(batch_id, sparql_compose_file, sparql_service_name, l
         boolean: whether or not the container is re-initialized
     """
     
-    containers = get_docker_containers(sparql_compose_file, sparql_service_name)
-    batch_id = int(batch_id)
-    container_name = containers[batch_id]
+    try:
+        containers = get_docker_containers(compose_file, service_name)
+        batch_id = int(batch_id)
+        container_name = containers[batch_id] if "virtuoso" in service_name else containers[0]
+    except:
+        return False
 
-    if (container_status := check_container_status(sparql_compose_file, sparql_service_name, container_name)) is None:
+    if (container_status := check_container_status(compose_file, service_name, container_name)) is None:
         # if deploy_if_not_exists:
         #     deploy_virtuoso(N_BATCH, container_infos_file, sparql_compose_file, sparql_service_name, restart=True)
         # else:
@@ -477,11 +489,11 @@ def activate_one_container(batch_id, sparql_compose_file, sparql_service_name, l
 
     if container_status != "running":
         logger.info("Stopping all containers...")
-        os.system(f"docker-compose -f {sparql_compose_file} stop {sparql_service_name}")
+        os.system(f"docker-compose -f {compose_file} stop {service_name}")
             
         logger.info(f"Starting container {container_name}...")
         os.system(f"docker start {container_name}")
-        container_endpoint = get_docker_endpoint_by_container_name(sparql_compose_file, sparql_service_name, container_name)
+        container_endpoint = get_docker_endpoint_by_container_name(compose_file, service_name, container_name)
         wait_for_container(container_endpoint, status_file, logger , wait=1)
         return True
     return False

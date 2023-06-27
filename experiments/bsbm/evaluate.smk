@@ -14,7 +14,7 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
 
-from utils import rsfb_logger, load_config, get_docker_endpoint_by_container_name, get_docker_containers, check_container_status, create_stats, virtuoso_kill_all_transactions, wait_for_container
+from utils import ping, rsfb_logger, load_config, get_docker_endpoint_by_container_name, get_docker_containers, check_container_status, create_stats, virtuoso_kill_all_transactions, wait_for_container
 from utils import activate_one_container as utils_activate_one_container
 
 #===============================
@@ -35,6 +35,12 @@ CONFIG_EVAL = CONFIG["evaluation"]
 SPARQL_COMPOSE_FILE = CONFIG_GEN["virtuoso"]["compose_file"]
 SPARQL_SERVICE_NAME = CONFIG_GEN["virtuoso"]["service_name"]
 SPARQL_CONTAINER_NAMES = CONFIG_GEN["virtuoso"]["container_names"]
+
+PROXY_COMPOSE_FILE =  CONFIG_EVAL["proxy"]["compose_file"]
+PROXY_SERVICE_NAME = CONFIG_EVAL["proxy"]["service_name"]
+PROXY_CONTAINER_NAMES = CONFIG_EVAL["proxy"]["container_name"]
+PROXY_SERVER = CONFIG["evaluation"]["proxy"]["endpoint"]
+PROXY_PORT = re.search(r":(\d+)", PROXY_SERVER).group(1)
 
 N_QUERY_INSTANCES = CONFIG_GEN["n_query_instances"]
 N_BATCH = CONFIG_GEN["n_batch"]
@@ -60,14 +66,27 @@ LOGGER = rsfb_logger(Path(__file__).name)
 def activate_one_container(batch_id):
     """ Activate one container while stopping all others
     """
-    is_restarted = utils_activate_one_container(batch_id, SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, logger, f"{BENCH_DIR}/virtuoso-ok.txt")
-    if is_restarted:
+    LOGGER.info("Activating Virtuoso docker container...")
+    is_virtuoso_restarted = utils_activate_one_container(batch_id, SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, LOGGER, f"{BENCH_DIR}/virtuoso-ok.txt")
+    if is_virtuoso_restarted:
         shell(f"python rsfb/engines/ideal.py warmup {CONFIGFILE}")
+
+    LOGGER.info("Activating proxy docker container...")
+    proxy_target = CONFIG_GEN["virtuoso"]["endpoints"][-1]
+    proxy_target = proxy_target.replace("/sparql", "/")
+    if ping(PROXY_SERVER) != 200:
+        shell(f"docker-compose -f {PROXY_COMPOSE_FILE} up -d {PROXY_SERVICE_NAME}")
+    
+    shell(f'curl -X POST -d "destination={proxy_target}" {PROXY_SERVER + "set_destination"}')
+    # set_target_cmd = requests.post(PROXY_SERVER + "set_destination", data={"destination": proxy_target})
+    # print(set_target_cmd.content)
+    # if set_target_cmd.status_code != 200:
+    #     raise RuntimeError(f"Could not set destination address {proxy_target} for proxy")
 
 def generate_federation_declaration(federation_declaration_file, engine, batch_id):
     sparql_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])
 
-    logger.info(f"Rewriting {engine} configfile as it is updated!")
+    LOGGER.info(f"Rewriting {engine} configfile as it is updated!")
     ratingsite_data_files = [ f"{MODEL_DIR}/dataset/ratingsite{i}.nq" for i in range(N_RATINGSITE) ]
     vendor_data_files = [ f"{MODEL_DIR}/dataset/vendor{i}.nq" for i in range(N_VENDOR) ]
 
@@ -165,9 +184,9 @@ rule transform_results:
                 .reset_index(drop=True) 
 
             if not expected_results.equals(engine_results):
-                logger.debug(expected_results)
-                logger.debug("not equals to")
-                logger.debug(engine_results)
+                LOGGER.debug(expected_results)
+                LOGGER.debug("not equals to")
+                LOGGER.debug(engine_results)
 
                 create_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
                 #raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
@@ -212,7 +231,7 @@ rule evaluate_engines:
 
         for attempt in range(CONFIG_EVAL["n_attempts"]):
             same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{batch_id}/attempt_{attempt}/results.txt"
-            logger.info(f"Checking {same_file_other_attempt} ...")
+            LOGGER.info(f"Checking {same_file_other_attempt} ...")
             if  os.path.exists(same_file_other_attempt) and \
                 os.path.exists(same_file_other_attempt) and \
                 os.stat(same_file_other_attempt).st_size == 0:
@@ -227,7 +246,7 @@ rule evaluate_engines:
         previous_reason = str(skip_stats_file | cat() | find_first_pattern([r"(timeout)"]))
 
         if canSkip and previous_reason != "":
-            logger.info(skipReason)
+            LOGGER.info(skipReason)
             shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {output.query_plan} --batch-id {batch_id} --noexec")
             create_stats(str(output.stats), previous_reason)
             #shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
