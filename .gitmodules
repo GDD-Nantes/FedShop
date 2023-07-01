@@ -32,3 +32,7 @@
 	path = engines/MULDER
 	url = https://github.com/SDM-TIB/MULDER.git
 	branch = master
+[submodule "rsfb/proxy/FedShop-proxy"]
+	path = rsfb/proxy/FedShop-proxy
+	url = https://github.com/mhoangvslev/FedShop-proxy.git
+	branch = main
