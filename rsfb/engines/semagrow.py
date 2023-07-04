@@ -94,7 +94,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     app = app_config["dir"]
     last_batch = int(config["generation"]["n_batch"]) - 1
     
-    endpoint = config["generation"]["virtuoso"]["endpoints"][last_batch]
     compose_file = config["generation"]["virtuoso"]["compose_file"]
     service_name = config["generation"]["virtuoso"]["service_name"]
     container_name = config["generation"]["virtuoso"]["container_names"][last_batch]
@@ -104,6 +103,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     summary_file = f"metadata-sparql-{batch_id}.ttl"   
     
     proxy_server = config["evaluation"]["proxy"]["endpoint"]
+    proxy_sparql_endpoint = proxy_server + "sparql"
     
     # Reset the proxy stats
     if requests.get(proxy_server + "reset").status_code != 200:
@@ -115,7 +115,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     Path(query_plan).touch()
     out_result = f"{Path(out_result).with_suffix('.csv')}"
     
-    cmd = f"./semagrow.sh repository.ttl {endpoint} ../../../{out_result} ../../../{out_source_selection} ../../../{query_plan} {timeout} ../../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file} {str(noexec).lower()}"
+    cmd = f"./semagrow.sh repository.ttl {proxy_sparql_endpoint} ../../../{out_result} ../../../{out_source_selection} ../../../{query_plan} {timeout} ../../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file} {str(noexec).lower()}"
 
     logger.debug("=== Semagrow ===")
     logger.debug(cmd)

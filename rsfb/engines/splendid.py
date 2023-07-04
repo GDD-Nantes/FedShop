@@ -72,7 +72,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     app_config = config["evaluation"]["engines"]["splendid"]
     app = app_config["dir"]
     last_batch = config["generation"]["n_batch"] - 1
-    endpoint = config["generation"]["virtuoso"]["endpoints"][last_batch]
     compose_file = config["generation"]["virtuoso"]["compose_file"]
     service_name = config["generation"]["virtuoso"]["service_name"]
     container_name = config["generation"]["virtuoso"]["container_names"][last_batch]
@@ -85,6 +84,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     http_req = "N/A"
     
     proxy_server = config["evaluation"]["proxy"]["endpoint"]
+    proxy_sparql_endpoint = proxy_server + "sparql"
     
     # Reset the proxy stats
     if requests.get(proxy_server + "reset").status_code != 200:
@@ -100,7 +100,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             elif lines[i].startswith("output.file"):
                 lines[i] = re.sub(r'output\.file=.+','output.file='+provenance_stat_to_modif, lines[i])
             elif lines[i].startswith("sparql.endpoint"):
-                lines[i] = re.sub(r'sparql\.endpoint=.+','sparql.endpoint='+endpoint, lines[i])
+                lines[i] = re.sub(r'sparql\.endpoint=.+','sparql.endpoint='+proxy_sparql_endpoint, lines[i])
     
     with open(properties, "w") as properties_file:
         properties_file.writelines(lines)

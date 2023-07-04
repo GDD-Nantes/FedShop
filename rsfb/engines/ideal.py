@@ -90,7 +90,6 @@ def __create_service_query(config, query, query_plan, force_source_selection):
     source_selection_df = pd.read_csv(opt_source_selection_file)
     
     internal_endpoint_prefix=str(config["evaluation"]["engines"]["ideal"]["internal_endpoint_prefix"])
-    # port = re.search(r":(\d+)", config["generation"]["virtuoso"]["endpoints"][-1]).group(1)
     proxy_server = config["evaluation"]["proxy"]["endpoint"]
     port = re.search(r":(\d+)", proxy_server).group(1)
     
@@ -183,6 +182,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     
     proxy_server = config["evaluation"]["proxy"]["endpoint"]
     proxy_port = re.search(r":(\d+)", proxy_server).group(1)
+    proxy_sparql_endpoint = proxy_server + "sparql"
     
     # Reset the proxy stats
     if requests.get(proxy_server + "reset").status_code != 200:
@@ -193,15 +193,12 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     # In case there is only one source for all triple patterns, send the original query to Virtuoso.
     # In such case, it doesn't make sense to send a federated version of the query, i.e, with SERVICE clause.
     if len(force_source_selection_df) == 1 and force_source_selection_df.iloc[0, :].nunique() == 1 : 
-        virtuoso_endpoint = config["generation"]["virtuoso"]["endpoints"][-1]
-        virtuoso_endpoint = re.sub(r":\d+", f":{proxy_port}", virtuoso_endpoint)
         default_graph = force_source_selection_df.iloc[0, :].unique().item()
         with open(query, "r") as qfs:
             query_text = qfs.read()
-            response, result = exec_query_on_endpoint(query_text, virtuoso_endpoint, error_when_timeout=True, timeout=timeout, default_graph=default_graph)
+            response, result = exec_query_on_endpoint(query_text, proxy_sparql_endpoint, error_when_timeout=True, timeout=timeout, default_graph=default_graph)
     else:
         out_query_text = __create_service_query(config, query, query_plan, force_source_selection)
-        print(endpoint)
         response, result = exec_query_on_endpoint(out_query_text, endpoint, error_when_timeout=True, timeout=timeout)
         
     endTime = time.time()

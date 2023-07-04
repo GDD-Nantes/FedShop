@@ -41,6 +41,7 @@ PROXY_SERVICE_NAME = CONFIG_EVAL["proxy"]["service_name"]
 PROXY_CONTAINER_NAMES = CONFIG_EVAL["proxy"]["container_name"]
 PROXY_SERVER = CONFIG["evaluation"]["proxy"]["endpoint"]
 PROXY_PORT = re.search(r":(\d+)", PROXY_SERVER).group(1)
+PROXY_SPARQL_ENDPOINT = PROXY_SERVER + "sparql"
 
 N_QUERY_INSTANCES = CONFIG_GEN["n_query_instances"]
 N_BATCH = CONFIG_GEN["n_batch"]
@@ -74,14 +75,16 @@ def activate_one_container(batch_id):
     LOGGER.info("Activating proxy docker container...")
     proxy_target = CONFIG_GEN["virtuoso"]["endpoints"][-1]
     proxy_target = proxy_target.replace("/sparql", "/")
-    if ping(PROXY_SERVER + "sparql") != 200:
+    if ping(PROXY_SPARQL_ENDPOINT) != 200:
         LOGGER.info("Starting proxy server...")
         shell(f"docker-compose -f {PROXY_COMPOSE_FILE} up -d {PROXY_SERVICE_NAME}")
-    
+        wait_for_container(PROXY_SPARQL_ENDPOINT, "/dev/null", logger , wait=1)
+
     shell(f'curl -X GET {PROXY_SERVER + "set-destination"}?proxyTo={proxy_target}')
 
 def generate_federation_declaration(federation_declaration_file, engine, batch_id):
-    sparql_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])
+    #sparql_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])
+    sparql_endpoint = PROXY_SPARQL_ENDPOINT
 
     LOGGER.info(f"Rewriting {engine} configfile as it is updated!")
     ratingsite_data_files = [ f"{MODEL_DIR}/dataset/ratingsite{i}.nq" for i in range(N_RATINGSITE) ]

@@ -90,13 +90,13 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     app = app_config["dir"]
     last_batch = int(config["generation"]["n_batch"]) - 1
     
-    endpoint = config["generation"]["virtuoso"]["endpoints"][last_batch]
     compose_file = config["generation"]["virtuoso"]["compose_file"]
     service_name = config["generation"]["virtuoso"]["service_name"]
     container_name = config["generation"]["virtuoso"]["container_names"][last_batch]
     timeout = int(config["evaluation"]["timeout"])
     
     proxy_server = config["evaluation"]["proxy"]["endpoint"]
+    proxy_sparql_endpoint = proxy_server + "sparql"
     
     # Reset the proxy stats
     if requests.get(proxy_server + "reset").status_code != 200:
@@ -110,7 +110,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     Path(out_source_selection).touch()
     Path(query_plan).touch()
 
-    cmd = f"./costfed.sh costfed/costfed.props {endpoint} ../../{out_result} ../../{out_source_selection} ../../{query_plan} {timeout} ../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file} {str(noexec).lower()}"
+    cmd = f"./costfed.sh costfed/costfed.props {proxy_sparql_endpoint} ../../{out_result} ../../{out_source_selection} ../../{query_plan} {timeout} ../../{query} {out_result.split('/')[7].split('_')[1]} false true {summary_file} {str(noexec).lower()}"
 
     logger.debug("=== CostFed ===")
     logger.debug(cmd)
