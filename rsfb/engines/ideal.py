@@ -176,12 +176,13 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     # Execute results
     endpoint = config["evaluation"]["engines"]["ideal"]["endpoint"]
     timeout = config["evaluation"]["timeout"]
-    proxy_server = config["evaluation"]["proxy"]["endpoint"]
-    proxy_port = re.search(r":(\d+)", proxy_server).group(1)
     exec_time = None
     
     force_source_selection_df = pd.read_csv(force_source_selection).dropna(axis=1, how="all")
     response, result = None, None
+    
+    proxy_server = config["evaluation"]["proxy"]["endpoint"]
+    proxy_port = re.search(r":(\d+)", proxy_server).group(1)
     
     # Reset the proxy stats
     if requests.get(proxy_server + "reset").status_code != 200:
@@ -221,21 +222,26 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     if stats != "/dev/null":
         with open(f"{Path(stats).parent}/exec_time.txt", "w") as exec_time_fs:
             exec_time_fs.write(str(exec_time))
+        
+        # Write proxy stats
+        proxy_stats = json.loads(requests.get(proxy_server + "get-stats").text)
+        
+        with open(f"{Path(stats).parent}/http_req.txt", "w") as http_req_fs:
+            http_req = proxy_stats["NB_HTTP_REQ"]
+            http_req_fs.write(str(http_req))
+            
+        with open(f"{Path(stats).parent}/ask.txt", "w") as http_ask_fs:
+            http_ask = proxy_stats["NB_ASK"]
+            http_ask_fs.write(str(http_ask))
+            
+        with open(f"{Path(stats).parent}/data_transfer.txt", "w") as data_transfer_fs:
+            data_transfer = proxy_stats["DATA_TRANSFER"]
+            data_transfer_fs.write(str(data_transfer))
+        
         logger.info(f"Writing stats to {stats}")
         create_stats(stats)
     
-    # Write proxy stats
-    with open(f"{Path(stats).parent}/http_req.txt", "w") as http_req_fs:
-        http_req = requests.get(proxy_server + "total_request").json()["total_http_request"]
-        http_req_fs.write(str(http_req))
-        
-    with open(f"{Path(stats).parent}/ask.txt", "w") as http_ask_fs:
-        http_ask = requests.get(proxy_server + "total_ask").json()["total_ask"]
-        http_ask_fs.write(str(http_ask))
-        
-    with open(f"{Path(stats).parent}/data_transfer.txt", "w") as data_transfer_fs:
-        data_transfer = requests.get(proxy_server + "total_data_transfer").json()["total_data_transfer"]
-        data_transfer_fs.write(str(data_transfer))
+    
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))

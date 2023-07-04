@@ -10,6 +10,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import requests
 from sklearn.preprocessing import LabelEncoder
 import psutil
 
@@ -94,6 +95,12 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     service_name = config["generation"]["virtuoso"]["service_name"]
     container_name = config["generation"]["virtuoso"]["container_names"][last_batch]
     timeout = int(config["evaluation"]["timeout"])
+    
+    proxy_server = config["evaluation"]["proxy"]["endpoint"]
+    
+    # Reset the proxy stats
+    if requests.get(proxy_server + "reset").status_code != 200:
+        raise RuntimeError("Could not reset statistics on proxy!")
 
     oldcwd = os.getcwd()
     summary_file = f"summaries/sum_fedshop_batch{batch_id}.n3"   
@@ -112,50 +119,17 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     os.chdir(Path(app))
     costfed_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     os.chdir(oldcwd)
+    
+    failed_reason = None
+    
     try:        
         costfed_proc.wait(timeout)
         if costfed_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
             
-            # Write stats
-            logger.info(f"Writing stats to {stats}")
-                         
-            # basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
-            # queryName = basicInfos.group(2)
-            # instance = basicInfos.group(3)
-            # batch = basicInfos.group(4)
-            # attempt = basicInfos.group(5)
-            
-            # stats_df = pd.read_csv(stats).rename({
-            #     "Result #0": "query",
-            #     "Result #1": "engine",
-            #     "Result #2": "instance",
-            #     "Result #3": "batch",
-            #     "Result #4": "attempt",
-            #     "Result #5": "exec_time",
-            #     "Result #6": "ask",
-            #     "Result #7": "source_selection_time",
-            #     "Result #8": "planning_time"
-            # }, axis=1)
-    
-            # stats_df = stats_df \
-            #     .replace('injected.sparql',str(queryName)) \
-            #     .replace('instance_id',str(instance)) \
-            #     .replace('batch_id',str(batch)) \
-            #     .replace('attempt_id',str(attempt))
-                
-            # stats_df.to_csv(stats, index=False)
-
-            def report_error(reason):
-                logger.error(f"{query} yield no results!")
-                os.system(f"docker stop {container_name}")
-                raise RuntimeError(f"{query} yield no results!")
-
-            create_stats(stats)
-
         else:
             logger.error(f"{query} reported error")    
-            create_stats(stats, "error_runtime")
+            failed_reason = "error_runtime"
             
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
@@ -167,13 +141,31 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         if psutil.virtual_memory().percent >= 60:
             os.system(f"docker stop {container_name}")
         
-        logger.info("Writing empty stats...")
-        create_stats(stats, "timeout")
+        failed_reason = "timeout"
     finally:
         os.system('pkill -9 -f "costfed/target"')
         cache_file = f"{app}/cache.db"
         Path(cache_file).unlink(missing_ok=True)
-        #kill_process(fedx_proc.pid)        
+        #kill_process(fedx_proc.pid)     
+        
+        if stats != "/dev/null":            
+            # Write proxy stats
+            proxy_stats = json.loads(requests.get(proxy_server + "get-stats").text)
+            
+            with open(f"{Path(stats).parent}/http_req.txt", "w") as http_req_fs:
+                http_req = proxy_stats["NB_HTTP_REQ"]
+                http_req_fs.write(str(http_req))
+                
+            with open(f"{Path(stats).parent}/ask.txt", "w") as http_ask_fs:
+                http_ask = proxy_stats["NB_ASK"]
+                http_ask_fs.write(str(http_ask))
+                
+            with open(f"{Path(stats).parent}/data_transfer.txt", "w") as data_transfer_fs:
+                data_transfer = proxy_stats["DATA_TRANSFER"]
+                data_transfer_fs.write(str(data_transfer))
+        
+            logger.info(f"Writing stats to {stats}")
+            create_stats(stats, failed_reason)   
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))

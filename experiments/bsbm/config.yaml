@@ -94,7 +94,7 @@ evaluation:
   proxy: 
     compose_file: "${generation.workdir}/docker/proxy.yml"
     service_name: "fedshop-proxy"
-    endpoint: "http://localhost:5555/proxy"
+    endpoint: "http://localhost:5555/"
     container_name: "docker-fedshop-proxy-1"
   engines:
     # fedx:

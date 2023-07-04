@@ -11,6 +11,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import requests
 
 from sklearn.calibration import LabelEncoder
 
@@ -119,6 +120,12 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     container_name = config["generation"]["virtuoso"]["container_names"][last_batch]
     timeout = int(config["evaluation"]["timeout"])
     old_dir = os.getcwd()
+    
+    proxy_server = config["evaluation"]["proxy"]["endpoint"]
+    
+    # Reset the proxy stats
+    if requests.get(proxy_server + "reset").status_code != 200:
+        raise RuntimeError("Could not reset statistics on proxy!")
 
     cmd = f"python scripts/run_anapsid -e ../../{engine_config} -q ../../{in_query_file} -p naive -s False -o False -d SSGM -a True -r ../../{out_result} -z ../../{Path(stats).parent}/ask.txt -y ../../{Path(stats).parent}/planning_time.txt -x ../../{query_plan} -v ../../{out_source_selection} -u ../../{Path(stats).parent}/source_selection_time.txt -n ../../{Path(stats).parent}/exec_time.txt -c {str(noexec)}"
 
@@ -132,12 +139,11 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     Path(query_plan).touch()   
     
     # Set the maximum amount of memory to be used by the subprocess in bytes
-    max_mem = 100000000  # 100 MB
-    resource.setrlimit(resource.RLIMIT_AS, (max_mem, max_mem))
-
     os.chdir(app_dir)
     anapsid_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     os.chdir(old_dir)
+    
+    failed_reason = None
 
     try: 
         anapsid_proc.wait(timeout=timeout)
@@ -164,23 +170,41 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             errorFile = f"{Path(stats).parent}/error.txt"
             if os.path.exists(errorFile):
                 with open(errorFile, "r") as f:
-                    reason = f.read()
-                    if reason == "type_error":
+                    failed_reason = f.read()
+                    if failed_reason == "type_error":
                         os.remove(askFile)
-                    create_stats(stats, reason)
             else:
-                create_stats(stats, "error_runtime")
+                failed_reason = "error_runtime"
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
         if (container_status := check_container_status(compose_file, service_name, container_name)) != "running":
             logger.debug(container_status)
             #raise RuntimeError("Backend is terminated!")
         logger.info("Writing empty stats...")
-        create_stats(stats, "timeout")
+        failed_reason = "timeout"
 
     finally:
         #kill_process(anapsid_proc.pid)
         os.system('pkill -9 -f "scripts/run_anapsid"')
+        
+        if stats != "/dev/null":            
+            # Write proxy stats
+            proxy_stats = json.loads(requests.get(proxy_server + "get-stats").text)
+            
+            with open(f"{Path(stats).parent}/http_req.txt", "w") as http_req_fs:
+                http_req = proxy_stats["NB_HTTP_REQ"]
+                http_req_fs.write(str(http_req))
+                
+            with open(f"{Path(stats).parent}/ask.txt", "w") as http_ask_fs:
+                http_ask = proxy_stats["NB_ASK"]
+                http_ask_fs.write(str(http_ask))
+                
+            with open(f"{Path(stats).parent}/data_transfer.txt", "w") as data_transfer_fs:
+                data_transfer = proxy_stats["DATA_TRANSFER"]
+                data_transfer_fs.write(str(data_transfer))
+        
+            logger.info(f"Writing stats to {stats}")
+            create_stats(stats, failed_reason)   
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))

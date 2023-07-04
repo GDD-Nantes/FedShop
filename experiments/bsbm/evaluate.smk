@@ -74,14 +74,11 @@ def activate_one_container(batch_id):
     LOGGER.info("Activating proxy docker container...")
     proxy_target = CONFIG_GEN["virtuoso"]["endpoints"][-1]
     proxy_target = proxy_target.replace("/sparql", "/")
-    if ping(PROXY_SERVER) != 200:
+    if ping(PROXY_SERVER + "sparql") != 200:
+        LOGGER.info("Starting proxy server...")
         shell(f"docker-compose -f {PROXY_COMPOSE_FILE} up -d {PROXY_SERVICE_NAME}")
     
-    shell(f'curl -X POST -d "destination={proxy_target}" {PROXY_SERVER + "set_destination"}')
-    # set_target_cmd = requests.post(PROXY_SERVER + "set_destination", data={"destination": proxy_target})
-    # print(set_target_cmd.content)
-    # if set_target_cmd.status_code != 200:
-    #     raise RuntimeError(f"Could not set destination address {proxy_target} for proxy")
+    shell(f'curl -X GET {PROXY_SERVER + "set-destination"}?proxyTo={proxy_target}')
 
 def generate_federation_declaration(federation_declaration_file, engine, batch_id):
     sparql_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])

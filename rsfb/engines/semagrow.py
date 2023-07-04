@@ -11,6 +11,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import requests
 from sklearn.preprocessing import LabelEncoder
 
 import sys
@@ -102,6 +103,12 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     oldcwd = os.getcwd()
     summary_file = f"metadata-sparql-{batch_id}.ttl"   
     
+    proxy_server = config["evaluation"]["proxy"]["endpoint"]
+    
+    # Reset the proxy stats
+    if requests.get(proxy_server + "reset").status_code != 200:
+        raise RuntimeError("Could not reset statistics on proxy!")
+    
     # Prepare args for semagrow
     Path(out_result).touch()
     Path(out_source_selection).touch()
@@ -122,40 +129,31 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         
     semagrow_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     os.chdir(oldcwd)
+    
+    failed_reason = None
+    
     try:        
         semagrow_proc.wait(timeout)
         if semagrow_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
             
             shutil.copy(out_result, Path(out_result).with_suffix('.txt'))
-                        
-            # Write stats
-            logger.info(f"Writing stats to {stats}")           
-            create_stats(stats)
-            
-            def report_error(reason):
-                logger.error(f"{query} yield no results!")
-                #os.system(f"docker stop {container_name}")
-                Path(out_source_selection).touch()
-                create_stats(stats, reason)
-                #raise RuntimeError(f"{query} yield no results!")
-                
+
             try: 
                 results_df = pd.read_csv(out_result).replace("null", None)
                 if results_df.empty or os.stat(out_result).st_size == 0: 
-                    errorFile = f"{Path(stats).parent}/error.txt"
-                    if os.path.exists(errorFile):
-                        with open(errorFile, "r") as f:
-                            reason = f.read()
-                            report_error(reason) 
-                    else:
-                        report_error("error_runtime")       
+                    logger.error(f"{query} yield no results!")
+                    Path(out_source_selection).touch()
+                    failed_reason = "error_runtime"
+
             except pd.errors.EmptyDataError:
-                report_error("error_runtime")
+                logger.error(f"{query} yield no results!")
+                Path(out_source_selection).touch()
+                failed_reason = "error_runtime"
 
         else:
             logger.error(f"{query} reported error")    
-            create_stats(stats, "error_runtime")
+            failed_reason = "error_runtime"
             
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
@@ -167,13 +165,32 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         if psutil.virtual_memory().percent >= 60:
             os.system(f"docker stop {container_name}")
         
-        logger.info("Writing empty stats...")
-        create_stats(stats, "timeout")
+        failed_reason = "timeout"
+        
     finally:
         os.system('pkill -9 -f "mainClass=org.semagrow.cli.CliMain"')
         #cache_file = f"{app}/cache.db"
         #Path(cache_file).unlink(missing_ok=True)
         #kill_process(fedx_proc.pid)    
+        
+        if stats != "/dev/null":            
+            # Write proxy stats
+            proxy_stats = json.loads(requests.get(proxy_server + "get-stats").text)
+            
+            with open(f"{Path(stats).parent}/http_req.txt", "w") as http_req_fs:
+                http_req = proxy_stats["NB_HTTP_REQ"]
+                http_req_fs.write(str(http_req))
+                
+            with open(f"{Path(stats).parent}/ask.txt", "w") as http_ask_fs:
+                http_ask = proxy_stats["NB_ASK"]
+                http_ask_fs.write(str(http_ask))
+                
+            with open(f"{Path(stats).parent}/data_transfer.txt", "w") as data_transfer_fs:
+                data_transfer = proxy_stats["DATA_TRANSFER"]
+                data_transfer_fs.write(str(data_transfer))
+        
+            logger.info(f"Writing stats to {stats}")
+            create_stats(stats, failed_reason) 
         
 
 @cli.command()

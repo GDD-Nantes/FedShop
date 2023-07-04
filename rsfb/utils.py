@@ -388,7 +388,9 @@ def create_stats(statsfile, failed_reason=None):
         "source_selection_time": failed_reason,
         "planning_time": failed_reason,
         "ask": failed_reason,
-        "exec_time": failed_reason
+        "exec_time": failed_reason,
+        "http_req": failed_reason,
+        "data_transfer": failed_reason
     }
     
     for metric in metrics.keys():
@@ -432,7 +434,10 @@ def ping(endpoint):
         "http": "",
         "https": "",
     }
-    try: return requests.get(endpoint, proxies=proxies).status_code
+    try:
+        response = requests.get(endpoint, proxies=proxies)
+        # print(response.status_code, response.text)
+        return response.status_code
     except: return -1
 
 def wait_for_container(endpoints, outfile, logger, wait=1):

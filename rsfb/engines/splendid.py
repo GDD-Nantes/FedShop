@@ -13,6 +13,7 @@ import csv
 from itertools import zip_longest
 
 import sys
+import requests
 
 from sklearn.calibration import LabelEncoder
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
@@ -82,6 +83,12 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     #void_conf = str(Path(engine_config).absolute())
     shutil.copy(engine_config,  f"{app}/eval/sail-config/config.n3")
     http_req = "N/A"
+    
+    proxy_server = config["evaluation"]["proxy"]["endpoint"]
+    
+    # Reset the proxy stats
+    if requests.get(proxy_server + "reset").status_code != 200:
+        raise RuntimeError("Could not reset statistics on proxy!")
 
     lines = []
     provenance_stat_to_modif = f"{query.split('/')[4]}-{query.split('/')[5]}.csv"
@@ -114,70 +121,57 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     splendid_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     #splendid_output, splendid_error = splendid_proc.communicate()
     os.chdir(oldcwd)
+    
+    failed_reason = None
+    
     try: 
         splendid_proc.wait(timeout=timeout)
         if splendid_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully") 
-
-            # Write stats
-            logger.info(f"Writing stats to {stats}")
-             
-            # stats_df = pd.read_csv(stats)
-            
-            # basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", stats)
-            # queryName = basicInfos.group(2)
-            # instance = basicInfos.group(3)
-            # batch = basicInfos.group(4)
-            # attempt = basicInfos.group(5)
-    
-            # stats_df = stats_df \
-            #     .replace('injected.sparql',str(queryName)) \
-            #     .replace('instance_id',str(instance)) \
-            #     .replace('batch_id',str(batch)) \
-            #     .replace('attempt_id',str(attempt))
-                
-            # stats_df.to_csv(stats, index=False)
-            
-            create_stats(stats)
-            
-            def report_error(reason):
-                logger.error(f"{query} yield no results!")
-                #os.system(f"docker stop {container_name}")
-                create_stats(stats, reason)
-                #raise RuntimeError(f"{query} yield no results!")
                 
             try: 
                 results_df = pd.read_csv(out_result).replace("null", None)
                 if results_df.empty or os.stat(out_result).st_size == 0: 
-                    errorFile = f"{Path(stats).parent}/error.txt"
-                    if os.path.exists(errorFile):
-                        with open(errorFile, "r") as f:
-                            reason = f.read()
-                            report_error(reason) 
-                    else:
-                        report_error("error_runtime")       
+                    logger.error(f"{query} yield no results!")
+                    failed_reason = "error_runtime"
             except pd.errors.EmptyDataError:
-                report_error("error_runtime")
+                logger.error(f"{query} yield no results!")
+                failed_reason = "error_runtime"
                         
         else:
             logger.error(f"{query} reported error {splendid_proc.returncode}")    
-            errorFile = f"{Path(stats).parent}/error.txt"
-            if os.path.exists(errorFile):
-                with open(errorFile, "r") as f:
-                    reason = f.read()
-                    create_stats(stats, reason)
-            else:
-                create_stats(stats, "error_runtime")
+            logger.error(f"{query} yield no results!")
+            failed_reason = "error_runtime"
+    
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
         if (container_status := check_container_status(compose_file, service_name, container_name)) != "running":
             logger.debug(container_status)
             raise RuntimeError("Backend is terminated!")
         logger.info("Writing empty stats...")
-        create_stats(stats, "timeout") 
+        failed_reason = "timeout"
     finally:
         os.system('pkill -9 -f "de.uni_koblenz.west.splendid.SPLENDID"')
         #kill_process(splendid_proc.pid)
+        
+        if stats != "/dev/null":            
+            # Write proxy stats
+            proxy_stats = json.loads(requests.get(proxy_server + "get-stats").text)
+            
+            with open(f"{Path(stats).parent}/http_req.txt", "w") as http_req_fs:
+                http_req = proxy_stats["NB_HTTP_REQ"]
+                http_req_fs.write(str(http_req))
+                
+            with open(f"{Path(stats).parent}/ask.txt", "w") as http_ask_fs:
+                http_ask = proxy_stats["NB_ASK"]
+                http_ask_fs.write(str(http_ask))
+                
+            with open(f"{Path(stats).parent}/data_transfer.txt", "w") as data_transfer_fs:
+                data_transfer = proxy_stats["DATA_TRANSFER"]
+                data_transfer_fs.write(str(data_transfer))
+        
+            logger.info(f"Writing stats to {stats}")
+            create_stats(stats, failed_reason) 
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))

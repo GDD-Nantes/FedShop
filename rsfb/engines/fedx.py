@@ -7,6 +7,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import requests
 from sklearn.preprocessing import LabelEncoder
 
 import sys
@@ -47,6 +48,12 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
     jar = os.path.join(app, "FedX-1.0-SNAPSHOT.jar")
     lib = os.path.join(app, "lib/*")
     timeout = int(config["evaluation"]["timeout"])
+    
+    proxy_server = config["evaluation"]["proxy"]["endpoint"]
+    
+    # Reset the proxy stats
+    if requests.get(proxy_server + "reset").status_code != 200:
+        raise RuntimeError("Could not reset statistics on proxy!")
 
     args = [engine_config, query, out_result, out_source_selection, query_plan, str(timeout), str(noexec).lower(), force_source_selection]
     args = " ".join(args)
@@ -59,25 +66,40 @@ def exec_fedx(eval_config, engine_config, query, out_result, out_source_selectio
     logger.debug("============")
     
     fedx_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    failed_reason = None
     try:        
         fedx_proc.wait(timeout)
         if fedx_proc.returncode == 0:
             logger.info(f"{query} benchmarked sucessfully")
-
-            def report_error(reason):
-                logger.error(f"{query} yield no results!")
-                raise RuntimeError(f"{query} yield no results!")
-            create_stats(stats)
         else:
             logger.error(f"{query} reported error")    
             if not os.path.exists(stats):
-                create_stats(stats, "error_runtime")                  
+                failed_reason = "error_runtime"
     except subprocess.TimeoutExpired: 
         logger.exception(f"{query} timed out!")
-        create_stats(stats, "timeout")            
+        failed_reason = "timeout"
     finally:
         os.system('pkill -9 -f "FedX-1.0-SNAPSHOT.jar"')
         #kill_process(fedx_proc.pid)
+        # Write stats
+        if stats != "/dev/null":            
+            # Write proxy stats
+            proxy_stats = json.loads(requests.get(proxy_server + "get-stats").text)
+            
+            with open(f"{Path(stats).parent}/http_req.txt", "w") as http_req_fs:
+                http_req = proxy_stats["NB_HTTP_REQ"]
+                http_req_fs.write(str(http_req))
+                
+            with open(f"{Path(stats).parent}/ask.txt", "w") as http_ask_fs:
+                http_ask = proxy_stats["NB_ASK"]
+                http_ask_fs.write(str(http_ask))
+                
+            with open(f"{Path(stats).parent}/data_transfer.txt", "w") as data_transfer_fs:
+                data_transfer = proxy_stats["DATA_TRANSFER"]
+                data_transfer_fs.write(str(data_transfer))
+        
+            logger.info(f"Writing stats to {stats}")
+            create_stats(stats, failed_reason)
 
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
