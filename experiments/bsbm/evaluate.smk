@@ -67,20 +67,23 @@ LOGGER = rsfb_logger(Path(__file__).name)
 def activate_one_container(batch_id):
     """ Activate one container while stopping all others
     """
+
     LOGGER.info("Activating Virtuoso docker container...")
     is_virtuoso_restarted = utils_activate_one_container(batch_id, SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, LOGGER, f"{BENCH_DIR}/virtuoso-ok.txt")
-    if is_virtuoso_restarted:
-        shell(f"python rsfb/engines/ideal.py warmup {CONFIGFILE}")
 
     LOGGER.info("Activating proxy docker container...")
     proxy_target = CONFIG_GEN["virtuoso"]["endpoints"][-1]
     proxy_target = proxy_target.replace("/sparql", "/")
-    if ping(PROXY_SPARQL_ENDPOINT) != 200:
+    if ping(PROXY_SPARQL_ENDPOINT) == -1:
         LOGGER.info("Starting proxy server...")
         shell(f"docker-compose -f {PROXY_COMPOSE_FILE} up -d {PROXY_SERVICE_NAME}")
+        
+    if ping(PROXY_SPARQL_ENDPOINT) != 200:
+        shell(f'curl -X GET {PROXY_SERVER + "set-destination"}?proxyTo={proxy_target}')
         wait_for_container(PROXY_SPARQL_ENDPOINT, "/dev/null", logger , wait=1)
 
-    shell(f'curl -X GET {PROXY_SERVER + "set-destination"}?proxyTo={proxy_target}')
+    if is_virtuoso_restarted:
+        shell(f"python rsfb/engines/ideal.py warmup {CONFIGFILE}")
 
 def generate_federation_declaration(federation_declaration_file, engine, batch_id):
     #sparql_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])

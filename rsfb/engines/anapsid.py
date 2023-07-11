@@ -348,6 +348,7 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     endpoints=f"{Path(outfile).parent}/endpoints.txt"
     
     if not Path(endpoints).exists():
+        Path.mkdir(Path(endpoints).parent, parents=True, exist_ok=True)
         for data_file in datafiles:
             with open(data_file, "r") as file, open(endpoints, "w") as efs:
                 t_file = file.readlines()
