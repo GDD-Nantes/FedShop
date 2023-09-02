@@ -270,7 +270,13 @@ def __get_publisher_info(x):
         .astype(int).item()
 
 def get_docker_endpoints(compose_file, service_name):
-    json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
+    cmd = f"docker-compose -f {compose_file} ps --all --format json {service_name}"
+    proc = subprocess.run(cmd, capture_output=True, shell=True)
+
+    if proc.returncode != 0:
+        raise RuntimeError(f"{cmd} return code {proc.returncode}!")
+
+    json_bytes = proc.stdout
     with BytesIO(json_bytes) as json_bs:
         infos = pd.read_json(json_bs)
         infos["containerId"] = infos["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
