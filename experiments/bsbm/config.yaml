@@ -97,26 +97,30 @@ evaluation:
     endpoint: "http://localhost:5555/"
     container_name: "docker-fedshop-proxy-1"
   engines:
-    # fedx:
-    #   dir: "engines/FedX/target"
-    # costfed:
-    #   dir: "engines/CostFed"
-    # splendid:
-    #   dir: "engines/SPLENDID"
-    # colchain:
-    #   dir: "engines/ColChain-Java"
-    fedup:
+    fedx:
+      dir: "engines/FedX/target"
+    costfed:
+      dir: "engines/CostFed"
+    splendid:
+      dir: "engines/SPLENDID"
+    fedup_h0:
       dir: "engines/FedUP-experiments"
       conda_env: "fedupxp"
-    # semagrow:
-    #   dir: "engines/semagrow/semagrow"
-    #   summary_generator_dir: "engines/semagrow/sevod-scraper"
-    # anapsid:
-    #   dir: "engines/ANAPSID"
-    # ideal:
-    #  dir: "engines/ARQ"
-    #  internal_endpoint_prefix: "http://localhost:8890/sparql/?default-graph-uri="
-    #  compose_file: "${generation.workdir}/docker/jena.yml"
-    #  service_name: "jena-fuseki"
-    #  endpoint: "http://localhost:3030/FedShop/query"
-    #  container_name: "docker-jena-fuseki-1"
+    fedup_id:
+      dir: "engines/FedUP-experiments"
+      conda_env: "fedupxp"
+    fedup_id_optimal:
+      dir: "engines/FedUP-experiments"
+      conda_env: "fedupxp"
+    semagrow:
+      dir: "engines/semagrow/semagrow"
+      summary_generator_dir: "engines/semagrow/sevod-scraper"
+    anapsid:
+      dir: "engines/ANAPSID"
+    ideal:
+     dir: "engines/ARQ"
+     internal_endpoint_prefix: "http://localhost:8890/sparql/?default-graph-uri="
+     compose_file: "${generation.workdir}/docker/jena.yml"
+     service_name: "jena-fuseki"
+     endpoint: "http://localhost:3030/FedShop/query"
+     container_name: "docker-jena-fuseki-1"

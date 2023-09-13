@@ -48,7 +48,7 @@ def prerequisites(ctx: click.Context, eval_config):
         eval_config (_type_): _description_
     """
     config = load_config(eval_config)
-    app_dir = config["evaluation"]["engines"]["fedup"]["dir"]
+    app_dir = config["evaluation"]["engines"]["fedup_h0"]["dir"]
     
     os.chdir(app_dir)
     
@@ -75,8 +75,9 @@ def prerequisites(ctx: click.Context, eval_config):
 @click.option("--force-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
 @click.option("--batch-id", type=click.INT, default=-1)
 @click.option("--noexec", is_flag=True, default=False)
+@click.option("--approach", type=click.Choice(["h0", "id", "id-optimal"]), default="h0")
 @click.pass_context
-def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id, noexec):
+def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id, noexec, approach):
     """Execute the workload instance then its associated source selection query.
     
     Expected output:
@@ -99,7 +100,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     
     config = load_config(eval_config)
     proxy_server = config["evaluation"]["proxy"]["endpoint"]
-    app_dir = config["evaluation"]["engines"]["fedup"]["dir"]
+    app_dir = config["evaluation"]["engines"]["fedup_h0"]["dir"]
 
     olddir = Path(os.getcwd()).absolute()
     
@@ -120,13 +121,16 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     failed_reason = None
     
     query_name = re.search(r"(q\d+)", query).group(1)
-    output_file = f"output/fedshop/fedup-h0/{query_name}.1.csv"
+    output_file = f"output/fedshop/fedup-{approach}/{query_name}.1.csv"
 
     elapsed_time = None
 
     try:        
         # Pre-process queries (malformed queries error, etc...)
-        with open(query, "r") as in_qfs, open(app_dir + f"/queries/fedshop/{query_name}.sparql", "w") as out_qfs:
+        query_file = app_dir + f"/queries/fedshop/{query_name}.sparql"
+        shutil.rmtree(Path(query_file).parent, ignore_errors=True)
+        Path(query_file).parent.mkdir(parents=True, exist_ok=True)
+        with open(query, "r") as in_qfs, open(query_file, "w") as out_qfs:
             query_lines = in_qfs.readlines()
             for line in query_lines:         
                 # Remove all comments
@@ -141,7 +145,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         os.chdir(app_dir)
         
         # Clean run Snakemake
-        cmd = f"rm -rf .snakemake/ output/ && {snakemake_bin} -C virtuoso_port={virtuoso_port} -C timeout={timeout} -c1 {output_file}"
+        cmd = f'rm -rf .snakemake/ output/ && {snakemake_bin} -C virtuoso_port={virtuoso_port} workload="[fedshop]" approach="[fedup-{approach}]" timeout={timeout} -c1'
         logger.debug(cmd)        
         
         start_time = time.time()
@@ -208,7 +212,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
             exec_time_file = "../../" + str(Path(out_result).parent) + "/exec_time.txt"
             with open(exec_time_file, "w") as exec_time_file_fs:
-                exec_time_file_fs.write(str(exec_time))
+                exec_time_file_fs.write(str(exec_time + source_selection_time))
                 
         elif status == "TIMEOUT":  
             
@@ -224,7 +228,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 
             
         elif status == "ERROR":
-            # raise RuntimeError("Something went wrong while running benchmark!")
+            raise RuntimeError("Something went wrong while running benchmark!")
             failed_reason = "error"  
             Path("../../" + out_result).touch()
             Path("../../" + out_source_selection).touch()
@@ -299,7 +303,7 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     """
     
     config = load_config(eval_config)
-    app_dir = config["evaluation"]["engines"]["fedup"]["dir"]
+    app_dir = config["evaluation"]["engines"]["fedup_h0"]["dir"]
     
     olddir = Path(os.getcwd()).absolute()
     os.chdir(app_dir)
