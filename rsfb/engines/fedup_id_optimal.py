@@ -49,7 +49,7 @@ def prerequisites(ctx: click.Context, eval_config):
         eval_config (_type_): _description_
     """
     
-    ctx.invoke(fedup_h0.prerequisites, eval_config)
+    ctx.invoke(fedup_h0.prerequisites, eval_config=eval_config)
 
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
@@ -62,7 +62,7 @@ def prerequisites(ctx: click.Context, eval_config):
 @click.option("--force-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True), default="")
 @click.option("--batch-id", type=click.INT, default=-1)
 @click.option("--noexec", is_flag=True, default=False)
-@click.option("--approach", type=click.Choice(["h0", "id", "id-optimal"]), default=False)
+@click.option("--approach", type=click.Choice(["h0", "id", "id-optimal"]), default="h0")
 @click.pass_context
 def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id, noexec, approach):
     """Execute the workload instance then its associated source selection query.
@@ -85,7 +85,12 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         batch_id (_type_): _description_
     """
     
-    ctx.invoke(fedup_h0.run_benchmark, eval_config, engine_config, query, out_result, out_source_selection, query_plan, stats, force_source_selection, batch_id, noexec, approach="id-optimal")
+    ctx.invoke(
+        fedup_h0.run_benchmark, eval_config=eval_config, engine_config=engine_config, 
+        query=query, out_result=out_result, out_source_selection=out_source_selection, 
+        query_plan=query_plan, stats=stats, force_source_selection=force_source_selection, 
+        batch_id=batch_id, noexec=noexec, approach="id-optimal"
+    )    
         
 
 @cli.command()
@@ -135,7 +140,10 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
         endpoint (_type_): _description_
     """
     
-    ctx.invoke(fedup_h0.generate_config_file, datafiles, outfile, eval_config, batch_id, endpoint)
+    ctx.invoke(
+        fedup_h0.generate_config_file, datafiles=datafiles, outfile=outfile, 
+        eval_config=eval_config, batch_id=batch_id, endpoint=endpoint
+    )
     
 if __name__ == "__main__":
     cli()

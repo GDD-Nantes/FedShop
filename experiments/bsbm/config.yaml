@@ -103,15 +103,6 @@ evaluation:
       dir: "engines/CostFed"
     splendid:
       dir: "engines/SPLENDID"
-    fedup_h0:
-      dir: "engines/FedUP-experiments"
-      conda_env: "fedupxp"
-    fedup_id:
-      dir: "engines/FedUP-experiments"
-      conda_env: "fedupxp"
-    fedup_id_optimal:
-      dir: "engines/FedUP-experiments"
-      conda_env: "fedupxp"
     semagrow:
       dir: "engines/semagrow/semagrow"
       summary_generator_dir: "engines/semagrow/sevod-scraper"

@@ -98,6 +98,11 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         batch_id (_type_): _description_
     """
     
+    if noexec: 
+        Path(out_result).touch()
+        Path(out_source_selection).touch()
+        return
+    
     config = load_config(eval_config)
     proxy_server = config["evaluation"]["proxy"]["endpoint"]
     app_dir = config["evaluation"]["engines"]["fedup_h0"]["dir"]
