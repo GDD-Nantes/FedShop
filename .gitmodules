@@ -36,7 +36,7 @@
 	path = engines/FedUP-experiments
 	url = https://github.com/GDD-Nantes/FedUP-experiments.git
 	branch = main
-[submodule "engiMULDER"]
+[submodule "engines/MULDER"]
 	path = engines/MULDER
 	url = https://github.com/mhoangvslev/MULDER.git
 	branch = master
