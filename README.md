@@ -1,30 +1,26 @@
 # FedShop: The Federated Shop Benchmark
 
-FedShop is a synthetic RDF Federated Benchmark designed for scalability. It evaluates the performance of SPARQL federated-query engines such as [FedX](https://rdf4j.org/documentation/programming/federation/), [CostFed](https://github.com/dice-group/CostFed), [Semagrow](https://semagrow.github.io/), Splendid, [HeFQUIN](https://github.com/LiUSemWeb/HeFQUIN), etc, when the number of federation members grows. FedShop is built around an e-commerce scenario with online hops and rating Web sites as in [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/). Compared to  BSBM, each shop and rating site of FedShop has its own SPARQL endpoint and shares a standard catalog of products. Following the BSBM idea, the FedShop queries simulate a user navigating the federation of shops as if it was a single virtual shop. The scale factor corresponds to the number of shops and rating sites within the federation. Hence, with the FedShop benchmark, we can observe the performance of federated queries when the number of federation members increases.
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7919872.svg)](https://doi.org/10.5281/zenodo.7919872)
+
+FedShop is a synthetic RDF Federated Benchmark designed for scalability. It evaluates the performance of SPARQL federated-query engines such as [FedX](https://rdf4j.org/documentation/programming/federation/), [CostFed](https://github.com/dice-group/CostFed), [Semagrow](https://semagrow.github.io/), Splendid, [HeFQUIN](https://github.com/LiUSemWeb/HeFQUIN), etc, when the number of federation members grows. FedShop is built around an e-commerce scenario with online hops and rating Web sites as in [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/). Compared to  BSBM, each shop and rating site of FedShop has its own SPARQL endpoint and shares a standard catalogue of products. Following the BSBM idea, the FedShop queries simulate a user navigating the federation of shops as if it were a single virtual shop. The scale factor corresponds to the number of shops and rating sites within the federation. Hence, with the FedShop benchmark, we can observe the performance of federated queries when the number of federation members increases.
 
 FedShop consists of three components: 
 - **the FedShop data generator** to generate data,
-- **the FedShop query generator** to instantiate template queries, along with a Reference Source Assignment (RSA) queries ie. fedshop queries expressed as SPARQL 1.1 queries with service clauses,
+- **the FedShop query generator** to instantiate template queries, along with a Reference Source Assignment (RSA) queries ie. FedShop queries expressed as SPARQL 1.1 queries with service clauses,
 - **the FedShop runner** to evaluate federated-query engines with FedShop queries on FedShop data.
 
 ## QuickStart and Documentation
 
 - The quickstart guide is available in the [Quickstart tutorial](https://github.com/GDD-Nantes/FedShop/wiki/1.-Quick-start)
-- How to configure fedshop and how to extend fedshop is available in the [wiki](https://github.com/GDD-Nantes/FedShop/wiki)
+- How to configure FedShop and how to extend FedShop is available in the [wiki](https://github.com/GDD-Nantes/FedShop/wiki)
 
 
 
 
 ## FedShop200 Datasets and Queries
 
-**FedShop200** is a basic set of datasets and queries generated with FedShop. It contains 120 SPARQL queries and datasets to populate a federation up to 200 endpoints. It is available at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7919872.svg)](https://doi.org/10.5281/zenodo.7919872) and [![Google Drive](https://img.shields.io/badge/Google%20Drive-4285F4?style=for-the-badge&logo=googledrive&logoColor=white)](https://drive.google.com/drive/folders/1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ). 
+**FedShop200** is a basic set of datasets and queries generated with FedShop. It contains 120 SPARQL queries and datasets to populate a federation of up to 200 endpoints. It is available at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7919872.svg)](https://doi.org/10.5281/zenodo.7919872).
 
-The following command allows downloading the archive (1.6GB) from Google Drive:
-
-```bash
-# !pip install --quiet gdown==4.5.4 --no-cache-dir
-gdown 1vi7iElN25Pmtciy5y7iccx5T1P9bNMXJ -O fedshop.zip # large dataset
-```
 Instead of downloading the complete archive, you can also download only individual parts of FedShop:
 * `fedshop-dataset.zip`: All the quads for the 200 federation members.
 * `fedshop-virtuoso.db`: The final Virtuoso database with all 200 federation members.
@@ -38,7 +34,7 @@ A first evaluation of existing SPARQL Federation engines on **FedShop200** compu
 
 ## FedShop Data Generator
 
-The FedShop Data Generator is defined as three  [WatDiv](https://dsg.uwaterloo.ca/watdiv/) template models in [experiments/bsbm/model](experiments/bsbm/model/). These models follow the [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/) specification as closely as possible. Using WatDiv models allows to changing the schema easily through the configuration file [`experiments/bsbm/config.yaml`](experiments/bsbm/config.yaml).
+The FedShop Data Generator is defined as three  [WatDiv](https://dsg.uwaterloo.ca/watdiv/) template models in [experiments/bsbm/model](experiments/bsbm/model/). These models follow the [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/) specification as closely as possible. Using WatDiv models allows changing the schema easily through the configuration file [`experiments/bsbm/config.yaml`](experiments/bsbm/config.yaml).
 
 Most of the parameters of FedShop are set in [`experiments/bsbm/config.yaml`](experiments/bsbm/config.yaml). It includes the number of products to generate, the number of vendors and rating sites. 
 
