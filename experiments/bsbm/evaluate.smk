@@ -77,10 +77,11 @@ def activate_one_container(batch_id):
     if ping(PROXY_SPARQL_ENDPOINT) == -1:
         LOGGER.info("Starting proxy server...")
         shell(f"docker-compose -f {PROXY_COMPOSE_FILE} up -d {PROXY_SERVICE_NAME}")
-        
-    if ping(PROXY_SPARQL_ENDPOINT) != 200:
-        shell(f'curl -X GET {PROXY_SERVER + "set-destination"}?proxyTo={proxy_target}')
-        wait_for_container(PROXY_SPARQL_ENDPOINT, "/dev/null", logger , wait=1)
+    
+    while ping(PROXY_SPARQL_ENDPOINT) != 200:
+        os.system(f'curl -X GET {PROXY_SERVER + "set-destination"}?proxyTo={proxy_target}')
+        time.sleep(1)
+        #wait_for_container(PROXY_SPARQL_ENDPOINT, "/dev/null", logger , wait=1)
 
     if is_virtuoso_restarted:
         shell(f"python rsfb/engines/ideal.py warmup {CONFIGFILE}")

@@ -210,6 +210,11 @@ rule compute_metrics:
             "{{benchDir}}/{query}/instance_{instance_id}/batch_{{batch_id}}/provenance.csv",
             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
             instance_id=range(N_QUERY_INSTANCES)
+        ),
+        expand(
+            "{{benchDir}}/{query}/instance_{instance_id}/batch_{{batch_id}}/results.csv",
+            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
+            instance_id=range(N_QUERY_INSTANCES)
         )
     output: "{benchDir}/metrics_batch{batch_id}.csv"
     shell: "python rsfb/metrics.py compute-metrics {CONFIGFILE} {output} {input}"
@@ -278,7 +283,6 @@ rule execute_provenance_query:
     input: 
         provenance_query="{benchDir}/{query}/instance_{instance_id}/provenance.sparql",
         loaded_virtuoso="{benchDir}/virtuoso_batch{batch_id}-ok.txt",
-        results="{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/results.csv"
     output: 
         default_source_selection="{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv",
         opt_source_selection="{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.opt.csv"
