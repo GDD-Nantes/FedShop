@@ -705,7 +705,8 @@ def instanciate_workload(ctx: click.Context, configfile, queryfile, value_select
         query = re.sub(r"(DEFINE)", r"##\1", query)
         
         # Restore FILTER/LIMIT/ORDER...
-        query = re.sub(r"(#)*(LIMIT|FILTER|ORDER)", r"\2", query)
+        # query = re.sub(r"(#)*(LIMIT|FILTER|ORDER)", r"\2", query)
+        query = re.sub(r"(#)*(FILTER|ORDER)", r"\2", query)
         
         write_query(query, next_queryfile)
 

@@ -85,12 +85,31 @@ def warmup(ctx: click.Context, eval_config, engine_config, repeat, batch_id):
             for _ in range(repeat):
                 ctx.invoke(run_benchmark, eval_config=eval_config, engine_config=engine_config, query=query, force_source_selection=force_source_selection, batch_id=batch_id)
 
-def __create_service_query(config, query, query_plan, force_source_selection):
+@cli.command()
+@click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.argument("query", type=click.Path(exists=False, file_okay=True, dir_okay=True)) # Engine config is not needed
+@click.argument("query-plan", type=click.Path(exists=False, file_okay=True, dir_okay=True))
+@click.argument("force-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True))
+@click.pass_context
+def create_service_query(ctx: click.Context, eval_config, query, query_plan, force_source_selection):
+    """Create a SERVICE query that will be sent to Jena
+
+    Args:
+        eval_config (_type_): _description_
+        query (_type_): _description_
+        query_plan (_type_): _description_
+        force_source_selection (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     opt_source_selection_file = f"{Path(force_source_selection).parent}/{Path(force_source_selection).stem}.opt.csv"
     source_selection_df = pd.read_csv(opt_source_selection_file)
     
-    internal_endpoint_prefix=str(config["evaluation"]["engines"]["ideal"]["internal_endpoint_prefix"])
-    proxy_server = config["evaluation"]["proxy"]["endpoint"]
+    eval_config = load_config(eval_config)
+    
+    internal_endpoint_prefix=str(eval_config["evaluation"]["engines"]["ideal"]["internal_endpoint_prefix"])
+    proxy_server = eval_config["evaluation"]["proxy"]["endpoint"]
     port = re.search(r":(\d+)", proxy_server).group(1)
     
     internal_endpoint_prefix=internal_endpoint_prefix.replace("localhost", "host.docker.internal")
@@ -192,14 +211,15 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 
     # In case there is only one source for all triple patterns, send the original query to Virtuoso.
     # In such case, it doesn't make sense to send a federated version of the query, i.e, with SERVICE clause.
-    if len(force_source_selection_df) == 1 and force_source_selection_df.iloc[0, :].nunique() == 1 : 
-        default_graph = force_source_selection_df.iloc[0, :].unique().item()
-        with open(query, "r") as qfs:
-            query_text = qfs.read()
-            response, result = exec_query_on_endpoint(query_text, proxy_sparql_endpoint, error_when_timeout=True, timeout=timeout, default_graph=default_graph)
-    else:
-        out_query_text = __create_service_query(config, query, query_plan, force_source_selection)
-        response, result = exec_query_on_endpoint(out_query_text, endpoint, error_when_timeout=True, timeout=timeout)
+    
+    # if len(force_source_selection_df) == 1 and force_source_selection_df.iloc[0, :].nunique() == 1 : 
+    #     default_graph = force_source_selection_df.iloc[0, :].unique().item()
+    #     with open(query, "r") as qfs:
+    #         query_text = qfs.read()
+    #         response, result = exec_query_on_endpoint(query_text, proxy_sparql_endpoint, error_when_timeout=True, timeout=timeout, default_graph=default_graph)
+    # else:
+    out_query_text = ctx.invoke(create_service_query, eval_config=eval_config, query=query, query_plan=query_plan, force_source_selection=force_source_selection)
+    response, result = exec_query_on_endpoint(out_query_text, endpoint, error_when_timeout=True, timeout=timeout)
         
     endTime = time.time()
     exec_time = (endTime - startTime)*1e3
