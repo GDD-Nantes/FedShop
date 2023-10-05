@@ -101,6 +101,7 @@ def load_model(modelfile, experiment_dir, clean):
 
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
+@click.option("--config", type=click.STRING, default=None)
 @click.option("--debug", is_flag=True, default=False)
 @click.option("--clean", type=click.STRING, help="[all, model, benchmark] + db")
 @click.option("--cores", type=click.INT, default=1, help="The number of cores used allocated. -1 if use all cores.")
@@ -109,15 +110,29 @@ def load_model(modelfile, experiment_dir, clean):
 @click.option("--no-cache", is_flag=True, default=False)
 @click.option("--noexec", is_flag=True, default=False)
 @click.pass_context
-def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomplete, touch, no_cache, noexec):
+def evaluate(ctx: click.Context, configfile, config, debug, clean, cores, rerun_incomplete, touch, no_cache, noexec):
 
+    config = config.strip()
     CONFIG = load_config(configfile)
     GEN_CONFIG = CONFIG["generation"]
     WORK_DIR = GEN_CONFIG["workdir"]
+    BENCH_DIR = f"{WORK_DIR}/benchmark/evaluation"
 
     EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate.smk"
-    #EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate_costfed_no_exec.smk"
+    SNAKEMAKE_CONFIGS = f"configfile={configfile} "
+    SINGLE_QUERY_MODE = False
+    SNAKEMAKE_CONFIG_MATCHER = None
     
+    if config is not None:
+        SNAKEMAKE_CONFIG_MATCHER = re.match(r"(\w+\=\w+(\s+)?)+", config)
+        if SNAKEMAKE_CONFIG_MATCHER is None:
+            raise RuntimeError(f"Syntax error: config option should be 'name1=value1 name2=value2'")
+    
+        SNAKEMAKE_CONFIGS += config
+        if "query" in config:
+            SINGLE_QUERY_MODE = True
+            EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate_one.smk"
+        
     if noexec:
         EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate_noexec.smk"
     
@@ -127,7 +142,7 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
     os.makedirs(name=WORKFLOW_DIR, exist_ok=True)
 
     if cores == -1: cores = "all"
-    SNAKEMAKE_OPTS = f"-p --cores {cores} --config configfile={configfile}"
+    SNAKEMAKE_OPTS = f"-p --cores {cores} --config {SNAKEMAKE_CONFIGS}"
     if rerun_incomplete: SNAKEMAKE_OPTS += " --rerun-incomplete"
     
     if no_cache:
@@ -141,21 +156,22 @@ def evaluate(ctx: click.Context, configfile, debug, clean, cores, rerun_incomple
     # if in evaluate mode
     if clean is not None :
         logger.info("Cleaning...")
-        if clean == "all":
-            shutil.rmtree(f"{WORK_DIR}/benchmark/evaluation", ignore_errors=True)
-        elif clean == "metrics":
-            os.system(f"rm {WORK_DIR}/benchmark/evaluation/*.csv")
-    
-    for batch in range(1, N_BATCH+1):
-        if debug:
-            logger.info("Producing rulegraph...")
-            RULEGRAPH_FILE = f"{WORKFLOW_DIR}/rulegraph_generate_batch{batch}"
-            if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --debug-dag --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
-            if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --rulegraph > {RULEGRAPH_FILE}.dot") != 0 : exit(1)
-            if os.system(f"dot -Tpng {RULEGRAPH_FILE}.dot > {RULEGRAPH_FILE}.png") != 0 : exit(1)
+        if SINGLE_QUERY_MODE:
+            config_dict = {}
+            for c in config.split():
+                k, v = c.split("=")
+                config_dict[k] = v
+            
+            shutil.rmtree(f"{BENCH_DIR}/{config_dict['engine']}/{config_dict['query']}/instance_{config_dict['instance']}/batch_{config_dict['batch']}/test/", ignore_errors=True)
         else:
-            logger.info(f"Producing metrics for batch {batch}/{N_BATCH}...")
-            if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
+            if clean == "all":
+                shutil.rmtree(f"{WORK_DIR}/benchmark/evaluation", ignore_errors=True)
+            elif clean == "metrics":
+                os.system(f"rm {WORK_DIR}/benchmark/evaluation/*.csv")
+    
+    cmd = f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE}"
+    logger.info(cmd)
+    if os.system(cmd) != 0 : exit(1)
             
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))

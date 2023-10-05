@@ -199,6 +199,8 @@ def transform_provenance(infile, outfile, prefix_cache):
     
     in_df = pd.read_csv(infile)
     
+    print(in_df)
+    
     with open(prefix_cache, "r") as prefix_cache_fs, open(os.path.join(Path(prefix_cache).parent, "provenance.sparql.comp"), "r") as comp_fs:
         prefix2alias = json.load(prefix_cache_fs)    
         composition = json.load(comp_fs)

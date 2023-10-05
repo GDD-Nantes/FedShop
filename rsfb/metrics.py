@@ -107,12 +107,12 @@ def compute_metrics(configfile, outfile, workload):
     records = []        
     for provenance_file in tqdm(workload):
         with open(provenance_file, "r") as ss_fs:
-            name_search = re.search(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/(attempt_(\d+)/)?provenance.csv", provenance_file)
+            name_search = re.search(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/((attempt_(\d+)|test)/)?provenance.csv", provenance_file)
             engine = name_search.group(1)
             query = name_search.group(2)
             instance = int(name_search.group(3))
             batch = int(name_search.group(4))
-            attempt = name_search.group(6)
+            attempt = name_search.group(7)
             total_nb_sources = vendor_edges[batch] + ratingsite_edges[batch]
             results_file = f"{Path(provenance_file).parent}/results.csv"
             

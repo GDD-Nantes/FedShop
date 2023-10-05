@@ -367,12 +367,12 @@ def write_empty_stats(outfile, reason):
     with open(outfile, "w") as fout:
         fout.write("query,engine,instance,batch,attempt,exec_time,ask,source_selection_time,planning_time\n")
         if outfile != "/dev/null":
-            basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", outfile)
+            basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/(attempt_(\d+)|test)/stats.csv", outfile)
             engine = basicInfos.group(1)
             queryName = basicInfos.group(2)
             instance = basicInfos.group(3)
             batch = basicInfos.group(4)
-            attempt = basicInfos.group(5)
+            attempt = basicInfos.group(6)
             fout.write(",".join([queryName, engine, instance, batch, attempt, reason, reason, reason, reason])+"\n")
             
 def create_stats(statsfile, failed_reason=None):
@@ -381,13 +381,14 @@ def create_stats(statsfile, failed_reason=None):
     
     baseDir = Path(statsfile).parent
     
-    basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/attempt_(\d+)/stats.csv", statsfile)
+    print(statsfile)
+    basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/(attempt_(\d+)|test)/stats.csv", statsfile)
     result = {
         "engine": basicInfos.group(1),
         "query": basicInfos.group(2),
         "instance": basicInfos.group(3),
         "batch": basicInfos.group(4),
-        "attempt": basicInfos.group(5)
+        "attempt": basicInfos.group(6)
     }
     
     metrics = {

@@ -183,23 +183,26 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             source_assignments_str = str(output["assignments"].item()).replace("'", '"').replace("\\n", "")
             source_assignments_in = json.loads(source_assignments_str)
             tpAliases = json.loads(str(output["tpAliases"].item()).replace("'", '"').replace("\\n", ""))
-            
-            source_assignments_out = {}
+
+            prefix_cache = os.path.join("../../", Path(query).parent, "prefix_cache.json")
+            comp = json.load(open(os.path.join(Path(prefix_cache).parent, "provenance.sparql.comp"), "r"))
+            prefix2alias = json.load(open(prefix_cache, "r"))
+
+            inv_comp = {f"{' '.join(v)}": k for k, v in comp.items()}
+            records = []
+                        
             for sa in source_assignments_in:
+                record = {}
                 for tp, source in sa.items():
                     alias = tpAliases[tp]
+                    triple = extract_triple(alias, prefix2alias)
+                    record[inv_comp.get(triple)] = source
                     source = re.sub(r"http://(www\.\w+\.fr)/", r"\1", source)
-                    source = f"StatementSource (id=sparql_{source}_, type=REMOTE)"
-                    if source_assignments_out.get(alias) is None:
-                        source_assignments_out[alias] = []
                     
-                    if source not in source_assignments_out[alias]:
-                        source_assignments_out[alias].append(source)
-            
-            source_assignments_out = {k: str(v) for k, v in source_assignments_out.items()}
-            source_assignments_df = pd.DataFrame.from_dict(source_assignments_out, orient="index").reset_index()
-            source_assignments_df.columns = ["triple", "source_selection"]
-            
+                records.append(record)
+                
+            source_assignments_df = pd.DataFrame.from_records(records)
+            source_assignments_df = source_assignments_df.reindex(sorted(source_assignments_df.columns, key=lambda x: int(x[2:])), axis=1)
             source_assignments_df.to_csv("../../" + out_source_selection, index=False)
             
             # Write results
@@ -207,7 +210,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             solutions = json.loads(solutions_str)
             #pd.DataFrame(solutions).to_csv("../../" + out_result, header=False, index=False)
             with open("../../" + out_result, "w") as out_result_fs:
-                out_result_fs.write("\n".join(set(solutions)))
+                out_result_fs.write("\n".join(solutions))
                 
             # Write metrics
             source_selection_time = output["sourceSelectionTime"].item()
@@ -228,8 +231,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
             failed_reason = "timeout"
             
-            Path("../../" + out_result).touch()
-            Path("../../" + out_source_selection).touch()
+            # Path("../../" + out_result).touch()
+            # Path("../../" + out_source_selection).touch()
 
             
         elif status == "ERROR":
@@ -237,6 +240,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             failed_reason = "error"  
             Path("../../" + out_result).touch()
             Path("../../" + out_source_selection).touch()
+        
+        # if os.system("lsof -t -i :8080 -sTCP:LISTEN | xargs -r kill -9") != 0:
+        #     raise RuntimeError("Could not kill FedUP after execution!")
         
         # Write stats
         os.chdir(olddir)
@@ -258,7 +264,32 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         
             logger.info(f"Writing stats to {stats}")
             create_stats(stats, failed_reason)
+
+def extract_triple(x, prefix2alias):
+    fedx_pattern = r"StatementPattern\s+(\(new scope\)\s+)?Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)"
+    match = re.match(fedx_pattern, x)
         
+    s = match.group(3)
+    if s is None: s = f"?{match.group(4)}"
+        
+    p = match.group(6)
+    if p is None: p = f"?{match.group(7)}"
+        
+    o = match.group(9) 
+    if o is None: o = f"?{match.group(10)}"
+        
+    result = " ".join([s, p, o])
+                
+    for prefix, alias in prefix2alias.items():
+        result = result.replace(prefix, f"{alias}:")
+            
+    if s.startswith("http"):
+        result = result.replace(s, str2n3(s))
+            
+    if o.startswith("http"):
+        result = result.replace(o, str2n3(o))
+        
+    return result 
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
@@ -288,7 +319,8 @@ def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
         outfile (_type_): _description_
         prefix_cache (_type_): _description_
     """
-    ctx.invoke(fedx.transform_provenance, infile=infile, outfile=outfile, prefix_cache=prefix_cache)
+    #ctx.invoke(fedx.transform_provenance, infile=infile, outfile=outfile, prefix_cache=prefix_cache)
+    shutil.copyfile(infile, outfile)
 
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
@@ -363,17 +395,17 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
         
     # Update the relevant configfiles
     fedup_h0_props = open("config/fedshop/fedup-h0.props").read()
-    fedup_h0_props = re.sub(r"fedup\.summary=\.\./summaries/fedshop/batch\d+/fedup-h0", f"fedup.summary=../summaries/fedshop/batch{batch_id}/fedup-h0", fedup_h0_props)
+    fedup_h0_props = re.sub(r"batch\d+", f"batch{batch_id}", fedup_h0_props)
     with open("config/fedshop/fedup-h0.props", "w") as h0fs:
         h0fs.write(fedup_h0_props)
     
     fedup_id_props = open("config/fedshop/fedup-id.props").read()
-    fedup_id_props = re.sub(r"fedup\.summary=\.\./summaries/fedshop/batch\d+/fedup-id", f"fedup.summary=../summaries/fedshop/batch{batch_id}/fedup-id", fedup_id_props)
+    fedup_id_props = re.sub(r"batch\d+", f"batch{batch_id}", fedup_id_props)
     with open("config/fedshop/fedup-id.props", "w") as idfs:
         idfs.write(fedup_id_props)
         
     fedup_id_opt_props = open("config/fedshop/fedup-id-optimal.props").read()
-    fedup_id_opt_props = re.sub(r"fedup\.summary=\.\./summaries/fedshop/batch\d+/fedup-id", f"fedup.summary=../summaries/fedshop/batch{batch_id}/fedup-id", fedup_id_opt_props)
+    fedup_id_opt_props = re.sub(r"batch\d+", f"batch{batch_id}", fedup_id_opt_props)
     with open("config/fedshop/fedup-id-optimal.props", "w") as id_opt_fs:
         id_opt_fs.write(fedup_id_opt_props)
     

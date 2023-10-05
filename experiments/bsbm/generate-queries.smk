@@ -206,18 +206,18 @@ rule compute_metrics:
     priority: 2
     threads: 1
     input: 
-        expand(
+        provenance = expand(
             "{{benchDir}}/{query}/instance_{instance_id}/batch_{{batch_id}}/provenance.csv",
             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
             instance_id=range(N_QUERY_INSTANCES)
         ),
-        expand(
+        results = expand(
             "{{benchDir}}/{query}/instance_{instance_id}/batch_{{batch_id}}/results.csv",
             query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
             instance_id=range(N_QUERY_INSTANCES)
         )
     output: "{benchDir}/metrics_batch{batch_id}.csv"
-    shell: "python rsfb/metrics.py compute-metrics {CONFIGFILE} {output} {input}"
+    shell: "python rsfb/metrics.py compute-metrics {CONFIGFILE} {output} {input.provenance}"
 
 rule ingest_virtuoso:
     priority: 4

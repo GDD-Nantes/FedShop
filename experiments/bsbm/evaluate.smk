@@ -193,7 +193,9 @@ rule transform_results:
                 LOGGER.debug(engine_results)
 
                 create_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
-                #raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
+
+                if len(engine_results) < len(expected_results):
+                    raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
             # else:
             #     create_stats(f"{Path(str(input)).parent}/stats.csv")
 
@@ -215,6 +217,7 @@ rule evaluate_engines:
         result_txt="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.txt",
     params:
         query_plan="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/query_plan.txt",
+        result_csv="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.csv",
         engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
         last_batch=LAST_BATCH
     run: 
@@ -233,6 +236,7 @@ rule evaluate_engines:
         canSkip = batch_id > 0 and os.path.exists(same_file_previous_batch) and os.stat(same_file_previous_batch).st_size == 0
         skipReason = f"Skip evaluation because previous batch at {same_file_previous_batch} timed out or error"
 
+        skipCount = 0
         for attempt in range(CONFIG_EVAL["n_attempts"]):
             same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{batch_id}/attempt_{attempt}/results.txt"
             LOGGER.info(f"Checking {same_file_other_attempt} ...")
@@ -244,7 +248,10 @@ rule evaluate_engines:
                 skipAttempt = attempt
                 skipReason = f"Skip evaluation because another attempt at {same_file_other_attempt} timed out"
                 canSkip = True
-                break
+                skipCount += 1
+                #break
+
+        canSkip = (skipCount == CONFIG_EVAL["n_attempts"] ) 
 
         skip_stats_file = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/stats.csv"
         previous_reason = str(skip_stats_file | cat() | find_first_pattern([r"(timeout)"]))
@@ -253,12 +260,38 @@ rule evaluate_engines:
             LOGGER.info(skipReason)
             shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id} --noexec")
             create_stats(str(output.stats), previous_reason)
-            #shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
+            # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
             # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/query_plan.txt {params.query_plan}")
             # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/source_selection.txt {output.source_selection}")
             # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/results.txt {output.result_txt}")
         else:
             shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id}")
+
+        # Transform results
+        # logger.debug("Comparing results...")
+        # shell("python rsfb/engines/{wildcards.engine}.py transform-results {output.result_txt} {params.result_csv}")
+        # if os.stat(str(output)).st_size > 0:
+        #     expected_results = pd.read_csv(f"{WORK_DIR}/benchmark/generation/{wildcards.query}/instance_{wildcards.instance_id}/batch_{wildcards.batch_id}/results.csv").dropna(how="all", axis=1)
+        #     expected_results = expected_results.reindex(sorted(expected_results.columns), axis=1)
+        #     expected_results = expected_results \
+        #         .sort_values(expected_results.columns.to_list()) \
+        #         .reset_index(drop=True) 
+            
+        #     engine_results = pd.read_csv(str(output)).dropna(how="all", axis=1)
+        #     engine_results = engine_results.reindex(sorted(engine_results.columns), axis=1)
+        #     engine_results = engine_results \
+        #         .sort_values(engine_results.columns.to_list()) \
+        #         .reset_index(drop=True) 
+
+        #     if not expected_results.equals(engine_results):
+        #         LOGGER.debug(expected_results)
+        #         LOGGER.debug("not equals to")
+        #         LOGGER.debug(engine_results)
+
+        #         #create_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
+        #         raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
+            # else:
+            #     create_stats(f"{Path(str(input)).parent}/stats.csv")
 
 rule engines_prerequisites:
     output: "{benchDir}/{engine}/{engine}-ok.txt"
