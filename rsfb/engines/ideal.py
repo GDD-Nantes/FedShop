@@ -75,6 +75,24 @@ def prerequisites(ctx: click.Context, eval_config):
 @click.option("--batch-id", type=click.INT, default=-1)
 @click.pass_context
 def warmup(ctx: click.Context, eval_config, engine_config, repeat, batch_id):
+    
+    def ping(url):
+        return requests.get(endpoint, params={"query": "ASK {?s ?p ?o}"}).status_code
+
+    # Probe and start Jena 
+    config = load_config(eval_config)
+    endpoint = config["evaluation"]["engines"]["ideal"]["endpoint"]        
+    
+    if ping(endpoint) == -1:
+        compose_file = config["evaluation"]["engines"]["ideal"]["compose_file"]
+        service_name = config["evaluation"]["engines"]["ideal"]["service_name"]
+        if os.system(f"docker-compose -f {compose_file} up -d {service_name}") != 0:
+            raise RuntimeError("Could not setup Jena Docker Container...")
+    
+    while ping(endpoint) != 200:
+        logger.debug("Waiting for Jena...")
+        time.sleep(1)
+    
     # Warm up the server
     config = load_config(eval_config) 
     queries = glob.glob("experiments/bsbm/benchmark/generation/q*/instance*/injected.sparql")
@@ -84,6 +102,7 @@ def warmup(ctx: click.Context, eval_config, engine_config, repeat, batch_id):
             force_source_selection = f"{Path(query).parent}/batch_{batch_id}/provenance.csv"
             for _ in range(repeat):
                 ctx.invoke(run_benchmark, eval_config=eval_config, engine_config=engine_config, query=query, force_source_selection=force_source_selection, batch_id=batch_id)
+                time.sleep(0.2)
 
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))

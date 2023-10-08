@@ -112,7 +112,6 @@ def load_model(modelfile, experiment_dir, clean):
 @click.pass_context
 def evaluate(ctx: click.Context, configfile, config, debug, clean, cores, rerun_incomplete, touch, no_cache, noexec):
 
-    config = config.strip()
     CONFIG = load_config(configfile)
     GEN_CONFIG = CONFIG["generation"]
     WORK_DIR = GEN_CONFIG["workdir"]
@@ -124,6 +123,7 @@ def evaluate(ctx: click.Context, configfile, config, debug, clean, cores, rerun_
     SNAKEMAKE_CONFIG_MATCHER = None
     
     if config is not None:
+        config = config.strip()
         SNAKEMAKE_CONFIG_MATCHER = re.match(r"(\w+\=\w+(\s+)?)+", config)
         if SNAKEMAKE_CONFIG_MATCHER is None:
             raise RuntimeError(f"Syntax error: config option should be 'name1=value1 name2=value2'")
@@ -169,9 +169,21 @@ def evaluate(ctx: click.Context, configfile, config, debug, clean, cores, rerun_
             elif clean == "metrics":
                 os.system(f"rm {WORK_DIR}/benchmark/evaluation/*.csv")
     
-    cmd = f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE}"
-    logger.info(cmd)
-    if os.system(cmd) != 0 : exit(1)
+    if SINGLE_QUERY_MODE:
+        cmd = f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE}"
+        logger.info(cmd)
+        if os.system(cmd) != 0 : exit(1)
+    else:
+        for batch in range(1, N_BATCH+1):
+            if debug:
+                logger.info("Producing rulegraph...")
+                RULEGRAPH_FILE = f"{WORKFLOW_DIR}/rulegraph_generate_batch{batch}"
+                if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --debug-dag --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
+                if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --rulegraph > {RULEGRAPH_FILE}.dot") != 0 : exit(1)
+                if os.system(f"dot -Tpng {RULEGRAPH_FILE}.dot > {RULEGRAPH_FILE}.png") != 0 : exit(1)
+            else:
+                logger.info(f"Producing metrics for batch {batch}/{N_BATCH}...")
+                if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
             
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))

@@ -4,7 +4,7 @@ FROM minhhoangdang/ubuntu2004-dind:amd64
 ENV DEBIAN_FRONTEND noninteractive
 ENV PATH="/root/miniconda/bin:$PATH"
 
-RUN apt-get update && apt-get install -y git libboost-all-dev openjdk-11-jdk \
+RUN apt-get update && apt-get install -y git libboost-all-dev openjdk-11-jdk jq \
     python3-pip python3-wheel python3-dev wbritish wamerican \
     python-is-python3 build-essential wget curl ruby \
     && apt-get clean && rm -rf /var/cache/apt/archives /var/lib/apt/lists

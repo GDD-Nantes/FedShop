@@ -110,6 +110,8 @@ evaluation:
       dir: "engines/ANAPSID"
     fedup_h0:
       dir: "engines/FedUP-experiments"
+    hibiscus:
+      dir: "engines/FedUP-experiments"
     ideal:
      dir: "engines/ARQ"
      internal_endpoint_prefix: "http://localhost:8890/sparql/?default-graph-uri="
