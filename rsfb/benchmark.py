@@ -1,3 +1,4 @@
+from itertools import product
 import os
 from pathlib import Path
 import re
@@ -21,7 +22,6 @@ def cli():
 @click.option("--rerun-incomplete", is_flag=True, default=False)
 @click.option("--touch", is_flag=True, default=False)
 @click.option("--no-cache", is_flag=True, default=False)
-
 @click.pass_context
 def generate(ctx: click.Context, category, configfile, debug, clean, cores, rerun_incomplete, touch, no_cache):
     """Run the benchmark
@@ -121,23 +121,44 @@ def evaluate(ctx: click.Context, configfile, config, debug, clean, cores, rerun_
     SNAKEMAKE_CONFIGS = f"configfile={configfile} "
     SINGLE_QUERY_MODE = False
     SNAKEMAKE_CONFIG_MATCHER = None
+
+    N_BATCH = GEN_CONFIG["n_batch"]
+
+    CONFIG_EVAL = CONFIG["evaluation"]
+    QUERY_DIR = f"{WORK_DIR}/queries"
+
+    config_dict = {}
     
     if config is not None:
         config = config.strip()
-        SNAKEMAKE_CONFIG_MATCHER = re.match(r"(\w+\=\w+(\s+)?)+", config)
+        SNAKEMAKE_CONFIG_MATCHER = re.match(r"(\w+\=\w+(,\w+)*(\s+)?)+", config)
         if SNAKEMAKE_CONFIG_MATCHER is None:
             raise RuntimeError(f"Syntax error: config option should be 'name1=value1 name2=value2'")
+        
+        for c in config.split():
+            k, v = c.split("=")
+            config_dict[k] = v.split(",")
+
+        if "batch" not in config_dict.keys():
+            config_dict["batch"] = list(range(N_BATCH))
+
+        if "engine" not in config_dict.keys():
+            config_dict["batch"] = CONFIG_EVAL["engines"]
+
+        if "query" not in config_dict.keys():
+            config_dict["query"] = [Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")]
+
+        if "instance" not in config_dict.keys():
+            config_dict["instance"] = list(range(GEN_CONFIG["n_query_instances"]))
     
         SNAKEMAKE_CONFIGS += config
-        if "query" in config:
+        if "query" in config or "engine" in config or "instance" in config or "batch" in config:
             SINGLE_QUERY_MODE = True
             EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate_one.smk"
         
     if noexec:
         EVALUATION_SNAKEFILE=f"{WORK_DIR}/evaluate_noexec.smk"
     
-    N_BATCH = GEN_CONFIG["n_batch"]
-
     WORKFLOW_DIR = f"{WORK_DIR}/rulegraph"
     os.makedirs(name=WORKFLOW_DIR, exist_ok=True)
 
@@ -156,34 +177,32 @@ def evaluate(ctx: click.Context, configfile, config, debug, clean, cores, rerun_
     # if in evaluate mode
     if clean is not None :
         logger.info("Cleaning...")
-        if SINGLE_QUERY_MODE:
-            config_dict = {}
-            for c in config.split():
-                k, v = c.split("=")
-                config_dict[k] = v
-            
-            shutil.rmtree(f"{BENCH_DIR}/{config_dict['engine']}/{config_dict['query']}/instance_{config_dict['instance']}/batch_{config_dict['batch']}/test/", ignore_errors=True)
+        if SINGLE_QUERY_MODE:     
+            keys, values = zip(*config_dict.items())
+            for comb in product(*values):
+                path_dict = dict(zip(keys, comb))
+                shutil.rmtree(f"{BENCH_DIR}/{path_dict['engine']}/{path_dict['query']}/instance_{path_dict['instance']}/batch_{path_dict['batch']}/debug/", ignore_errors=True)
         else:
             if clean == "all":
                 shutil.rmtree(f"{WORK_DIR}/benchmark/evaluation", ignore_errors=True)
             elif clean == "metrics":
                 os.system(f"rm {WORK_DIR}/benchmark/evaluation/*.csv")
     
-    if SINGLE_QUERY_MODE:
-        cmd = f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE}"
-        logger.info(cmd)
-        if os.system(cmd) != 0 : exit(1)
+    batch_size = len(config_dict["batch"])
+    if batch_size == 1:
+        if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE}") != 0 : exit(1)
+
     else:
-        for batch in range(1, N_BATCH+1):
+        for batch in range(1, batch_size):
             if debug:
                 logger.info("Producing rulegraph...")
                 RULEGRAPH_FILE = f"{WORKFLOW_DIR}/rulegraph_generate_batch{batch}"
-                if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --debug-dag --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
+                if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --debug-dag --batch merge_metrics={batch}/{batch_size}") != 0 : exit(1)
                 if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --rulegraph > {RULEGRAPH_FILE}.dot") != 0 : exit(1)
                 if os.system(f"dot -Tpng {RULEGRAPH_FILE}.dot > {RULEGRAPH_FILE}.png") != 0 : exit(1)
             else:
-                logger.info(f"Producing metrics for batch {batch}/{N_BATCH}...")
-                if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --batch merge_metrics={batch}/{N_BATCH}") != 0 : exit(1)
+                logger.info(f"Producing metrics for batch {batch}/{batch_size}...")
+                if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --batch merge_metrics={batch}/{batch_size}") != 0 : exit(1)
             
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))

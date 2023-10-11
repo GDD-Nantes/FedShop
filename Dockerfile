@@ -29,7 +29,7 @@ RUN python -m nltk.downloader stopwords punkt
 
 # Install dependencies
 RUN curl -s https://bitbucket.org/mjensen/mvnvm/raw/master/mvn > /usr/bin/mvn && chmod a+x /usr/bin/mvn
-RUN wget https://github.com/docker/compose/releases/download/v2.16.0/docker-compose-linux-x86_64 -O /usr/bin/docker-compose && chmod a+x /usr/bin/docker-compose
+RUN wget https://github.com/docker/compose/releases/download/v2.22.0/docker-compose-linux-x86_64 -O /usr/bin/docker-compose && chmod a+x /usr/bin/docker-compose
 
 WORKDIR /FedShop/generators/watdiv
 RUN make rebuild && make install

@@ -77,12 +77,15 @@ def prerequisites(ctx: click.Context, eval_config):
 def warmup(ctx: click.Context, eval_config, engine_config, repeat, batch_id):
     
     def ping(url):
-        return requests.get(endpoint, params={"query": "ASK {?s ?p ?o}"}).status_code
+        try:
+            return requests.get(endpoint, params={"query": "ASK {?s ?p ?o}"}).status_code
+        except:
+            return -1
 
     # Probe and start Jena 
     config = load_config(eval_config)
-    endpoint = config["evaluation"]["engines"]["ideal"]["endpoint"]        
-    
+    endpoint = config["evaluation"]["engines"]["ideal"]["endpoint"]    
+        
     if ping(endpoint) == -1:
         compose_file = config["evaluation"]["engines"]["ideal"]["compose_file"]
         service_name = config["evaluation"]["engines"]["ideal"]["service_name"]
@@ -101,8 +104,14 @@ def warmup(ctx: click.Context, eval_config, engine_config, repeat, batch_id):
         for batch_id in range(config["generation"]["n_batch"]):
             force_source_selection = f"{Path(query).parent}/batch_{batch_id}/provenance.csv"
             for _ in range(repeat):
-                ctx.invoke(run_benchmark, eval_config=eval_config, engine_config=engine_config, query=query, force_source_selection=force_source_selection, batch_id=batch_id)
-                time.sleep(0.2)
+                success = False
+                while not success:
+                    try:
+                        ctx.invoke(run_benchmark, eval_config=eval_config, engine_config=engine_config, query=query, force_source_selection=force_source_selection, batch_id=batch_id)
+                        success = True
+                    except:
+                        # Wait so that server could release resources
+                        time.sleep(1)
 
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))

@@ -1,5 +1,6 @@
 import ast
 from io import BytesIO
+import json
 import os
 from pathlib import Path
 import re
@@ -278,7 +279,11 @@ def get_docker_endpoints(compose_file, service_name):
 
     json_bytes = proc.stdout
     with BytesIO(json_bytes) as json_bs:
-        infos = pd.read_json(json_bs)
+        records = []
+        for js in json_bs.readlines():
+            records.append(json.loads(js))
+
+        infos = pd.DataFrame.from_records(records)
         infos["containerId"] = infos["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
         infos.sort_values("containerId", inplace=True)
                 
@@ -291,7 +296,10 @@ def get_docker_endpoints(compose_file, service_name):
 def get_docker_endpoint_by_container_name(compose_file, service_name, container_name):        
     json_bytes = subprocess.run(f"docker-compose -f {compose_file} ps --all --format json {service_name}", capture_output=True, shell=True).stdout
     with BytesIO(json_bytes) as json_bs:
-        infos = pd.read_json(json_bs)
+        records = []
+        for js in json_bs.readlines():
+            records.append(json.loads(js))
+        infos = pd.DataFrame.from_records(records)
         infos["containerId"] = infos["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
         infos.sort_values("containerId", inplace=True)
         result = infos.query(f"`Name` == {repr(container_name)}")["Publishers"] \
@@ -305,8 +313,11 @@ def check_container_status(compose_file, service_name, container_name):
     json_bytes = compose_proc.stdout
     
     with BytesIO(json_bytes) as json_bs:
-        infos = pd.read_json(json_bs)
-        
+        records = []
+        for js in json_bs.readlines():
+            records.append(json.loads(js))        
+        infos = pd.DataFrame.from_records(records)
+    
         result = None
         if not infos.empty:
             result = infos.query(f"`Name` == {repr(container_name)}")["State"].item()
@@ -316,9 +327,11 @@ def check_container_status(compose_file, service_name, container_name):
 def get_docker_containers(compose_file, service_name):    
     cmd = f"docker-compose -f {compose_file} ps --all --format json {service_name}"
     json_bytes = subprocess.run(cmd, capture_output=True, shell=True).stdout
-    
     with BytesIO(json_bytes) as json_bs:
-        result = pd.read_json(json_bs)
+        records = []
+        for js in json_bs.readlines():
+            records.append(json.loads(js))
+        result = pd.DataFrame.from_records(records)
         result["containerId"] = result["Name"].str.replace(r".*\-(\d+)$", r"\1", regex=True).astype(int)
         result.sort_values("containerId", inplace=True)
         return result["Name"].to_list()
@@ -367,7 +380,7 @@ def write_empty_stats(outfile, reason):
     with open(outfile, "w") as fout:
         fout.write("query,engine,instance,batch,attempt,exec_time,ask,source_selection_time,planning_time\n")
         if outfile != "/dev/null":
-            basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/(attempt_(\d+)|test)/stats.csv", outfile)
+            basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/(attempt_(\d+)|debug)/stats.csv", outfile)
             engine = basicInfos.group(1)
             queryName = basicInfos.group(2)
             instance = basicInfos.group(3)
@@ -382,7 +395,7 @@ def create_stats(statsfile, failed_reason=None):
     baseDir = Path(statsfile).parent
     
     print(statsfile)
-    basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/(attempt_(\d+)|test)/stats.csv", statsfile)
+    basicInfos = re.match(r".*/(\w+)/(q\w+)/instance_(\d+)/batch_(\d+)/(attempt_(\d+)|debug)/stats.csv", statsfile)
     result = {
         "engine": basicInfos.group(1),
         "query": basicInfos.group(2),

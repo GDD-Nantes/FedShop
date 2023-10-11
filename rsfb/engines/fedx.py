@@ -198,9 +198,7 @@ def transform_provenance(infile, outfile, prefix_cache):
         return decoded
     
     in_df = pd.read_csv(infile)
-    
-    print(in_df)
-    
+        
     with open(prefix_cache, "r") as prefix_cache_fs, open(os.path.join(Path(prefix_cache).parent, "provenance.sparql.comp"), "r") as comp_fs:
         prefix2alias = json.load(prefix_cache_fs)    
         composition = json.load(comp_fs)
@@ -215,7 +213,7 @@ def transform_provenance(infile, outfile, prefix_cache):
         # If unequal length (as in union, optional), fill with nan
         max_length = in_df["source_selection"].apply(len).max()
         in_df["source_selection"] = in_df["source_selection"].apply(pad)
-        
+                
         out_df = in_df.set_index("tp_name")["source_selection"] \
             .to_frame().T \
             .apply(pd.Series.explode) \

@@ -14,9 +14,9 @@ services:
       VIRT_Parameters_MaxClientConnections: 20
       VIRT_Parameters_IndexTreeMaps: 256
       VIRT_Parameters_CheckpointInterval: 0
-      VIRT_Parameters_DefaultIsolation: 1; READ UNCOMMITED
-      VIRT_Parameters_ThreadCleanupInterval: 1; Automatically clean up threads
-      VIRT_Parameters_ResourcesCleanupInterval: 1; Automatically clean up threads
+      VIRT_Parameters_DefaultIsolation: 1
+      VIRT_Parameters_ThreadCleanupInterval: 1
+      VIRT_Parameters_ResourcesCleanupInterval: 1
       VIRT_Plugins_Load1: "plain, geos"
       VIRT_Plugins_Load2: "plain, proj4"
       VIRT_Plugins_Load3: "plain, shapefileio"
@@ -42,10 +42,10 @@ services:
       VIRT_Parameters_MaxDirtyBuffers: 1000000
       VIRT_Parameters_MaxClientConnections: 20
       VIRT_Parameters_IndexTreeMaps: 256
-      VIRT_Parameters_CheckpointInterval: 0
+      VIRT_Parameters_CheckpointInterval: 0 
       VIRT_Parameters_DefaultIsolation: 1; READ UNCOMMITED
-      VIRT_Parameters_ThreadCleanupInterval: 1; Automatically clean up threads
-      VIRT_Parameters_ResourcesCleanupInterval: 1; Automatically clean up threads
+      VIRT_Parameters_ThreadCleanupInterval: 1
+      VIRT_Parameters_ResourcesCleanupInterval: 1
       VIRT_Plugins_Load1: "plain, geos"
       VIRT_Plugins_Load2: "plain, proj4"
       VIRT_Plugins_Load3: "plain, shapefileio"

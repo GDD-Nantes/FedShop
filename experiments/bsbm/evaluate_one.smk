@@ -25,11 +25,6 @@ from utils import activate_one_container as utils_activate_one_container
 #===============================
 
 CONFIGFILE = config["configfile"]
-BATCH_ID = config["batch"]
-ENGINE_ID = config["engine"]
-QUERY_PATH = config["query"]
-INSTANCE_ID = config["instance"]
-
 WORK_DIR = "experiments/bsbm"
 CONFIG = load_config(CONFIGFILE)
 
@@ -62,6 +57,16 @@ MODEL_DIR = f"{WORK_DIR}/model"
 BENCH_DIR = f"{WORK_DIR}/benchmark/evaluation"
 TEMPLATE_DIR = f"{MODEL_DIR}/watdiv"
 
+BATCH_ID = str(config["batch"]).split(",") if config.get("batch") is not None else range(N_BATCH)
+ENGINE_ID = str(config["engine"]).split(",") if config.get("engine") is not None else CONFIG_EVAL["engines"]
+QUERY_PATH = (
+    [Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in str(config["query"]).split(",")] 
+    if config.get("query") is not None else 
+    [Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")]
+)
+INSTANCE_ID = str(config["instance"]).split(",") if config.get("instance") is not None else range(N_QUERY_INSTANCES)
+NO_EXEC = eval(str(config["explain"])) if config.get("explain") is not None else False
+
 LOGGER = rsfb_logger(Path(__file__).name)
 
 #=================
@@ -78,6 +83,7 @@ def activate_one_container(batch_id):
     LOGGER.info("Activating proxy docker container...")
     proxy_target = CONFIG_GEN["virtuoso"]["endpoints"][-1]
     proxy_target = proxy_target.replace("/sparql", "/")
+
     if ping(PROXY_SPARQL_ENDPOINT) == -1:
         LOGGER.info("Starting proxy server...")
         shell(f"docker-compose -f {PROXY_COMPOSE_FILE} up -d {PROXY_SERVICE_NAME}")
@@ -113,7 +119,7 @@ def generate_federation_declaration(federation_declaration_file, engine, batch_i
 rule all:
     input: 
         provenance=expand(
-            "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/test/provenance.csv", 
+            "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/debug/provenance.csv", 
             benchDir=BENCH_DIR,
             batch_id=BATCH_ID,
             engine=ENGINE_ID,
@@ -121,7 +127,7 @@ rule all:
             instance_id=INSTANCE_ID
         ),
         results=expand(
-            "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/test/results.csv", 
+            "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/debug/results.csv", 
             benchDir=BENCH_DIR,
             batch_id=BATCH_ID,
             engine=ENGINE_ID,
@@ -130,16 +136,16 @@ rule all:
         ),
 
 rule transform_provenance:
-    input: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/test/source_selection.txt"
-    output: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/test/provenance.csv"
+    input: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/debug/source_selection.txt"
+    output: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/debug/provenance.csv"
     params:
         prefix_cache=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/prefix_cache.json", workDir=WORK_DIR)
     run: 
         shell("python rsfb/engines/{wildcards.engine}.py transform-provenance {input} {output} {params.prefix_cache}")
 
 rule transform_results:
-    input: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/test/results.txt"
-    output: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/test/results.csv"
+    input: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/debug/results.txt"
+    output: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/debug/results.csv"
     run:
         # Transform results
         shell("python rsfb/engines/{wildcards.engine}.py transform-results {input} {output}")
@@ -181,12 +187,12 @@ rule evaluate_engines:
         virtuoso_last_batch=ancient(expand("{workDir}/benchmark/generation/virtuoso_batch{batch_n}-ok.txt", workDir=WORK_DIR, batch_n=N_BATCH-1)),
         engine_status=ancient("{benchDir}/{engine}/{engine}-ok.txt"),
     output: 
-        stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/test/stats.csv",
-        source_selection="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/test/source_selection.txt",
-        result_txt="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/test/results.txt",
+        stats="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/debug/stats.csv",
+        source_selection="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/debug/source_selection.txt",
+        result_txt="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/debug/results.txt",
     params:
-        query_plan="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/test/query_plan.txt",
-        result_csv="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/test/results.csv",
+        query_plan="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/debug/query_plan.txt",
+        result_csv="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/debug/results.csv",
         engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
         last_batch=LAST_BATCH
     run: 
@@ -196,7 +202,10 @@ rule evaluate_engines:
         engine_config = f"{WORK_DIR}/benchmark/evaluation/{engine}/config/batch_{batch_id}/{engine}.conf"
         generate_federation_declaration(engine_config, engine, batch_id)
         virtuoso_kill_all_transactions(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, LAST_BATCH)
-        shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id}")
+        cmd = "python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id}"
+        if NO_EXEC:
+            cmd += " --noexec"
+        shell(cmd)
 
 
 rule engines_prerequisites:

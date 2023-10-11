@@ -231,8 +231,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
             failed_reason = "timeout"
             
-            # Path("../../" + out_result).touch()
-            # Path("../../" + out_source_selection).touch()
+            Path("../../" + out_result).touch()
+            Path("../../" + out_source_selection).touch()
 
             
         elif status == "ERROR":
