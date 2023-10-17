@@ -14,9 +14,10 @@ generation:
     # compose_file: "${generation.workdir}/docker/generator.yml"
     # container_name: "bsbm-watdiv"
   virtuoso:
+    manual_port: -1 # Put -1 if you use Docker 
     compose_file: "${generation.workdir}/docker/virtuoso.yml"
     service_name: "bsbm-virtuoso"
-    endpoints: "${get_docker_endpoints: ${generation.virtuoso.compose_file}, ${generation.virtuoso.service_name}}" 
+    endpoints: "${get_docker_endpoints: ${generation.virtuoso.manual_port}, ${generation.virtuoso.compose_file}, ${generation.virtuoso.service_name}}" 
     container_names: "${get_virtuoso_containers: ${generation.virtuoso.compose_file}, ${generation.virtuoso.service_name}}" 
   schema:
     # Configuration for ONE batch
@@ -89,7 +90,7 @@ generation:
         rating4_p: 0.7
 
 evaluation:
-  n_attempts: 3
+  n_attempts: 4
   timeout: 120 # 60s + With overhead (jvm + startup + summary)
   proxy: 
     compose_file: "${generation.workdir}/docker/proxy.yml"
@@ -108,10 +109,6 @@ evaluation:
       summary_generator_dir: "engines/semagrow/sevod-scraper"
     anapsid:
       dir: "engines/ANAPSID"
-    fedup_h0:
-      dir: "engines/FedUP-experiments"
-    hibiscus:
-      dir: "engines/FedUP-experiments"
     ideal:
      dir: "engines/ARQ"
      internal_endpoint_prefix: "http://localhost:8890/sparql/?default-graph-uri="

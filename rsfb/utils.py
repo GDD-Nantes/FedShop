@@ -270,7 +270,10 @@ def __get_publisher_info(x):
         .query('`URL` == "0.0.0.0" and `TargetPort` == 8890')["PublishedPort"] \
         .astype(int).item()
 
-def get_docker_endpoints(compose_file, service_name):
+def get_docker_endpoints(manual_endpoint, compose_file, service_name):
+    if manual_endpoint == -1:
+        return [f"http://localhost:{manual_endpoint}/sparql"]
+    
     cmd = f"docker-compose -f {compose_file} ps --all --format json {service_name}"
     proc = subprocess.run(cmd, capture_output=True, shell=True)
 

@@ -132,13 +132,13 @@ def compute_metrics(configfile, outfile, workload):
                     "query": query,
                     "instance": instance,
                     "batch": batch,
-                    "nb_results": "error_runtime",
-                    "nb_distinct_sources": "error_runtime",
-                    "relevant_sources_selectivity": "error_runtime",
-                    "tpwss": "error_runtime",
-                    "avg_rwss": "error_runtime",
-                    "min_rwss": "error_runtime",
-                    "max_rwss": "error_runtime"
+                    "nb_results": np.nan,
+                    "nb_distinct_sources": np.nan,
+                    "relevant_sources_selectivity": np.nan,
+                    "tpwss": np.nan,
+                    "avg_rwss": np.nan,
+                    "min_rwss": np.nan,
+                    "max_rwss": np.nan
                     #"tp_specific_relevant_sources_selectivity": get_tp_specific_relevant_sources(source_selection_result),
                     #"bgp_restricted_source_level_tp_selectivity": get_bgp_restricted_source_level_tp_selectivity(source_selection_result),
                     #"xfed_join_restricted_source_level_tp_selectivity": get_xfed_join_restricted_source_level_tp_selectivity(source_selection_result)
