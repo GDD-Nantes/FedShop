@@ -1,6 +1,6 @@
 # FedShop: The Federated Shop Benchmark
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7919872.svg)](https://doi.org/10.5281/zenodo.7919872)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.svg)](https://zenodo.org/records/7919872/latest)
 
 FedShop is a synthetic RDF Federated Benchmark designed for scalability. It evaluates the performance of SPARQL federated-query engines such as [FedX](https://rdf4j.org/documentation/programming/federation/), [CostFed](https://github.com/dice-group/CostFed), [Semagrow](https://semagrow.github.io/), Splendid, [HeFQUIN](https://github.com/LiUSemWeb/HeFQUIN), etc, when the number of federation members grows. FedShop is built around an e-commerce scenario with online hops and rating Web sites as in [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/). Compared to  BSBM, each shop and rating site of FedShop has its own SPARQL endpoint and shares a standard catalogue of products. Following the BSBM idea, the FedShop queries simulate a user navigating the federation of shops as if it were a single virtual shop. The scale factor corresponds to the number of shops and rating sites within the federation. Hence, with the FedShop benchmark, we can observe the performance of federated queries when the number of federation members increases.
 
@@ -19,7 +19,7 @@ FedShop consists of three components:
 
 ## FedShop200 Datasets and Queries
 
-**FedShop200** is a basic set of datasets and queries generated with FedShop. It contains 120 SPARQL queries and datasets to populate a federation of up to 200 endpoints. It is available at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7919872.svg)](https://doi.org/10.5281/zenodo.7919872).
+**FedShop200** is a basic set of datasets and queries generated with FedShop. It contains 120 SPARQL queries and datasets to populate a federation of up to 200 endpoints. It is available at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.svg)](https://zenodo.org/records/7919872/latest).
 
 Instead of downloading the complete archive, you can also download only individual parts of FedShop:
 * `fedshop-dataset.zip`: All the quads for the 200 federation members.
