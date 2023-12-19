@@ -24,7 +24,8 @@ FedShop consists of three components:
 Instead of downloading the complete archive, you can also download only individual parts of FedShop:
 * `fedshop-dataset.zip`: All the quads for the 200 federation members.
 * `fedshop-virtuoso.db`: The final Virtuoso database with all 200 federation members.
-* `fedshop-workload.txt`: The FedShop Workload
+* `fedshop-batches.zip`: nq files for each federation (20, 40, 60, 80, etc..).
+* `fedshop-workload.txt`: The FedShop Workload, i.e., all queries in a single text file.
 * `fedshop-service.txt`: RSA Fedshop Workload, i.e. the Reference Source Assignement for FedShop queries as SPARQL 1.1 queries with Service clauses.
 * `eval-model.zip`: results obtained after [Evaluation process](https://github.com/GDD-Nantes/FedShop/wiki/5.-FedShop-Runner). These are results for every engines, on every queries instances per batch.
 * `gen-model.zip`: results obtained after [Generation process](https://github.com/GDD-Nantes/FedShop/wiki/4.-FedShop-Data-Generator). These are instanciated queries for every batches, for every instances.
