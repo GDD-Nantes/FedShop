@@ -419,7 +419,7 @@ def inject_constant(queryfile, value_selection, ignore_errors, instance_id):
         value_selection_values = pd.read_csv(value_selection, parse_dates=[h for h in header if "date" in h])
         placeholder_chosen_values = value_selection_values
         placeholder_chosen_values_idx = instance_id
-        
+                
         prefix_full_to_alias, parse_result = __parse_query_from_file(queryfile)
         prefix_alias_to_full = {v: k for k, v in prefix_full_to_alias.items()}
         
@@ -446,14 +446,16 @@ def inject_constant(queryfile, value_selection, ignore_errors, instance_id):
             if len(placeholder_chosen_values) == 0:
                 if ignore_errors: continue
                 else: raise RuntimeError(f"There is no value for `{right}` in {value_selection}")
-
-            if instance_id is None and (
-                placeholder_chosen_values_idx is None or 
-                placeholder_chosen_values_idx not in placeholder_chosen_values.index.values
-            ):
-                placeholder_chosen_values_idx = placeholder_chosen_values.sample(1).index.item()
+            
+            # When instance_id is not specified, choose randomly
+            # if instance_id is None and (
+            #     placeholder_chosen_values_idx is None or 
+            #     placeholder_chosen_values_idx not in placeholder_chosen_values.index.values
+            # ):
+            #     placeholder_chosen_values_idx = placeholder_chosen_values.sample(1).index.item()
+            
             # Replace for FILTER clauses
-            repl_val = placeholder_chosen_values.loc[placeholder_chosen_values_idx, right]
+            repl_val = placeholder_chosen_values.loc[placeholder_chosen_values_idx, right]            
             if resource["type"] is not None:
                 dtype = placeholder_chosen_values[right].dtype
                 epsilon = 0
@@ -535,7 +537,8 @@ def inject_constant(queryfile, value_selection, ignore_errors, instance_id):
                                                             
                 # Special treatment for REGEX
                 #   Extract randomly 1 from 10 most common words in the result list
-                elif op == "in":
+                elif op == "in" and (not Path(value_selection).stem.startswith("workload") or instance_id is not None): 
+
                     langs = placeholder_chosen_values[right].apply(lambda x: lang_detect(x))
                     for lang in set(langs):
                         try: stopwords.extend(nltk_stopwords.words(lang))
@@ -563,10 +566,10 @@ def inject_constant(queryfile, value_selection, ignore_errors, instance_id):
                 #     repl_val = placeholder_chosen_values.query(exclusion_query)[right].sample(1)
                     
                 logger.debug(f"op: {op}; isOpUnary: {isOpUnary}; left: {left}; right: {right}; val: {repl_val}")
-                
+            
             try: repl_val = repl_val.item()
             except: pass
-            
+                        
             # Should never happens, but...
             if repl_val is None:
                 raise ValueError(f"There is no value for left = `{left}`, right = `{right}`")

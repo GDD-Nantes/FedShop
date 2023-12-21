@@ -101,7 +101,7 @@ def load_model(modelfile, experiment_dir, clean):
 
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))
-@click.option("--config", type=click.STRING, default=None)
+@click.option("--config", type=click.STRING, default=None, help='Params for snakemake file. Example: --config="engine=costfed attempt=0 query=q04 instance=7 batch=0"')
 @click.option("--debug", is_flag=True, default=False)
 @click.option("--clean", type=click.STRING, help="[all, model, benchmark] + db")
 @click.option("--cores", type=click.INT, default=1, help="The number of cores used allocated. -1 if use all cores.")
@@ -159,7 +159,7 @@ def evaluate(ctx: click.Context, configfile, config, debug, clean, cores, rerun_
             config_dict["attempt"] = list(range(CONFIG_EVAL["n_attempts"]))
     
         SNAKEMAKE_CONFIGS += config
-        SINGLE_QUERY_MODE = config_dict["debug"]
+        SINGLE_QUERY_MODE = eval(config_dict["debug"]) if config_dict.get("debug") is not None else False
     
     WORKFLOW_DIR = f"{WORK_DIR}/rulegraph"
     os.makedirs(name=WORKFLOW_DIR, exist_ok=True)
@@ -178,34 +178,31 @@ def evaluate(ctx: click.Context, configfile, config, debug, clean, cores, rerun_
 
     # if in evaluate mode
     if clean is not None :
-        logger.info("Cleaning...")
-        keys, values = zip(*config_dict.items())
-        for comb in product(*values):
-            path_dict = dict(zip(keys, comb))
-            if SINGLE_QUERY_MODE:
-                shutil.rmtree(f"{BENCH_DIR}/{path_dict['engine']}/{path_dict['query']}/instance_{path_dict['instance']}/batch_{path_dict['batch']}/debug/", ignore_errors=True)
-            else:
-                shutil.rmtree(f"{BENCH_DIR}/{path_dict['engine']}/{path_dict['query']}/instance_{path_dict['instance']}/batch_{path_dict['batch']}/attempt_{path_dict['attempt']}/", ignore_errors=True)
+        if len(config_dict) > 0:
+            keys, values = zip(*config_dict.items())
+            for comb in product(*values):
+                path_dict = dict(zip(keys, comb))
+                if SINGLE_QUERY_MODE:
+                    shutil.rmtree(f"{BENCH_DIR}/{path_dict['engine']}/{path_dict['query']}/instance_{path_dict['instance']}/batch_{path_dict['batch']}/debug/", ignore_errors=True)
+                else:
+                    shutil.rmtree(f"{BENCH_DIR}/{path_dict['engine']}/{path_dict['query']}/instance_{path_dict['instance']}/batch_{path_dict['batch']}/attempt_{path_dict['attempt']}/", ignore_errors=True)
         if clean == "all":
             shutil.rmtree(f"{WORK_DIR}/benchmark/evaluation", ignore_errors=True)
         elif clean == "metrics":
             os.system(f"rm {WORK_DIR}/benchmark/evaluation/*.csv")
     
-    batch_size = len(config_dict["batch"]) if SINGLE_QUERY_MODE else N_BATCH
-    if batch_size == 1:
-        if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE}") != 0 : exit(1)
-
-    else:
-        for batch in range(1, batch_size+1):
-            if debug:
-                logger.info("Producing rulegraph...")
-                RULEGRAPH_FILE = f"{WORKFLOW_DIR}/rulegraph_generate_batch{batch}"
-                if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --debug-dag --batch merge_metrics={batch}/{batch_size}") != 0 : exit(1)
-                if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --rulegraph > {RULEGRAPH_FILE}.dot") != 0 : exit(1)
-                if os.system(f"dot -Tpng {RULEGRAPH_FILE}.dot > {RULEGRAPH_FILE}.png") != 0 : exit(1)
-            else:
-                logger.info(f"Producing metrics for batch {batch}/{batch_size}...")
-                if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --batch merge_metrics={batch}/{batch_size}") != 0 : exit(1)
+    batch_size = len(config_dict["batch"]) if "batch" in config_dict.keys() else N_BATCH
+    
+    for batch in range(1, batch_size+1):
+        if debug:
+            logger.info("Producing rulegraph...")
+            RULEGRAPH_FILE = f"{WORKFLOW_DIR}/rulegraph_generate_batch{batch}"
+            if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --debug-dag --batch merge_metrics={batch}/{batch_size}") != 0 : exit(1)
+            if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --rulegraph > {RULEGRAPH_FILE}.dot") != 0 : exit(1)
+            if os.system(f"dot -Tpng {RULEGRAPH_FILE}.dot > {RULEGRAPH_FILE}.png") != 0 : exit(1)
+        else:
+            logger.info(f"Producing metrics for batch {batch}/{batch_size}...")
+            if os.system(f"snakemake {SNAKEMAKE_OPTS} --snakefile {EVALUATION_SNAKEFILE} --batch merge_metrics={batch}/{batch_size}") != 0 : exit(1)
             
 @cli.command()
 @click.argument("configfile", type=click.Path(exists=True, file_okay=True, dir_okay=False))

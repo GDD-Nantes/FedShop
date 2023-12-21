@@ -37,6 +37,7 @@ def query(queryfile, batch_id):
     result = None    
     with open(queryfile, "r") as fp:
         query_text = fp.read()
+        print(query_text)
         activate_one_container(batch_id, SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, LOGGER, "/dev/null")
         _, result = exec_query(configfile=CONFIGFILE, query=query_text, error_when_timeout=True, batch_id=batch_id)
         with BytesIO(result) as header_stream, BytesIO(result) as data_stream: 
@@ -95,83 +96,36 @@ def human_readable(bytesize):
 @cli.command()  
 def get_vendor_stats():
     
-    data = np.arange(CONFIG["schema"]["vendor"]["params"]["vendor_n"])
-    _, edges = np.histogram(data, N_BATCH)
-    edges = edges[1:].astype(int)
+    results = []
+    for batch_id in range(N_BATCH):
+        tmp = query(f"{WORKDIR}/vendor_stats.sparql", batch_id).rename({"nbQuads": f"batch{batch_id}"}, axis=1)
+        results.append(tmp)
     
-    result = {
-        "nquads": {},
-        "size": {}
-    }
-    
-    for nq_file in glob.glob(f"{Path(__file__).parent.parent}/model/dataset/vendor*.nq"):
-        member_id = int(re.findall(r"(\d+)\.nq", nq_file)[0])
-        batch_id = np.argwhere((member_id <= edges)).min().item()
-        nquads = int(subprocess.check_output(['wc', '-l', nq_file]).split()[0])
-        
-        if result["nquads"].get(f"batch{batch_id}") is None:    
-            result["nquads"][f"batch{batch_id}"] = 0
-
-        result["nquads"][f"batch{batch_id}"] += nquads
-        
-        fsize = os.stat(nq_file).st_size
-        
-        if result["size"].get(f"batch{batch_id}") is None:    
-            result["size"][f"batch{batch_id}"] = 0
-
-        result["size"][f"batch{batch_id}"] += fsize
-        
-    result_df = pd.DataFrame.from_dict(result, orient="index").sort_index(axis=1).cumsum(axis=1)
-    
-    result_df.loc["size_simplified", :] = result_df.loc["size", :].apply(human_readable)
-    result_df.to_csv(f"{Path(__file__).parent}/vendor_stats.stat", index=True)
+    result = pd.concat(results, axis=1)
+    result.to_csv(f"{WORKDIR}/vendor_stats.stat", index=False)
     
 
 @cli.command()  
 def get_ratingsite_stats():
     
-    data = np.arange(CONFIG["schema"]["ratingsite"]["params"]["ratingsite_n"])
-    _, edges = np.histogram(data, N_BATCH)
-    edges = edges[1:].astype(int)
+    results = []
+    for batch_id in range(N_BATCH):
+        tmp = query(f"{WORKDIR}/ratingsite_stats.sparql", batch_id).rename({"nbQuads": f"batch{batch_id}"}, axis=1)
+        results.append(tmp)
     
-    result = {
-        "nquads": {},
-        "size": {}
-    }
-    
-    for nq_file in glob.glob(f"{Path(__file__).parent.parent}/model/dataset/ratingsite*.nq"):
-        member_id = int(re.findall(r"(\d+)\.nq", nq_file)[0])
-        batch_id = np.argwhere((member_id <= edges)).min().item()
-        nquads = int(subprocess.check_output(['wc', '-l', nq_file]).split()[0])
-        
-        if result["nquads"].get(f"batch{batch_id}") is None:    
-            result["nquads"][f"batch{batch_id}"] = 0
-
-        result["nquads"][f"batch{batch_id}"] += nquads
-        
-        fsize = os.stat(nq_file).st_size
-        
-        if result["size"].get(f"batch{batch_id}") is None:    
-            result["size"][f"batch{batch_id}"] = 0
-
-        result["size"][f"batch{batch_id}"] += fsize
-        
-    result_df = pd.DataFrame.from_dict(result, orient="index").sort_index(axis=1).cumsum(axis=1)
-        
-    result_df.loc["size_simplified", :] = result_df.loc["size", :].apply(human_readable)
-    result_df.to_csv(f"{Path(__file__).parent}/ratingsite_stats.stat", index=True)
+    result = pd.concat(results, axis=1)
+    result.to_csv(f"{WORKDIR}/ratingsite_stats.stat", index=False)
 
 @cli.command()
 def get_overall_stats():
-    vendor_stats = pd.read_csv(f"{Path(__file__).parent}/vendor_stats.stat", index_col=0).loc[["nquads", "size"], :].astype(float)
-    ratingsite_stats = pd.read_csv(f"{Path(__file__).parent}/ratingsite_stats.stat", index_col=0).loc[["nquads", "size"], :].astype(float)
+    vendor_stats = pd.read_csv(f"{Path(__file__).parent}/vendor_stats.stat")
+    ratingsite_stats = pd.read_csv(f"{Path(__file__).parent}/ratingsite_stats.stat")
     
     result_df = vendor_stats + ratingsite_stats
     
     print(result_df)
     
-    result_df.loc["size_simplified", :] = result_df.loc["size", :].apply(human_readable)
-    result_df.to_csv(f"{Path(__file__).parent}/overall_stats.stat", index=True)
+    result_df.to_csv(f"{Path(__file__).parent}/overall_stats.stat", index=False)
         
 if __name__ == "__main__":
     cli()

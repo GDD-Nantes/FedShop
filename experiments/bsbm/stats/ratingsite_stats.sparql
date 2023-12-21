@@ -1,0 +1,6 @@
+SELECT (COUNT(*) as ?nbQuads) WHERE {
+    GRAPH ?g {
+        ?s ?p ?o .
+    }
+    FILTER(REGEX(?g, "ratingsite"))
+}

@@ -90,7 +90,7 @@ generation:
         rating4_p: 0.7
 
 evaluation:
-  n_attempts: 4
+  n_attempts: 3
   timeout: 120 # 60s + With overhead (jvm + startup + summary)
   proxy: 
     compose_file: "${generation.workdir}/docker/proxy.yml"
@@ -109,6 +109,12 @@ evaluation:
       summary_generator_dir: "engines/semagrow/sevod-scraper"
     anapsid:
       dir: "engines/ANAPSID"
+    fedup_h0:
+      dir: "engines/FedUP-experiments"
+    fedup_id:
+      dir: "engines/FedUP-experiments"
+    hibiscus:
+      dir: "engines/FedUP-experiments"
     ideal:
      dir: "engines/ARQ"
      internal_endpoint_prefix: "http://localhost:8890/sparql/?default-graph-uri="

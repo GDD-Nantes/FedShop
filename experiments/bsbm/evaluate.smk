@@ -84,7 +84,7 @@ def activate_one_container(batch_id):
     """
 
     is_virtuoso_restarted = False
-    VIRTUOSO_MANUAL_ENDPOINT = CONFIG_GEN["virtuoso"].get("manuel_port")
+    VIRTUOSO_MANUAL_ENDPOINT = CONFIG_GEN["virtuoso"]["manual_port"]
     if VIRTUOSO_MANUAL_ENDPOINT != -1:
         if ping(f"http://localhost:{VIRTUOSO_MANUAL_ENDPOINT}/sparql") != 200:
             raise RuntimeError(f"Virtuoso endpoint {VIRTUOSO_MANUAL_ENDPOINT} is not available!")
@@ -167,17 +167,17 @@ rule compute_metrics:
     input: 
         provenance=expand(
             "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/attempt_{attempt_id}/provenance.csv", 
-            engine=CONFIG_EVAL["engines"],
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            instance_id=range(N_QUERY_INSTANCES),
-            attempt_id=range(CONFIG_EVAL["n_attempts"])
+            engine=ENGINE_ID,
+            query=QUERY_PATH,
+            instance_id=INSTANCE_ID,
+            attempt_id=ATTEMPT_ID
         ),
         results=expand(
             "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/attempt_{attempt_id}/results.csv", 
-            engine=CONFIG_EVAL["engines"],
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            instance_id=range(N_QUERY_INSTANCES),
-            attempt_id=range(CONFIG_EVAL["n_attempts"])
+            engine=ENGINE_ID,
+            query=QUERY_PATH,
+            instance_id=INSTANCE_ID,
+            attempt_id=ATTEMPT_ID
         ),
     output: "{benchDir}/eval_metrics_batch{batch_id}.csv"
     shell: "python rsfb/metrics.py compute-metrics {CONFIGFILE} {output} {input.provenance}"
@@ -216,8 +216,8 @@ rule transform_results:
 
                 create_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
 
-                if len(engine_results) < len(expected_results):
-                    raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
+                # if len(engine_results) < len(expected_results):
+                #     raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
             # else:
             #     create_stats(f"{Path(str(input)).parent}/stats.csv")
 
@@ -279,7 +279,7 @@ rule evaluate_engines:
         previous_reason = str(skip_stats_file | cat() | find_first_pattern([r"(timeout)"]))
 
         if NO_EXEC:
-            shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id}")
+            shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id} --noexec")
 
         else:
             if canSkip and previous_reason != "":

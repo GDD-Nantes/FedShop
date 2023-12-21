@@ -271,7 +271,7 @@ def __get_publisher_info(x):
         .astype(int).item()
 
 def get_docker_endpoints(manual_endpoint, compose_file, service_name):
-    if manual_endpoint == -1:
+    if manual_endpoint != -1:
         return [f"http://localhost:{manual_endpoint}/sparql"]
     
     cmd = f"docker-compose -f {compose_file} ps --all --format json {service_name}"
