@@ -14,8 +14,19 @@ FedShop consists of three components:
 - The quickstart guide is available in the [Quickstart tutorial](https://github.com/GDD-Nantes/FedShop/wiki/1.-Quick-start)
 - How to configure FedShop and how to extend FedShop is available in the [wiki](https://github.com/GDD-Nantes/FedShop/wiki)
 
-
-
+FedShop has been published in ISWC2023 as a resource paper:
+- Dang, M. H., Aimonier-Davat, J., Molli, P., Hartig, O., Skaf-Molli, H., & Le Crom, Y. (2023, October). FedShop: A Benchmark for Testing the Scalability of SPARQL Federation Engines. In International Semantic Web Conference (pp. 285-301). Cham: Springer Nature Switzerland.
+- https://hal.science/hal-04180506/document 
+```
+@inproceedings{dang2023fedshop,
+  title={FedShop: A Benchmark for Testing the Scalability of SPARQL Federation Engines},
+  author={Dang, Minh-Hoang and Aimonier-Davat, Julien and Molli, Pascal and Hartig, Olaf and Skaf-Molli, Hala and Le Crom, Yotlan},
+  booktitle={International Semantic Web Conference},
+  pages={285--301},
+  year={2023},
+  organization={Springer}
+}
+```
 
 ## FedShop200 Datasets and Queries
 
