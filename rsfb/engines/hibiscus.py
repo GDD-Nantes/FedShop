@@ -36,7 +36,7 @@ def cli():
 
 def __compile_fedup():
     if os.system(f"{mvn_bin} -Dmaven.repo.local={os.getcwd()}/.m2/repository clean install -Dmaven.test.skip=true") != 0:
-        raise RuntimeError("Could not compile FedUP!")
+        raise RuntimeError("Could not compile HiBISCuS!")
 
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
@@ -48,13 +48,13 @@ def prerequisites(ctx: click.Context, eval_config):
         eval_config (_type_): _description_
     """
     config = load_config(eval_config)
-    app_dir = config["evaluation"]["engines"]["fedup_h0"]["dir"]
+    app_dir = config["evaluation"]["engines"]["hibiscus"]["dir"]
     
     os.chdir(app_dir)
     
     if os.system('conda info --envs | grep "fedupxp"') != 0:
         if os.system("conda env create -f environment.yml") != 0:
-            raise RuntimeError("Could not setup Python environment for FedUP")
+            raise RuntimeError("Could not setup Python environment for HiBISCuS")
     
     if not os.path.exists("apache-jena-4.7.0"):
         if os.system("wget https://archive.apache.org/dist/jena/binaries/apache-jena-4.7.0.tar.gz") != 0:
@@ -105,7 +105,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     
     config = load_config(eval_config)
     proxy_server = config["evaluation"]["proxy"]["endpoint"]
-    app_dir = config["evaluation"]["engines"]["fedup_h0"]["dir"]
+    app_dir = config["evaluation"]["engines"]["hibiscus"]["dir"]
 
     olddir = Path(os.getcwd()).absolute()
     
@@ -116,7 +116,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     # Get env-specific executable for python
     get_python_proc = subprocess.run('conda info --envs | grep "fedupxp"', shell=True, capture_output=True)
     if get_python_proc.returncode != 0:
-        raise RuntimeError("Could not get the correct executable for FedUP")
+        raise RuntimeError("Could not get the correct executable for HiBISCuS")
     
     env_dir = get_python_proc.stdout.decode()
     snakemake_bin = os.path.join(re.sub(r"(.*)\s+(\*)?\s+(.*)", r"\3", env_dir).strip(), "bin", "snakemake")
@@ -126,7 +126,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     failed_reason = None
     
     query_name = re.search(r"(q\d+)", query).group(1)
-    output_file = f"output/fedshop/fedup-{approach}/{query_name}.1.csv"
+    output_file = f"output/fedshop/hibiscus/{query_name}.1.csv"
 
     elapsed_time = None
 
@@ -150,7 +150,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         os.chdir(app_dir)
         
         # Clean run Snakemake
-        cmd = f'rm -rf .snakemake/ output/ && {snakemake_bin} -C virtuoso_port={virtuoso_port} workload="[fedshop]" approach="[fedup-{approach}]" timeout={timeout} -c1'
+        cmd = f'rm -rf .snakemake/ output/ && {snakemake_bin} -C virtuoso_port={virtuoso_port} workload="[fedshop]" approach="[hibiscus]" timeout={timeout} -c1'
         logger.debug(cmd)        
         
         start_time = time.time()
@@ -167,7 +167,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         
         # No output 
         if not os.path.exists(output_file):
-            # Kill all FedUP instance
+            # Kill all HiBISCuS instance
             if os.system("lsof -t -i :8080 -sTCP:LISTEN | xargs -r kill -9") != 0:
                 logger.warn("FedUp is either already killed (GOOD) or cannot be killed (BAD)")
             raise RuntimeError("FedUp did not produce any output!")
@@ -175,40 +175,39 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         # Write output
         output = pd.read_csv(output_file)
         status = output["status"].item()
-        
-        exec_time = output["executionTime"].item()
-        
+                
         if status == "OK":
             # Write source assignment
             source_assignments_str = str(output["assignments"].item()).replace("'", '"').replace("\\n", "")
-            source_assignments_in = json.loads(source_assignments_str)
-            tpAliases = json.loads(str(output["tpAliases"].item()).replace("'", '"').replace("\\n", ""))
-
-            prefix_cache = os.path.join("../../", Path(query).parent, "prefix_cache.json")
-            comp = json.load(open(os.path.join(Path(prefix_cache).parent, "provenance.sparql.comp"), "r"))
-            prefix2alias = json.load(open(prefix_cache, "r"))
-
-            inv_comp = {f"{' '.join(v)}": k for k, v in comp.items()}
-            records = []
-                        
+            source_assignments_in = json.loads(source_assignments_str)        
+            
+            source_assignments_out = {}
             for sa in source_assignments_in:
-                record = {}
                 for tp, source in sa.items():
-                    alias = tpAliases[tp]
-                    triple = extract_triple(alias, prefix2alias)
-                    record[inv_comp.get(triple)] = source
-                    source = re.sub(r"http://(www\.\w+\.fr)/", r"\1", source)
+                    fex_pattern = r"(StatementSource\s+\(id=sparql_).*(www(\.\w+)+\.[a-z]+).*(_,\s+type=[A-Z]+\))"
+                    source = re.sub(fex_pattern, r"\1\2\4", source)
+                    if source_assignments_out.get(tp) is None:
+                        source_assignments_out[tp] = []
                     
-                records.append(record)
-                
-            source_assignments_df = pd.DataFrame.from_records(records)
-            source_assignments_df = source_assignments_df.reindex(sorted(source_assignments_df.columns, key=lambda x: int(x[2:])), axis=1)
+                    if source not in source_assignments_out[tp]:
+                        source_assignments_out[tp].append(source)
+            
+            source_assignments_out = {k: str(v) for k, v in source_assignments_out.items()}
+            source_assignments_df = pd.DataFrame.from_dict(source_assignments_out, orient="index").reset_index()
+            source_assignments_df.columns = ["triple", "source_selection"]
+            Path("../../" + out_source_selection).parent.mkdir(parents=True, exist_ok=True)
             source_assignments_df.to_csv("../../" + out_source_selection, index=False)
             
             # Write results
             solutions_str = str(output["solutions"].item()).replace('"', '\\"').replace("'[", '"[').replace("]'", ']"').replace("\\'", "'").replace('""', '"')
             solutions = json.loads(solutions_str)
-            #pd.DataFrame(solutions).to_csv("../../" + out_result, header=False, index=False)
+            if len(solutions) == 0:
+                # TODO: Only do this to output results quickly. Further investigation required!!
+                # TODO: Check fedup.log.bak for error detail. Prime suspect: Virtuoso
+                Path("../../" + out_result).touch() 
+                failed_reason = "error_zero_result"
+                # raise RuntimeError("FedUp terminated but did not produce any output!")
+            
             with open("../../" + out_result, "w") as out_result_fs:
                 out_result_fs.write("\n".join(solutions))
                 
@@ -220,6 +219,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             
             exec_time_file = "../../" + str(Path(out_result).parent) + "/exec_time.txt"
             with open(exec_time_file, "w") as exec_time_file_fs:
+                exec_time = output["executionTime"].item()
                 exec_time_file_fs.write(str(exec_time + source_selection_time))
                 
         elif status == "TIMEOUT":  
@@ -241,8 +241,8 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
             Path("../../" + out_result).touch()
             Path("../../" + out_source_selection).touch()
         
-        # if os.system("lsof -t -i :8080 -sTCP:LISTEN | xargs -r kill -9") != 0:
-        #     raise RuntimeError("Could not kill FedUP after execution!")
+        elif status == "500":
+            raise RuntimeError("FedUP Internal Server error")
         
         # Write stats
         os.chdir(olddir)
@@ -264,32 +264,6 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
         
             logger.info(f"Writing stats to {stats}")
             create_stats(stats, failed_reason)
-
-def extract_triple(x, prefix2alias):
-    fedx_pattern = r"StatementPattern\s+(\(new scope\)\s+)?Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)\s+Var\s+\((name=\w+,\s+value=(.*),\s+anonymous|name=(\w+))\)"
-    match = re.match(fedx_pattern, x)
-        
-    s = match.group(3)
-    if s is None: s = f"?{match.group(4)}"
-        
-    p = match.group(6)
-    if p is None: p = f"?{match.group(7)}"
-        
-    o = match.group(9) 
-    if o is None: o = f"?{match.group(10)}"
-        
-    result = " ".join([s, p, o])
-                
-    for prefix, alias in prefix2alias.items():
-        result = result.replace(prefix, f"{alias}:")
-            
-    if s.startswith("http"):
-        result = result.replace(s, str2n3(s))
-            
-    if o.startswith("http"):
-        result = result.replace(o, str2n3(o))
-        
-    return result 
 
 @cli.command()
 @click.argument("infile", type=click.Path(exists=False, file_okay=True, dir_okay=False))
@@ -319,8 +293,7 @@ def transform_provenance(ctx: click.Context, infile, outfile, prefix_cache):
         outfile (_type_): _description_
         prefix_cache (_type_): _description_
     """
-    #ctx.invoke(fedx.transform_provenance, infile=infile, outfile=outfile, prefix_cache=prefix_cache)
-    shutil.copyfile(infile, outfile)
+    ctx.invoke(fedx.transform_provenance, infile=infile, outfile=outfile, prefix_cache=prefix_cache)
 
 @cli.command()
 @click.argument("datafiles", type=click.Path(exists=True, dir_okay=False, file_okay=True), nargs=-1)
@@ -340,44 +313,11 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     """
     
     config = load_config(eval_config)
-    app_dir = config["evaluation"]["engines"]["fedup_h0"]["dir"]
+    app_dir = config["evaluation"]["engines"]["hibiscus"]["dir"]
     
     olddir = Path(os.getcwd()).absolute()
     os.chdir(app_dir)
     
-    # Create fedup summary
-    summary_file = f"summaries/fedshop/batch{batch_id}/fedup-h0.nq"
-    batch_file = f"datasets/fedshop/fedup-batch{batch_id}.nq"
-    modulo = 0
-    
-    # Generate data if not exists
-    if not os.path.exists(batch_file):
-        Path(batch_file).parent.mkdir(parents=True, exist_ok=True)
-        if os.system(f"cat {' '.join(datafiles)} > {batch_file}") != 0:
-            raise RuntimeError("Could not generate batch file for FedUP")
-    
-    # Generate summary files if not exists
-    if not os.path.exists(summary_file):    
-        Path(summary_file).parent.mkdir(parents=True, exist_ok=True)
-        cmd = f'{mvn_bin} exec:java -Dmaven.repo.local={os.getcwd()}/.m2/repository -Dexec.mainClass="fr.univnantes.gdd.fedup.startup.GenerateSummaries" -Dexec.args="fedup -d {batch_file} -o {summary_file} -m {modulo}" -pl fedup'
-        logger.debug(cmd)
-        if os.system(cmd) != 0:
-            raise RuntimeError("Could not generate summary file for FedUP")
-                
-    # Load the summaries into Apache Jena
-    apache_summary_file = f"summaries/fedshop/batch{batch_id}/fedup-h0"
-    if not os.path.exists(apache_summary_file):
-        Path(apache_summary_file).parent.mkdir(parents=True, exist_ok=True)
-        if os.system(f'./apache-jena-4.7.0/bin/tdb2.xloader --loc {apache_summary_file} {summary_file}') != 0:
-            raise RuntimeError("Could not load summary file into Apache Jena")
-    
-    # Load the ideal summaries into Apache Jena
-    apache_summary_id = f"summaries/fedshop/batch{batch_id}/fedup-id"
-    if not os.path.exists(apache_summary_id):
-        Path(apache_summary_id).parent.mkdir(parents=True, exist_ok=True)
-        if os.system(f'./apache-jena-4.7.0/bin/tdb2.xloader --loc {apache_summary_id} {batch_file}') != 0:
-            raise RuntimeError("Could not load ideal summary file into Apache Jena")
-        
     # Update the endpoints.txt
     sources = set()
     for datafile in datafiles:
@@ -387,32 +327,41 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
             source = source[1:-1]
             sources.add(source)
     
-    with open("config/fedshop/endpoints.txt", "w") as epf:
+    endpoints_file = "config/fedshop/endpoints.txt"
+    with open(endpoints_file, "w") as epf:
         #virtuoso_endpoint = config["generation"]["virtuoso"]["endpoints"]
         proxy_server = config["evaluation"]["proxy"]["endpoint"] + "sparql"
         endpoints = [ proxy_server + f"?default-graph-uri={source}" for source in sources ]
         epf.write('\n'.join(endpoints))
+    
+    # Create hibiscus summary
+    summary_file = f"summaries/fedshop/batch{batch_id}/hibiscus.n3"
+    batch_file = f"datasets/fedshop/fedup-batch{batch_id}.nq"
+    
+    # Generate data if not exists
+    if not os.path.exists(batch_file):
+        Path(batch_file).parent.mkdir(parents=True, exist_ok=True)
+        if os.system(f"cat {' '.join(datafiles)} > {batch_file}") != 0:
+            raise RuntimeError("Could not generate batch file for HiBISCuS")
+    
+    # Generate summary files if not exists
+    if not os.path.exists(summary_file):    
+        Path(summary_file).parent.mkdir(parents=True, exist_ok=True)
+        cmd = f'{mvn_bin} exec:java -Dmaven.repo.local={os.getcwd()}/.m2/repository -Dexec.mainClass="fr.univnantes.gdd.fedup.startup.GenerateSummaries" -Dexec.args="hibiscus -e {endpoints_file} -o {summary_file}" -pl fedup'
+        logger.debug(cmd)
+        if os.system(cmd) != 0:
+            raise RuntimeError("Could not generate summary file for HiBISCuS")
         
     # Update the relevant configfiles
-    fedup_h0_props = open("config/fedshop/fedup-h0.props").read()
-    fedup_h0_props = re.sub(r"batch\d+", f"batch{batch_id}", fedup_h0_props)
-    with open("config/fedshop/fedup-h0.props", "w") as h0fs:
-        h0fs.write(fedup_h0_props)
-    
-    fedup_id_props = open("config/fedshop/fedup-id.props").read()
-    fedup_id_props = re.sub(r"batch\d+", f"batch{batch_id}", fedup_id_props)
-    with open("config/fedshop/fedup-id.props", "w") as idfs:
-        idfs.write(fedup_id_props)
-        
-    fedup_id_opt_props = open("config/fedshop/fedup-id-optimal.props").read()
-    fedup_id_opt_props = re.sub(r"batch\d+", f"batch{batch_id}", fedup_id_opt_props)
-    with open("config/fedshop/fedup-id-optimal.props", "w") as id_opt_fs:
-        id_opt_fs.write(fedup_id_opt_props)
+    hibiscus_props = open("config/fedshop/hibiscus.props").read()
+    hibiscus_props = re.sub(r"batch\d+", f"batch{batch_id}", hibiscus_props)
+    with open("config/fedshop/hibiscus.props", "w") as h0fs:
+        h0fs.write(hibiscus_props)
     
     os.chdir(olddir)
     Path(outfile).parent.mkdir(parents=True, exist_ok=True)
     with open(outfile, "w") as ofs:
-        ofs.write(fedup_h0_props)
+        ofs.write(hibiscus_props)
     
 if __name__ == "__main__":
     cli()

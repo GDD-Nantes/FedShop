@@ -25,7 +25,6 @@ from utils import activate_one_container as utils_activate_one_container
 #===============================
 
 CONFIGFILE = config["configfile"]
-
 WORK_DIR = "experiments/bsbm"
 CONFIG = load_config(CONFIGFILE)
 
@@ -58,6 +57,22 @@ MODEL_DIR = f"{WORK_DIR}/model"
 BENCH_DIR = f"{WORK_DIR}/benchmark/evaluation"
 TEMPLATE_DIR = f"{MODEL_DIR}/watdiv"
 
+BATCH_ID = str(config["batch"]).split(",") if config.get("batch") is not None else range(N_BATCH)
+ENGINE_ID = str(config["engine"]).split(",") if config.get("engine") is not None else CONFIG_EVAL["engines"]
+QUERY_PATH = (
+    [Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in str(config["query"]).split(",")] 
+    if config.get("query") is not None else 
+    [Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")]
+)
+INSTANCE_ID = str(config["instance"]).split(",") if config.get("instance") is not None else range(N_QUERY_INSTANCES)
+
+DEBUG = eval(str(config["debug"])) if config.get("explain") is not None else False
+
+ATTEMPT_ID = str(config["attempt"]).split(",") if config.get("attempt") is not None else range(CONFIG_EVAL["n_attempts"])
+if DEBUG:
+    ATTEMPT_ID = ["debug"]
+
+NO_EXEC = eval(str(config["explain"])) if config.get("explain") is not None else False
 LOGGER = rsfb_logger(Path(__file__).name)
 
 #=================
@@ -68,8 +83,15 @@ def activate_one_container(batch_id):
     """ Activate one container while stopping all others
     """
 
-    LOGGER.info("Activating Virtuoso docker container...")
-    is_virtuoso_restarted = utils_activate_one_container(batch_id, SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, LOGGER, f"{BENCH_DIR}/virtuoso-ok.txt")
+    is_virtuoso_restarted = False
+    VIRTUOSO_MANUAL_ENDPOINT = CONFIG_GEN["virtuoso"]["manual_port"]
+    if VIRTUOSO_MANUAL_ENDPOINT != -1:
+        if ping(f"http://localhost:{VIRTUOSO_MANUAL_ENDPOINT}/sparql") != 200:
+            raise RuntimeError(f"Virtuoso endpoint {VIRTUOSO_MANUAL_ENDPOINT} is not available!")
+
+    else:
+        LOGGER.info("Activating Virtuoso docker container...")
+        is_virtuoso_restarted = utils_activate_one_container(batch_id, SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, LOGGER, f"{BENCH_DIR}/virtuoso-ok.txt")
 
     LOGGER.info("Activating proxy docker container...")
     proxy_target = CONFIG_GEN["virtuoso"]["endpoints"][-1]
@@ -77,10 +99,11 @@ def activate_one_container(batch_id):
     if ping(PROXY_SPARQL_ENDPOINT) == -1:
         LOGGER.info("Starting proxy server...")
         shell(f"docker-compose -f {PROXY_COMPOSE_FILE} up -d {PROXY_SERVICE_NAME}")
-        
-    if ping(PROXY_SPARQL_ENDPOINT) != 200:
-        shell(f'curl -X GET {PROXY_SERVER + "set-destination"}?proxyTo={proxy_target}')
-        wait_for_container(PROXY_SPARQL_ENDPOINT, "/dev/null", logger , wait=1)
+    
+    while ping(PROXY_SPARQL_ENDPOINT) != 200:
+        os.system(f'curl -X GET {PROXY_SERVER + "set-destination"}?proxyTo={proxy_target}')
+        time.sleep(1)
+        #wait_for_container(PROXY_SPARQL_ENDPOINT, "/dev/null", logger , wait=1)
 
     if is_virtuoso_restarted:
         shell(f"python rsfb/engines/ideal.py warmup {CONFIGFILE}")
@@ -110,7 +133,7 @@ rule all:
 
 rule merge_metrics:
     priority: 1
-    input: expand("{{benchDir}}/metrics_batch{batch_id}.csv", batch_id=range(N_BATCH))
+    input: expand("{{benchDir}}/metrics_batch{batch_id}.csv", batch_id=BATCH_ID)
     output: "{benchDir}/metrics.csv"
     run: pd.concat((pd.read_csv(f) for f in input)).to_csv(f"{output}", index=False)
 
@@ -130,10 +153,10 @@ rule merge_stats:
     input: 
         expand(
             "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/attempt_{attempt_id}/stats.csv", 
-            engine=CONFIG_EVAL["engines"],
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            instance_id=range(N_QUERY_INSTANCES),
-            attempt_id=range(CONFIG_EVAL["n_attempts"])
+            engine=ENGINE_ID,
+            query=QUERY_PATH,
+            instance_id=INSTANCE_ID,
+            attempt_id=ATTEMPT_ID
         )
     output: "{benchDir}/eval_stats_batch{batch_id}.csv"
     run: pd.concat((pd.read_csv(f) for f in input)).to_csv(f"{output}", index=False)
@@ -144,17 +167,17 @@ rule compute_metrics:
     input: 
         provenance=expand(
             "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/attempt_{attempt_id}/provenance.csv", 
-            engine=CONFIG_EVAL["engines"],
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            instance_id=range(N_QUERY_INSTANCES),
-            attempt_id=range(CONFIG_EVAL["n_attempts"])
+            engine=ENGINE_ID,
+            query=QUERY_PATH,
+            instance_id=INSTANCE_ID,
+            attempt_id=ATTEMPT_ID
         ),
         results=expand(
             "{{benchDir}}/{engine}/{query}/instance_{instance_id}/batch_{{batch_id}}/attempt_{attempt_id}/results.csv", 
-            engine=CONFIG_EVAL["engines"],
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            instance_id=range(N_QUERY_INSTANCES),
-            attempt_id=range(CONFIG_EVAL["n_attempts"])
+            engine=ENGINE_ID,
+            query=QUERY_PATH,
+            instance_id=INSTANCE_ID,
+            attempt_id=ATTEMPT_ID
         ),
     output: "{benchDir}/eval_metrics_batch{batch_id}.csv"
     shell: "python rsfb/metrics.py compute-metrics {CONFIGFILE} {output} {input.provenance}"
@@ -192,7 +215,9 @@ rule transform_results:
                 LOGGER.debug(engine_results)
 
                 create_stats(f"{Path(str(input)).parent}/stats.csv", "error_mismatch_expected_results")
-                #raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
+
+                # if len(engine_results) < len(expected_results):
+                #     raise RuntimeError(f"{wildcards.engine} does not produce the expected results")
             # else:
             #     create_stats(f"{Path(str(input)).parent}/stats.csv")
 
@@ -214,6 +239,7 @@ rule evaluate_engines:
         result_txt="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.txt",
     params:
         query_plan="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/query_plan.txt",
+        result_csv="{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.csv",
         engine_config="{benchDir}/{engine}/config/batch_{batch_id}/{engine}.conf",
         last_batch=LAST_BATCH
     run: 
@@ -232,6 +258,7 @@ rule evaluate_engines:
         canSkip = batch_id > 0 and os.path.exists(same_file_previous_batch) and os.stat(same_file_previous_batch).st_size == 0
         skipReason = f"Skip evaluation because previous batch at {same_file_previous_batch} timed out or error"
 
+        skipCount = 0
         for attempt in range(CONFIG_EVAL["n_attempts"]):
             same_file_other_attempt = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{batch_id}/attempt_{attempt}/results.txt"
             LOGGER.info(f"Checking {same_file_other_attempt} ...")
@@ -243,21 +270,29 @@ rule evaluate_engines:
                 skipAttempt = attempt
                 skipReason = f"Skip evaluation because another attempt at {same_file_other_attempt} timed out"
                 canSkip = True
-                break
+                skipCount += 1
+                #break
+
+        canSkip = (skipCount == CONFIG_EVAL["n_attempts"] ) 
 
         skip_stats_file = f"{BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/stats.csv"
         previous_reason = str(skip_stats_file | cat() | find_first_pattern([r"(timeout)"]))
 
-        if canSkip and previous_reason != "":
-            LOGGER.info(skipReason)
+        if NO_EXEC:
             shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id} --noexec")
-            create_stats(str(output.stats), previous_reason)
-            #shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
-            # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/query_plan.txt {params.query_plan}")
-            # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/source_selection.txt {output.source_selection}")
-            # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/results.txt {output.result_txt}")
+
         else:
-            shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id}")
+            if canSkip and previous_reason != "":
+                LOGGER.info(skipReason)
+                shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id} --noexec")
+                create_stats(str(output.stats), previous_reason)
+                # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
+                # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/query_plan.txt {params.query_plan}")
+                # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/source_selection.txt {output.source_selection}")
+                # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/results.txt {output.result_txt}")
+            else:
+                shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id}")
+
 
 rule engines_prerequisites:
     output: "{benchDir}/{engine}/{engine}-ok.txt"

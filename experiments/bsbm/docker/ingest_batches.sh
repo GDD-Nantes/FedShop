@@ -6,8 +6,21 @@ function probe(){
 }
 
 # PARAMS
-n_containers=10
+n_containers=$1
+container_from=1
+container_to=$n_containers
 reset_database=true
+
+if [ $# -eq 3 ]; then
+    n_containers=$1
+    container_from=$2
+    container_to=$3
+
+    if [ $container_to -lt $n_containers ]; then
+        echo "container_to could not exceed n_containers"
+        exit -1;
+    fi
+fi
 
 OPENLINK_CONTAINER_PATH_TO_ISQL="/opt/virtuoso-opensource/bin/isql"
 OPENLINK_CONTAINER_PATH_TO_DATA="/usr/share/proj/" 
@@ -25,7 +38,7 @@ if [ "$reset_database" = true ]; then
     docker volume ls | awk 'NR > 1 {print $2}' | xargs docker volume rm
 fi
 
-for container_id in $(seq 1 $n_containers)
+for container_id in $(seq $container_from $container_to)
 do
     container_name="docker-bsbm-virtuoso-${container_id}"
     echo "Stopping all containers..."

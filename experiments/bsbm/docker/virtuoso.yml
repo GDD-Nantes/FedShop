@@ -1,4 +1,32 @@
 services:
+  bsbm-virtuoso:
+    image: openlink/virtuoso-opensource-7:7.2.7
+    environment:
+      SPARQL_UPDATE: "false"
+      DBA_PASSWORD: "dba"
+      VIRT_HTTPServer_ServerThreads: 20
+      VIRT_HTTPServer_MaxClientConnections: 20
+      VIRT_SPARQL_MaxQueryCostEstimationTime: 0
+      VIRT_SPARQL_ResultSetMaxRows: 0
+      VIRT_SPARQL_MaxQueryExecutionTime: 0
+      VIRT_Parameters_NumberOfBuffers: 1360000
+      VIRT_Parameters_MaxDirtyBuffers: 1000000
+      VIRT_Parameters_MaxClientConnections: 20
+      VIRT_Parameters_IndexTreeMaps: 256
+      VIRT_Parameters_CheckpointInterval: 0
+      VIRT_Parameters_DefaultIsolation: 1
+      VIRT_Parameters_ThreadCleanupInterval: 1
+      VIRT_Parameters_ResourcesCleanupInterval: 1
+      VIRT_Plugins_Load1: "plain, geos"
+      VIRT_Plugins_Load2: "plain, proj4"
+      VIRT_Plugins_Load3: "plain, shapefileio"
+      #VIRT_Plugins_Load4: "plain, graphql"
+    volumes:
+      - "../model/dataset:/usr/share/proj"
+    ports:
+      - 33201-33210:1111
+      - 34201-34210:8890
+      
   bsbm-product-only:
     container_name: "bsbm-product-only"
     image: openlink/virtuoso-opensource-7:7.2.9
@@ -14,9 +42,10 @@ services:
       VIRT_Parameters_MaxDirtyBuffers: 1000000
       VIRT_Parameters_MaxClientConnections: 20
       VIRT_Parameters_IndexTreeMaps: 256
+      VIRT_Parameters_CheckpointInterval: 0 
       VIRT_Parameters_DefaultIsolation: 1; READ UNCOMMITED
-      VIRT_Parameters_ThreadCleanupInterval: 1; Automatically clean up threads
-      VIRT_Parameters_ResourcesCleanupInterval: 1; Automatically clean up threads
+      VIRT_Parameters_ThreadCleanupInterval: 1
+      VIRT_Parameters_ResourcesCleanupInterval: 1
       VIRT_Plugins_Load1: "plain, geos"
       VIRT_Plugins_Load2: "plain, proj4"
       VIRT_Plugins_Load3: "plain, shapefileio"
@@ -26,34 +55,3 @@ services:
     ports:
       - 1111:1111
       - 8890:8890
-
-  bsbm-virtuoso:
-    image: openlink/virtuoso-opensource-7:7.2.7
-    environment:
-      SPARQL_UPDATE: "false"
-      DBA_PASSWORD: "dba"
-      VIRT_HTTPServer_ServerThreads: 20
-      VIRT_HTTPServer_MaxClientConnections: 20
-      VIRT_SPARQL_MaxQueryCostEstimationTime: 0
-      VIRT_SPARQL_ResultSetMaxRows: 0
-      VIRT_SPARQL_MaxQueryExecutionTime: 0
-      # Uncomment next two lines if there is 16 GB system memory free
-      # VIRT_Parameters_NumberOfBuffers: 1360000
-      # VIRT_Parameters_MaxDirtyBuffers: 1000000
-      # Uncomment next two lines if there is 4 GB system memory free
-      VIRT_Parameters_NumberOfBuffers: 340000
-      VIRT_Parameters_MaxDirtyBuffers: 250000
-      VIRT_Parameters_ThreadCleanupInterval: 10
-      VIRT_Parameters_ResourcesCleanupInterval: 10
-      VIRT_Parameters_MaxClientConnections: 20
-      VIRT_Parameters_IndexTreeMaps: 256
-      VIRT_Plugins_Load1: "plain, geos"
-      VIRT_Plugins_Load2: "plain, proj4"
-      VIRT_Plugins_Load3: "plain, shapefileio"
-      VIRT_Plugins_Load4: "-"
-      #VIRT_Plugins_Load4: "plain, graphql"
-    volumes:
-      - "../model/dataset:/usr/share/proj"
-    ports:
-      - 33201-33210:1111
-      - 34201-34210:8890
