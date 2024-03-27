@@ -108,7 +108,7 @@ evaluation:
     #   summary_generator_dir: "engines/semagrow/sevod-scraper"
     # anapsid:
     #   dir: "engines/ANAPSID"
-    ideal:
+    rsa:
      dir: "engines/ARQ"
      internal_endpoint_prefix: "http://localhost:8890/sparql/?default-graph-uri="
      compose_file: "${generation.workdir}/docker/jena.yml"

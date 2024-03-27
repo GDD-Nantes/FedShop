@@ -21,12 +21,12 @@ import requests
 from tqdm import tqdm
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import activate_one_container, check_container_status, load_config, rsfb_logger, wait_for_container, create_stats
+from utils import activate_one_container, check_container_status, load_config, fedshop_logger, wait_for_container, create_stats
 from query import write_query, exec_query_on_endpoint
 
-logger = rsfb_logger(Path(__file__).name)
+logger = fedshop_logger(Path(__file__).name)
 
-import fedx
+import fedup
 
 # How to use
 # 1. Duplicate this file and rename the new file with <engine>.py
@@ -52,14 +52,14 @@ def prerequisites(ctx: click.Context, eval_config):
 
     # Download and install Jena
     current_pwd = os.getcwd()
-    os.chdir(config["evaluation"]["engines"]["ideal"]["dir"])
+    os.chdir(config["evaluation"]["engines"]["rsa"]["dir"])
     os.system("sh setup.sh")
     os.chdir(current_pwd)
     
     # Start fuseki server
-    compose_file = config["evaluation"]["engines"]["ideal"]["compose_file"]
-    service_name = config["evaluation"]["engines"]["ideal"]["service_name"]
-    container_name = config["evaluation"]["engines"]["ideal"]["container_name"]
+    compose_file = config["evaluation"]["engines"]["rsa"]["compose_file"]
+    service_name = config["evaluation"]["engines"]["rsa"]["service_name"]
+    container_name = config["evaluation"]["engines"]["rsa"]["container_name"]
     batch_id = config["generation"]["n_batch"] - 1
     if check_container_status(compose_file, service_name, container_name) != "running":
         if os.system(f"docker-compose -f {compose_file} up -d --force-recreate jena-fuseki") != 0:
@@ -67,6 +67,9 @@ def prerequisites(ctx: click.Context, eval_config):
     
     wait_for_container(config["generation"]["virtuoso"]["endpoints"][-1], "/dev/null", logger)
     #ctx.invoke(warmup, eval_config=eval_config)
+    
+    # Compile and install fedup
+    ctx.invoke(fedup.prerequisites, eval_config=eval_config)
     
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
@@ -84,11 +87,11 @@ def warmup(ctx: click.Context, eval_config, engine_config, repeat, batch_id):
 
     # Probe and start Jena 
     config = load_config(eval_config)
-    endpoint = config["evaluation"]["engines"]["ideal"]["endpoint"]    
+    endpoint = config["evaluation"]["engines"]["rsa"]["endpoint"]    
         
     if ping(endpoint) == -1:
-        compose_file = config["evaluation"]["engines"]["ideal"]["compose_file"]
-        service_name = config["evaluation"]["engines"]["ideal"]["service_name"]
+        compose_file = config["evaluation"]["engines"]["rsa"]["compose_file"]
+        service_name = config["evaluation"]["engines"]["rsa"]["service_name"]
         if os.system(f"docker-compose -f {compose_file} up -d {service_name}") != 0:
             raise RuntimeError("Could not setup Jena Docker Container...")
     
@@ -119,7 +122,7 @@ def warmup(ctx: click.Context, eval_config, engine_config, repeat, batch_id):
 @click.argument("query-plan", type=click.Path(exists=False, file_okay=True, dir_okay=True))
 @click.argument("force-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True))
 @click.pass_context
-def create_service_query(ctx: click.Context, eval_config, query, query_plan, force_source_selection):
+def create_service_query_manually(ctx: click.Context, eval_config, query, query_plan, force_source_selection):
     """Create a SERVICE query that will be sent to Jena
 
     Args:
@@ -136,7 +139,7 @@ def create_service_query(ctx: click.Context, eval_config, query, query_plan, for
     
     eval_config = load_config(eval_config)
     
-    internal_endpoint_prefix=str(eval_config["evaluation"]["engines"]["ideal"]["internal_endpoint_prefix"])
+    internal_endpoint_prefix=str(eval_config["evaluation"]["engines"]["rsa"]["internal_endpoint_prefix"])
     proxy_server = eval_config["evaluation"]["proxy"]["endpoint"]
     port = re.search(r":(\d+)", proxy_server).group(1)
     
@@ -179,7 +182,48 @@ def create_service_query(ctx: click.Context, eval_config, query, query_plan, for
         # Write service query
         out_query_text = write_query(out_query_text, service_query_file)
         return out_query_text
+    
+@cli.command()
+@click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
+@click.argument("query", type=click.Path(exists=False, file_okay=True, dir_okay=True)) # Engine config is not needed
+@click.argument("query-plan", type=click.Path(exists=False, file_okay=True, dir_okay=True))
+@click.option("--force-source-selection", type=click.Path(exists=False, file_okay=True, dir_okay=True))
+@click.option("--batch-id", type=click.INT)
+@click.pass_context
+def create_service_query(ctx: click.Context, eval_config, query, query_plan, force_source_selection, batch_id):
+    """Create a SERVICE query using FedUP
 
+    Args:
+        eval_config (_type_): _description_
+        query (_type_): _description_
+        query_plan (_type_): _description_
+        force_source_selection (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    conf = load_config(eval_config)
+    fedup_dir = conf["evaluation"]["engines"]["rsa"]["fedup_dir"]
+    proxy_server = conf["evaluation"]["proxy"]["endpoint"]
+    remote = proxy_server + "sparql?default-graph-uri=" 
+        
+    query = os.path.realpath(query)
+    query_plan = os.path.realpath(query_plan)
+    
+    summary_file = os.path.realpath(f"{fedup_dir}/summaries/fedshop/batch{batch_id}/fedup-id")
+    federation_file = os.path.realpath(f"{fedup_dir}/config/fedshop/endpoints_batch{batch_id}.txt")
+    
+    Path(federation_file).parent.mkdir(parents=True, exist_ok=True)
+    with open(federation_file, "w") as f:
+        for i in range((batch_id+1)*10):
+            f.write(f"http://www.vendor{i}.fr/\n")
+            f.write(f"http://www.ratingsite{i}.fr/\n")
+    
+    os.chdir(fedup_dir)
+    cmd = f'mvn exec:java -Dmain.class="fr.gdd.fedup.utils.QuerySourceSelectionExplain" -Dexec.args="--query={query} --summary={summary_file} --output={query_plan} --federation={federation_file} --format=union --remote={remote}"'
+    logger.debug(f"{cmd}")
+    os.system(cmd)
+    
 @cli.command()
 @click.argument("eval-config", type=click.Path(exists=True, file_okay=True, dir_okay=True))
 @click.argument("engine-config", type=click.Path(exists=False, file_okay=True, dir_okay=True))
@@ -220,7 +264,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     Path(query_plan).touch(exist_ok=True)
    
     # Execute results
-    endpoint = config["evaluation"]["engines"]["ideal"]["endpoint"]
+    endpoint = config["evaluation"]["engines"]["rsa"]["endpoint"]
     timeout = config["evaluation"]["timeout"]
     exec_time = None
     

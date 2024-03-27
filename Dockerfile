@@ -34,7 +34,7 @@ RUN wget https://github.com/docker/compose/releases/download/v2.22.0/docker-comp
 WORKDIR /FedShop/generators/watdiv
 RUN make rebuild && make install
 
-VOLUME /FedShop/experiments /FedShop/engines /FedShop/rsfb
+VOLUME /FedShop/experiments /FedShop/engines /FedShop/fedshop
 WORKDIR /FedShop
 ENTRYPOINT [ "dockerd-entrypoint.sh" ]
 CMD []

@@ -17,8 +17,8 @@ from io import BytesIO, StringIO, TextIOWrapper
 from rdflib import Literal, URIRef, XSD
 import click
 
-from utils import load_config, rsfb_logger, str2n3
-logger = rsfb_logger(Path(__file__).name)
+from utils import load_config, fedshop_logger, str2n3
+logger = fedshop_logger(Path(__file__).name)
 
 import nltk
 nltk.download('stopwords', quiet=True)

@@ -18,10 +18,10 @@ import requests
 from sklearn.calibration import LabelEncoder
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import check_container_status, kill_process, load_config, rsfb_logger, create_stats
+from utils import check_container_status, kill_process, load_config, fedshop_logger, create_stats
 import fedx
 
-logger = rsfb_logger(Path(__file__).name)
+logger = fedshop_logger(Path(__file__).name)
 # Example of use : 
 # python3 utils/generate-fedx-config-file.py experiments/bsbm/model/vendor test/out.ttl
 

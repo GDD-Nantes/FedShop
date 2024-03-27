@@ -17,7 +17,7 @@ from rdflib import Literal, URIRef
 
 import logging
 
-def rsfb_logger(logname):
+def fedshop_logger(logname):
     logger = logging.getLogger(logname)
     logger.setLevel(logging.DEBUG)
 
@@ -38,7 +38,7 @@ def rsfb_logger(logname):
     logger.addHandler(handler)
     return logger
 
-LOGGER = rsfb_logger(Path(__file__).name)
+LOGGER = fedshop_logger(Path(__file__).name)
 
 def str2n3(value):
     if str(value).startswith("http") or str(value).startswith("nodeID"): 

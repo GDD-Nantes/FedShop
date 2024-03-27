@@ -12,9 +12,9 @@ from textops import cat, find_first_pattern
 
 import sys
 smk_directory = os.path.abspath(workflow.basedir)
-sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
+sys.path.append(os.path.join(Path(smk_directory).parent.parent, "fedshop"))
 
-from utils import ping, rsfb_logger, load_config, get_docker_endpoint_by_container_name, get_docker_containers, check_container_status, create_stats, virtuoso_kill_all_transactions, wait_for_container
+from utils import ping, fedshop_logger, load_config, get_docker_endpoint_by_container_name, get_docker_containers, check_container_status, create_stats, virtuoso_kill_all_transactions, wait_for_container
 from utils import activate_one_container as utils_activate_one_container
 
 #===============================
@@ -73,7 +73,7 @@ if DEBUG:
     ATTEMPT_ID = ["debug"]
 
 NO_EXEC = eval(str(config["explain"])) if config.get("explain") is not None else False
-LOGGER = rsfb_logger(Path(__file__).name)
+LOGGER = fedshop_logger(Path(__file__).name)
 
 #=================
 # USEFUL FUNCTIONS
@@ -106,7 +106,7 @@ def activate_one_container(batch_id):
         #wait_for_container(PROXY_SPARQL_ENDPOINT, "/dev/null", logger , wait=1)
 
     if is_virtuoso_restarted:
-        shell(f"python rsfb/engines/ideal.py warmup {CONFIGFILE}")
+        shell(f"python fedshop/engines/rsa.py warmup {CONFIGFILE}")
 
 def generate_federation_declaration(federation_declaration_file, engine, batch_id):
     #sparql_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, SPARQL_CONTAINER_NAMES[LAST_BATCH])
@@ -122,7 +122,7 @@ def generate_federation_declaration(federation_declaration_file, engine, batch_i
     batch_files = ratingsite_data_files[:ratingsiteSliceId+1] + vendor_data_files[:vendorSliceId+1]  
 
     activate_one_container(LAST_BATCH)
-    shell(f"python rsfb/engines/{engine}.py generate-config-file {' '.join(batch_files)} {federation_declaration_file} {CONFIGFILE} {batch_id} {sparql_endpoint}")
+    shell(f"python fedshop/engines/{engine}.py generate-config-file {' '.join(batch_files)} {federation_declaration_file} {CONFIGFILE} {batch_id} {sparql_endpoint}")
 
 #=================
 # PIPELINE
@@ -180,7 +180,7 @@ rule compute_metrics:
             attempt_id=ATTEMPT_ID
         ),
     output: "{benchDir}/eval_metrics_batch{batch_id}.csv"
-    shell: "python rsfb/metrics.py compute-metrics {CONFIGFILE} {output} {input.provenance}"
+    shell: "python fedshop/metrics.py compute-metrics {CONFIGFILE} {output} {input.provenance}"
 
 rule transform_provenance:
     input: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/source_selection.txt"
@@ -188,14 +188,14 @@ rule transform_provenance:
     params:
         prefix_cache=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/prefix_cache.json", workDir=WORK_DIR)
     run: 
-        shell("python rsfb/engines/{wildcards.engine}.py transform-provenance {input} {output} {params.prefix_cache}")
+        shell("python fedshop/engines/{wildcards.engine}.py transform-provenance {input} {output} {params.prefix_cache}")
 
 rule transform_results:
     input: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.txt"
     output: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.csv"
     run:
         # Transform results
-        shell("python rsfb/engines/{wildcards.engine}.py transform-results {input} {output}")
+        shell("python fedshop/engines/{wildcards.engine}.py transform-results {input} {output}")
         if os.stat(str(output)).st_size > 0:
             expected_results = pd.read_csv(f"{WORK_DIR}/benchmark/generation/{wildcards.query}/instance_{wildcards.instance_id}/batch_{wildcards.batch_id}/results.csv").dropna(how="all", axis=1)
             expected_results = expected_results.reindex(sorted(expected_results.columns), axis=1)
@@ -222,10 +222,6 @@ rule transform_results:
             #     create_stats(f"{Path(str(input)).parent}/stats.csv")
 
 rule evaluate_engines:
-    """Evaluate queries using each engine's source selection on FedX.
-    
-    - Output: only statistics, no source-seleciton
-    """
     threads: 1
     retries: 1
     input: 
@@ -279,22 +275,22 @@ rule evaluate_engines:
         previous_reason = str(skip_stats_file | cat() | find_first_pattern([r"(timeout)"]))
 
         if NO_EXEC:
-            shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id} --noexec")
+            shell("python fedshop/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id} --noexec")
 
         else:
             if canSkip and previous_reason != "":
                 LOGGER.info(skipReason)
-                shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id} --noexec")
+                shell("python fedshop/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id} --noexec")
                 create_stats(str(output.stats), previous_reason)
                 # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
                 # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/query_plan.txt {params.query_plan}")
                 # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/source_selection.txt {output.source_selection}")
                 # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/results.txt {output.result_txt}")
             else:
-                shell("python rsfb/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id}")
+                shell("python fedshop/engines/{engine}.py run-benchmark {CONFIGFILE} {params.engine_config} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --force-source-selection {input.engine_source_selection} --query-plan {params.query_plan} --batch-id {batch_id}")
 
 
 rule engines_prerequisites:
     output: "{benchDir}/{engine}/{engine}-ok.txt"
-    shell: "python rsfb/engines/{wildcards.engine}.py prerequisites {CONFIGFILE} && echo 'OK' > {output}"
+    shell: "python fedshop/engines/{wildcards.engine}.py prerequisites {CONFIGFILE} && echo 'OK' > {output}"
 

@@ -5,10 +5,10 @@ from typing import Dict, Tuple
 import click
 import pandas as pd
 import numpy as np
-from utils import load_config, rsfb_logger
+from utils import load_config, fedshop_logger
 from tqdm import tqdm
 
-logger = rsfb_logger(Path(__file__).name)
+logger = fedshop_logger(Path(__file__).name)
 
 @click.group
 def cli():
@@ -38,7 +38,7 @@ def compute_metrics(configfile, outfile, workload):
     """
     
     def get_rwss(df: pd.DataFrame, agg, is_evaluation_mode):
-        """Result-wise source-selection. Only has meaning on ideal source-selection, i.e, the source-selection calculated in generation
+        """Result-wise source-selection. Only has meaning on rsa source-selection, i.e, the source-selection calculated in generation
 
         Args:
             df (pd.DataFrame): _description_

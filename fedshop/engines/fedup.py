@@ -16,8 +16,8 @@ import sys
 import requests
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import create_stats, kill_process, load_config, rsfb_logger, str2n3
-logger = rsfb_logger(Path(__file__).name)
+from utils import create_stats, kill_process, load_config, fedshop_logger, str2n3
+logger = fedshop_logger(Path(__file__).name)
 
 import fedx
 
@@ -48,7 +48,7 @@ def prerequisites(ctx: click.Context, eval_config):
         eval_config (_type_): _description_
     """
     config = load_config(eval_config)
-    app_dir = config["evaluation"]["engines"]["fedup_h0"]["dir"]
+    app_dir = config["evaluation"]["engines"]["fedup"]["dir"]
     
     os.chdir(app_dir)
     
@@ -105,7 +105,7 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
     
     config = load_config(eval_config)
     proxy_server = config["evaluation"]["proxy"]["endpoint"]
-    app_dir = config["evaluation"]["engines"]["fedup_h0"]["dir"]
+    app_dir = config["evaluation"]["engines"]["fedup"]["dir"]
 
     olddir = Path(os.getcwd()).absolute()
     
@@ -340,7 +340,7 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     """
     
     config = load_config(eval_config)
-    app_dir = config["evaluation"]["engines"]["fedup_h0"]["dir"]
+    app_dir = config["evaluation"]["engines"]["fedup"]["dir"]
     
     olddir = Path(os.getcwd()).absolute()
     os.chdir(app_dir)
@@ -371,12 +371,12 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
         if os.system(f'./apache-jena-4.7.0/bin/tdb2.xloader --loc {apache_summary_file} {summary_file}') != 0:
             raise RuntimeError("Could not load summary file into Apache Jena")
     
-    # Load the ideal summaries into Apache Jena
+    # Load the rsa summaries into Apache Jena
     apache_summary_id = f"summaries/fedshop/batch{batch_id}/fedup-id"
     if not os.path.exists(apache_summary_id):
         Path(apache_summary_id).parent.mkdir(parents=True, exist_ok=True)
         if os.system(f'./apache-jena-4.7.0/bin/tdb2.xloader --loc {apache_summary_id} {batch_file}') != 0:
-            raise RuntimeError("Could not load ideal summary file into Apache Jena")
+            raise RuntimeError("Could not load rsa summary file into Apache Jena")
         
     # Update the endpoints.txt
     sources = set()
@@ -387,17 +387,17 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
             source = source[1:-1]
             sources.add(source)
     
-    with open("config/fedshop/endpoints.txt", "w") as epf:
+    with open(f"config/fedshop/endpoints_batch{batch_id}.txt", "w") as epf:
         #virtuoso_endpoint = config["generation"]["virtuoso"]["endpoints"]
         proxy_server = config["evaluation"]["proxy"]["endpoint"] + "sparql"
         endpoints = [ proxy_server + f"?default-graph-uri={source}" for source in sources ]
         epf.write('\n'.join(endpoints))
         
     # Update the relevant configfiles
-    fedup_h0_props = open("config/fedshop/fedup-h0.props").read()
-    fedup_h0_props = re.sub(r"batch\d+", f"batch{batch_id}", fedup_h0_props)
+    fedup_props = open("config/fedshop/fedup-h0.props").read()
+    fedup_props = re.sub(r"batch\d+", f"batch{batch_id}", fedup_props)
     with open("config/fedshop/fedup-h0.props", "w") as h0fs:
-        h0fs.write(fedup_h0_props)
+        h0fs.write(fedup_props)
     
     fedup_id_props = open("config/fedshop/fedup-id.props").read()
     fedup_id_props = re.sub(r"batch\d+", f"batch{batch_id}", fedup_id_props)
@@ -412,7 +412,7 @@ def generate_config_file(ctx: click.Context, datafiles, outfile, eval_config, ba
     os.chdir(olddir)
     Path(outfile).parent.mkdir(parents=True, exist_ok=True)
     with open(outfile, "w") as ofs:
-        ofs.write(fedup_h0_props)
+        ofs.write(fedup_props)
     
 if __name__ == "__main__":
     cli()

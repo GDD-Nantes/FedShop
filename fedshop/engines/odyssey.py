@@ -130,9 +130,9 @@ def run_benchmark(ctx: click.Context, eval_config, engine_config, query, out_res
 
     data_transform(input_provenance_file, output_provenance_file)
 
-    ideal_ss = f"engines/Odyssey/results/{provenance_stat_to_modif}"
+    rsa_ss = f"engines/Odyssey/results/{provenance_stat_to_modif}"
 
-    args = [engine_config, query, result, stats, source_selection, ideal_ss]
+    args = [engine_config, query, result, stats, source_selection, rsa_ss]
     args = " ".join(args)
     #timeoutCmd = f'timeout --signal=SIGKILL {timeout}' if timeout != 0 else ""
     timeoutCmd = ""

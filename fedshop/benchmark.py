@@ -5,9 +5,9 @@ import re
 import shutil
 import subprocess
 import click
-from utils import load_config, rsfb_logger
+from utils import load_config, fedshop_logger
 
-logger = rsfb_logger(Path(__file__).name)
+logger = fedshop_logger(Path(__file__).name)
 
 @click.group
 def cli():
@@ -22,8 +22,9 @@ def cli():
 @click.option("--rerun-incomplete", is_flag=True, default=False)
 @click.option("--touch", is_flag=True, default=False)
 @click.option("--no-cache", is_flag=True, default=False)
+@click.option("--dry-run", is_flag=True, default=False)
 @click.pass_context
-def generate(ctx: click.Context, category, configfile, debug, clean, cores, rerun_incomplete, touch, no_cache):
+def generate(ctx: click.Context, category, configfile, debug, clean, cores, rerun_incomplete, touch, no_cache, dry_run):
     """Run the benchmark
 
     Args:
@@ -48,6 +49,7 @@ def generate(ctx: click.Context, category, configfile, debug, clean, cores, reru
 
     SNAKEMAKE_OPTS = f"-p --cores {cores} --config configfile={configfile}"
     if rerun_incomplete: SNAKEMAKE_OPTS += " --rerun-incomplete"
+    if dry_run: SNAKEMAKE_OPTS += " --dry-run"
     
     if touch:
         logger.info("Marking files as completed...")

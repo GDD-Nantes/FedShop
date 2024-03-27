@@ -28,8 +28,8 @@
 	path = engines/semagrow/semagrow
 	url = https://github.com/Yotlan/semagrow
 	branch = master
-[submodule "rsfb/proxy/FedShop-proxy"]
-	path = rsfb/proxy/FedShop-proxy
+[submodule "fedshop/proxy/FedShop-proxy"]
+	path = fedshop/proxy/FedShop-proxy
 	url = https://github.com/mhoangvslev/FedShop-proxy.git
 	branch = main
 [submodule "engines/FedUP-experiments"]

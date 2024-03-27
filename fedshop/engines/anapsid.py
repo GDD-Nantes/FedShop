@@ -18,10 +18,10 @@ from sklearn.calibration import LabelEncoder
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import check_container_status, kill_process, load_config, rsfb_logger, create_stats, str2n3
+from utils import check_container_status, kill_process, load_config, fedshop_logger, create_stats, str2n3
 import fedx
 
-logger = rsfb_logger(Path(__file__).name)
+logger = fedshop_logger(Path(__file__).name)
 
 # How to use
 # 1. Duplicate this file and rename the new file with <engine>.py

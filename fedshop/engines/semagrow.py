@@ -17,10 +17,10 @@ from sklearn.preprocessing import LabelEncoder
 import sys
 sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import check_container_status, load_config, rsfb_logger, str2n3, create_stats, create_stats
+from utils import check_container_status, load_config, fedshop_logger, str2n3, create_stats, create_stats
 import fedx
 
-logger = rsfb_logger(Path(__file__).name)
+logger = fedshop_logger(Path(__file__).name)
 
 # How to use
 # 1. Duplicate this file and rename the new file with <engine>.py

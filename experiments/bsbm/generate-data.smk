@@ -10,7 +10,7 @@ import json
 
 import sys
 smk_directory = os.path.abspath(workflow.basedir)
-sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
+sys.path.append(os.path.join(Path(smk_directory).parent.parent, "fedshop"))
 
 from utils import load_config, get_docker_endpoint_by_container_name, check_container_status
 
@@ -197,7 +197,7 @@ rule generate_ratingsites:
         status=expand("{workDir}/generator-ok.txt", workDir=WORK_DIR),
         product=ancient(CONFIG["schema"]["product"]["export_output_dir"])
     output: "{modelDir}/dataset/ratingsite{ratingsite_id}.nq"
-    shell: "python rsfb/generate.py generate {CONFIGFILE} ratingsite {output} --id {wildcards.ratingsite_id}"
+    shell: "python fedshop/generate.py generate {CONFIGFILE} ratingsite {output} --id {wildcards.ratingsite_id}"
 
 rule generate_vendors:
     priority: 13
@@ -206,14 +206,14 @@ rule generate_vendors:
         status=expand("{workDir}/generator-ok.txt", workDir=WORK_DIR),
         product=ancient(CONFIG["schema"]["product"]["export_output_dir"])
     output: "{modelDir}/dataset/vendor{vendor_id}.nq"
-    shell: "python rsfb/generate.py generate {CONFIGFILE} vendor {output} --id {wildcards.vendor_id}"
+    shell: "python fedshop/generate.py generate {CONFIGFILE} vendor {output} --id {wildcards.vendor_id}"
 
 rule generate_products:
     priority: 14
     threads: 1
     input: expand("{workDir}/generator-ok.txt", workDir=WORK_DIR)
     output: directory(CONFIG["schema"]["product"]["export_output_dir"]), 
-    shell: 'python rsfb/generate.py generate {CONFIGFILE} product {output}'
+    shell: 'python fedshop/generate.py generate {CONFIGFILE} product {output}'
 
 rule start_generator_container:
     output: "{workDir}/generator-ok.txt"

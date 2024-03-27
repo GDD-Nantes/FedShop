@@ -10,9 +10,9 @@ import json
 
 import sys
 smk_directory = os.path.abspath(workflow.basedir)
-sys.path.append(os.path.join(Path(smk_directory).parent.parent, "rsfb"))
+sys.path.append(os.path.join(Path(smk_directory).parent.parent, "fedshop"))
 
-from utils import load_config, get_docker_endpoint_by_container_name, check_container_status
+from utils import ping, fedshop_logger, load_config, get_docker_endpoint_by_container_name, check_container_status
 
 #===============================
 # GENERATION PHASE:
@@ -27,10 +27,20 @@ from utils import load_config, get_docker_endpoint_by_container_name, check_cont
 CONFIGFILE = config["configfile"]
 
 WORK_DIR = "experiments/bsbm"
-CONFIG = load_config(CONFIGFILE)["generation"]
+CONFIG = load_config(CONFIGFILE)
+CONFIG_GEN = CONFIG["generation"]
+CONFIG_EVAL = CONFIG["evaluation"]
 
-SPARQL_COMPOSE_FILE = CONFIG["virtuoso"]["compose_file"]
-SPARQL_SERVICE_NAME = CONFIG["virtuoso"]["service_name"]
+
+SPARQL_COMPOSE_FILE = CONFIG_GEN["virtuoso"]["compose_file"]
+SPARQL_SERVICE_NAME = CONFIG_GEN["virtuoso"]["service_name"]
+
+PROXY_COMPOSE_FILE =  CONFIG_EVAL["proxy"]["compose_file"]
+PROXY_SERVICE_NAME = CONFIG_EVAL["proxy"]["service_name"]
+PROXY_CONTAINER_NAMES = CONFIG_EVAL["proxy"]["container_name"]
+PROXY_SERVER = CONFIG_EVAL["proxy"]["endpoint"]
+PROXY_PORT = re.search(r":(\d+)", PROXY_SERVER).group(1)
+PROXY_SPARQL_ENDPOINT = PROXY_SERVER + "sparql"
 
 CONTAINER_PATH_TO_ISQL = "/opt/virtuoso-opensource/bin/isql"
 CONTAINER_PATH_TO_DATA = "/usr/share/proj/" 
@@ -38,13 +48,13 @@ CONTAINER_PATH_TO_DATA = "/usr/share/proj/"
 # CONTAINER_PATH_TO_ISQL = "/usr/local/virtuoso-opensource/bin/isql-v" 
 # CONTAINER_PATH_TO_DATA = "/usr/local/virtuoso-opensource/share/virtuoso/vad"
 
-N_QUERY_INSTANCES = CONFIG["n_query_instances"]
-VERBOSE = CONFIG["verbose"]
-N_BATCH = CONFIG["n_batch"]
+N_QUERY_INSTANCES = CONFIG_GEN["n_query_instances"]
+VERBOSE = CONFIG_GEN["verbose"]
+N_BATCH = CONFIG_GEN["n_batch"]
 
 # Config per batch
-N_VENDOR=CONFIG["schema"]["vendor"]["params"]["vendor_n"]
-N_RATINGSITE=CONFIG["schema"]["ratingsite"]["params"]["ratingsite_n"]
+N_VENDOR=CONFIG_GEN["schema"]["vendor"]["params"]["vendor_n"]
+N_RATINGSITE=CONFIG_GEN["schema"]["ratingsite"]["params"]["ratingsite_n"]
 
 FEDERATION_COUNT=N_VENDOR+N_RATINGSITE
 
@@ -52,6 +62,8 @@ QUERY_DIR = f"{WORK_DIR}/queries"
 MODEL_DIR = f"{WORK_DIR}/model"
 BENCH_DIR = f"{WORK_DIR}/benchmark/generation"
 TEMPLATE_DIR = f"{MODEL_DIR}/watdiv"
+
+LOGGER = fedshop_logger(Path(__file__).name)
 
 #=================
 # USEFUL FUNCTIONS
@@ -84,17 +96,17 @@ def deploy_virtuoso(container_infos_file, restart=False):
         shell("docker volume prune --force")
         time.sleep(2)
     # shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} up -d --scale {SPARQL_SERVICE_NAME}={N_BATCH}")
-    # wait_for_container(CONFIG["virtuoso"]["endpoints"], f"{BENCH_DIR}/virtuoso-up.txt", wait=1)
+    # wait_for_container(CONFIG_GEN["virtuoso"]["endpoints"], f"{BENCH_DIR}/virtuoso-up.txt", wait=1)
     
     shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} create --no-recreate --scale {SPARQL_SERVICE_NAME}={N_BATCH} {SPARQL_SERVICE_NAME}") # For docker-compose version > 2.15.1
-    SPARQL_CONTAINER_NAMES = CONFIG["virtuoso"]["container_names"]
+    SPARQL_CONTAINER_NAMES = CONFIG_GEN["virtuoso"]["container_names"]
     pd.DataFrame(SPARQL_CONTAINER_NAMES, columns=["Name"]).to_csv(str(container_infos_file), index=False)
 
     shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} stop {SPARQL_SERVICE_NAME}")
     return container_infos_file
 
 def start_generator(status_file):
-    exec_cmd = CONFIG["generator"]["exec"]
+    exec_cmd = CONFIG_GEN["generator"]["exec"]
     if os.system(f"command -v {exec_cmd}") == 0:
         with open(status_file, "w") as f:
             f.write(exec_cmd + "\n")
@@ -168,22 +180,43 @@ def check_file_stats(container_infos_file, batch_id):
 def activate_one_container(container_infos_file, batch_id):
     """ Activate one container while stopping all others
     """
-    container_infos_file = str(container_infos_file)
-    container_infos = pd.read_csv(container_infos_file)
-    batch_id = int(batch_id)
-    container_name = container_infos.loc[batch_id, "Name"]
 
-    if (container_status := check_container_status(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)) is None:
-        deploy_virtuoso(container_infos_file, restart=True)
+    is_virtuoso_restarted = False
+    VIRTUOSO_MANUAL_ENDPOINT = CONFIG_GEN["virtuoso"]["manual_port"]
+    if VIRTUOSO_MANUAL_ENDPOINT != -1:
+        if ping(f"http://localhost:{VIRTUOSO_MANUAL_ENDPOINT}/sparql") != 200:
+            raise RuntimeError(f"Virtuoso endpoint {VIRTUOSO_MANUAL_ENDPOINT} is not available!")
 
-    if container_status != "running":
-        print("Stopping all containers...")
-        shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} stop {SPARQL_SERVICE_NAME}")
-            
-        print(f"Starting container {container_name}...")
-        shell(f"docker start {container_name}")
-        container_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
-        wait_for_container(container_endpoint, f"{BENCH_DIR}/virtuoso-ok.txt", wait=1)
+    else:
+        LOGGER.info("Activating Virtuoso docker container...")
+        container_infos_file = str(container_infos_file)
+        container_infos = pd.read_csv(container_infos_file)
+        batch_id = int(batch_id)
+        container_name = container_infos.loc[batch_id, "Name"]
+
+        if (container_status := check_container_status(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)) is None:
+            deploy_virtuoso(container_infos_file, restart=True)
+
+        if container_status != "running":
+            print("Stopping all containers...")
+            shell(f"docker-compose -f {SPARQL_COMPOSE_FILE} stop {SPARQL_SERVICE_NAME}")
+                
+            print(f"Starting container {container_name}...")
+            shell(f"docker start {container_name}")
+            container_endpoint = get_docker_endpoint_by_container_name(SPARQL_COMPOSE_FILE, SPARQL_SERVICE_NAME, container_name)
+            wait_for_container(container_endpoint, f"{BENCH_DIR}/virtuoso-ok.txt", wait=1)
+
+    LOGGER.info("Activating proxy docker container...")
+    proxy_target = CONFIG_GEN["virtuoso"]["endpoints"][-1]
+    proxy_target = proxy_target.replace("/sparql", "/")
+    if ping(PROXY_SPARQL_ENDPOINT) == -1:
+        LOGGER.info("Starting proxy server...")
+        shell(f"docker-compose -f {PROXY_COMPOSE_FILE} up -d {PROXY_SERVICE_NAME}")
+    
+    while ping(PROXY_SPARQL_ENDPOINT) != 200:
+        os.system(f'curl -X GET {PROXY_SERVER + "set-destination"}?proxyTo={proxy_target}')
+        time.sleep(1)
+        #wait_for_container(PROXY_SPARQL_ENDPOINT, "/dev/null", logger , wait=1)
 
 #=================
 # PIPELINE
@@ -192,32 +225,12 @@ def activate_one_container(container_infos_file, batch_id):
 rule all:
     input: 
         expand(
-            "{benchDir}/metrics.csv",
-            benchDir=BENCH_DIR
+                "{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/rsa.sparql",
+                benchDir=BENCH_DIR,
+                query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
+                instance_id=range(N_QUERY_INSTANCES),
+                batch_id=range(N_BATCH)
         )
-
-rule merge_metrics:
-    priority: 1
-    input: expand("{{benchDir}}/metrics_batch{batch_id}.csv", batch_id=range(N_BATCH))
-    output: "{benchDir}/metrics.csv"
-    run: pd.concat((pd.read_csv(f) for f in input)).to_csv(f"{output}", index=False)
-
-rule compute_metrics:
-    priority: 2
-    threads: 1
-    input: 
-        provenance = expand(
-            "{{benchDir}}/{query}/instance_{instance_id}/batch_{{batch_id}}/provenance.csv",
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            instance_id=range(N_QUERY_INSTANCES)
-        ),
-        results = expand(
-            "{{benchDir}}/{query}/instance_{instance_id}/batch_{{batch_id}}/results.csv",
-            query=[Path(os.path.join(QUERY_DIR, f)).resolve().stem for f in os.listdir(QUERY_DIR) if f.endswith(".sparql")],
-            instance_id=range(N_QUERY_INSTANCES)
-        )
-    output: "{benchDir}/metrics_batch{batch_id}.csv"
-    shell: "python rsfb/metrics.py compute-metrics {CONFIGFILE} {output} {input.provenance}"
 
 rule ingest_virtuoso:
     priority: 4
@@ -225,7 +238,7 @@ rule ingest_virtuoso:
     input: 
         vendor=expand("{modelDir}/virtuoso/ingest_vendor_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
         ratingsite=expand("{modelDir}/virtuoso/ingest_ratingsite_batch{{batch_id}}.sh", modelDir=MODEL_DIR),
-    output: "{benchDir}/virtuoso_batch{batch_id}-ok.txt"
+    output: "{benchDir}/virtuoso_batch0-ok.txt"
     run: 
         container_infos = f"{BENCH_DIR}/container_infos.csv"
         activate_one_container(container_infos, wildcards.batch_id)
@@ -237,19 +250,6 @@ rule ingest_virtuoso:
         shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationVendor.test_vendor_nb_sources")
         shell(f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v TestGenerationRatingSite.test_ratingsite_nb_sources")
         shell(f'echo "OK" > {output}')
-
-        # test_proc = subprocess.run(
-        #     f"RSFB__CONFIGFILE={CONFIGFILE} RSFB__BATCHID={wildcards.batch_id} python -W ignore:UserWarning {WORK_DIR}/tests/test.py -v", 
-        #     capture_output=True, shell=True
-        # )
-
-        # if test_proc.returncode == 0:
-        #     with open(str(output), "w") as f:
-        #         f.write(test_proc.stdout.decode())
-        #         f.close()
-        # else: 
-        #     raise RuntimeError("The ingested data did not pass the tests. Check the output file for more information.")
-
 
 rule deploy_virtuoso:
     priority: 5
@@ -276,72 +276,16 @@ rule make_virtuoso_ingest_command_for_ratingsite:
     output: "{modelDir}/virtuoso/ingest_ratingsite_batch{batch_id}.sh"
     run: generate_virtuoso_scripts(input.container_infos, "ratingsite", output, wildcards.batch_id, N_RATINGSITE)
 
-rule execute_provenance_query:
-    priority: 3
-    threads: 1
-    #retries: 1
-    input: 
-        provenance_query="{benchDir}/{query}/instance_{instance_id}/provenance.sparql",
-        loaded_virtuoso="{benchDir}/virtuoso_batch{batch_id}-ok.txt",
-    output: 
-        default_source_selection="{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.csv",
-        opt_source_selection="{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/provenance.opt.csv"
-    run: 
-        activate_one_container(f"{BENCH_DIR}/container_infos.csv", wildcards.batch_id)
-
-        in_provenance_opt_query = f"{input.provenance_query}.opt"
-        in_provenance_opt_composition = f"{in_provenance_opt_query}.comp"
-
-        in_provenance_def_query = f"{input.provenance_query}"
-        in_provenance_def_composition = f"{in_provenance_def_query}.comp"
-
-        
-        shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_provenance_def_query} {output.default_source_selection} {wildcards.batch_id}")
-        shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_provenance_opt_query} {output.opt_source_selection} {wildcards.batch_id}")
-        #shell(f"python rsfb/query.py unwrap {output.opt_source_selection} {in_provenance_opt_composition} {in_provenance_def_composition}")
-
-rule build_provenance_query: 
-    """
-    From the data generated for the 10 shops (TODO: and the review datasets?), 
-    for each query template created in the previous step, 
-    we select 10 random values for the placeholders in the BSBM query templates.
-    """
-    priority: 6
-    threads: 5
-    input: 
-        injected="{benchDir}/{query}/instance_{instance_id}/injected.sparql",
-        injection_cache="{benchDir}/{query}/instance_{instance_id}/injection_cache.json"
-    output: 
-        provenance_query="{benchDir}/{query}/instance_{instance_id}/provenance.sparql",
-        provenance_composition="{benchDir}/{query}/instance_{instance_id}/provenance.sparql.comp"
-    run: 
-        shell("python rsfb/query.py build-provenance-query {input.injected} {output.provenance_query}")
-        in_provenance_opt_query = f"{QUERY_DIR}/{wildcards.query}.provenance.opt"
-        in_provenance_opt_composition = f"{in_provenance_opt_query}.comp"
-
-        out_provenance_opt_query = f"{output.provenance_query}.opt"
-        out_provenance_opt_composition = f"{out_provenance_opt_query}.comp"
-        if os.path.exists(in_provenance_opt_query):
-            shell(f"python rsfb/query.py inject-from-cache {in_provenance_opt_query} {input.injection_cache} {out_provenance_opt_query}")
-            shell(f"python rsfb/query.py inject-from-cache {in_provenance_opt_composition} {input.injection_cache} {out_provenance_opt_composition}")
-
 rule execute_workload_instances:
     priority: 7
     threads: 1
     input: 
         workload_instance="{benchDir}/{query}/instance_{instance_id}/injected.sparql",
-        loaded_virtuoso="{benchDir}/virtuoso_batch{batch_id}-ok.txt",
-    output: "{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/results.csv"
+        loaded_virtuoso="{benchDir}/virtuoso_batch9-ok.txt",
+    output: "{benchDir}/{query}/instance_{instance_id}/batch_{batch_id}/rsa.sparql"
     run: 
-        activate_one_container(f"{BENCH_DIR}/container_infos.csv", wildcards.batch_id)
-
-        in_injected_opt_query = f"{input.workload_instance}.opt"
-        in_injected_def_query = f"{input.workload_instance}"
-
-        if os.path.exists(in_injected_opt_query):
-            shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_injected_opt_query} {output} {wildcards.batch_id}")
-        else:
-            shell(f"python rsfb/query.py execute-query {CONFIGFILE} {in_injected_def_query} {output} {wildcards.batch_id}")
+        activate_one_container(f"{BENCH_DIR}/container_infos.csv", 9)
+        shell("python fedshop/engines/rsa.py create-service-query {CONFIGFILE} {input.workload_instance} {output} --batch-id {wildcards.batch_id}")
 
 rule instanciate_workload:
     priority: 7
@@ -358,13 +302,13 @@ rule instanciate_workload:
         batch_id = 0
     run:
         activate_one_container(f"{BENCH_DIR}/container_infos.csv", params.batch_id)
-        shell("python rsfb/query.py instanciate-workload {CONFIGFILE} {input.queryfile} {input.workload_value_selection} {output.injected_query} {wildcards.instance_id}")
+        shell("python fedshop/query.py instanciate-workload {CONFIGFILE} {input.queryfile} {input.workload_value_selection} {output.injected_query} {wildcards.instance_id}")
         
         in_injected_opt_query = f"{QUERY_DIR}/{wildcards.query}.injected.opt"
         out_injected_opt_query = f"{output.injected_query}.opt"
 
         if os.path.exists(in_injected_opt_query):
-            shell(f"python rsfb/query.py inject-from-cache {in_injected_opt_query} {output.injection_cache} {out_injected_opt_query}")
+            shell(f"python fedshop/query.py inject-from-cache {in_injected_opt_query} {output.injection_cache} {out_injected_opt_query}")
 
 rule create_workload_value_selection:
     priority: 8
@@ -376,7 +320,7 @@ rule create_workload_value_selection:
     params:
         n_query_instances = N_QUERY_INSTANCES
     shell:
-        "python rsfb/query.py create-workload-value-selection {input.value_selection_query} {input.value_selection} {output} {params.n_query_instances}"
+        "python fedshop/query.py create-workload-value-selection {input.value_selection_query} {input.value_selection} {output} {params.n_query_instances}"
 
 rule exec_value_selection_query:
     priority: 9
@@ -390,7 +334,7 @@ rule exec_value_selection_query:
         batch_id=0
     run: 
         activate_one_container(f"{BENCH_DIR}/container_infos.csv", params.batch_id)
-        shell("python rsfb/query.py execute-query {CONFIGFILE} {input.value_selection_query} {output} {params.batch_id}")
+        shell("python fedshop/query.py execute-query {CONFIGFILE} {input.value_selection_query} {output} {params.batch_id}")
 
 rule build_value_selection_query:
     priority: 10
@@ -398,4 +342,4 @@ rule build_value_selection_query:
     input: 
         queryfile=expand("{queryDir}/{{query}}.sparql", queryDir=QUERY_DIR)
     output: "{benchDir}/{query}/value_selection.sparql"
-    shell: "python rsfb/query.py build-value-selection-query {input.queryfile} {output}"
+    shell: "python fedshop/query.py build-value-selection-query {input.queryfile} {output}"
