@@ -40,3 +40,7 @@
 	path = engines/MULDER
 	url = https://github.com/mhoangvslev/MULDER.git
 	branch = master
+[submodule "engines/fedup"]
+	path = engines/fedup
+	url = https://github.com/mhoangvslev/fedup.git
+	branch = main
