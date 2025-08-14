@@ -48,7 +48,7 @@ A first evaluation of existing SPARQL Federation engines on **FedShop200** compu
 
 ## FedShop Data Generator
 
-The FedShop Data Generator is defined as three  [WatDiv](https://dsg.uwaterloo.ca/watdiv/) template models in [experiments/bsbm/model](experiments/bsbm/model/). These models follow the [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/) specification as closely as possible. Using WatDiv models allows changing the schema easily through the configuration file [`experiments/bsbm/config.yaml`](experiments/bsbm/config.yaml).
+The FedShop Data Generator is defined as three  [WatDiv](https://dsg.uwaterloo.ca/watdiv/) template models in [experiments/bsbm/model](experiments/bsbm/model/). These models follow the [BSBM](http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/) specification as closely as possible. Using WatDiv models allows changing the schema easily through the configuration file [`experiments/bsbm/snakefile/config.yaml`](experiments/bsbm/snakefile/config.yaml).
 
 Most of the parameters of FedShop are set in [`experiments/bsbm/snakemake/config.yaml`](experiments/bsbm/snakemake/config.yaml). It includes the number of products to generate, the number of vendors and rating sites. 
 
@@ -70,14 +70,14 @@ Such a process is very long and complex. All the artifacts produced during gener
 
 The overall workflow for FedShop generation is as follows:
 * Create the catalog of products (200000 by default)
-* Batch(0)= Create 10 autonomous vendors and 10 autonomous rating-sites sharing products from the catalog (products are replicated with local URL per vendors and rating sites). The distribution law can be controled with parameters declared in experiments/bsbm/config.yaml 
+* Batch(0)= Create 10 autonomous vendors and 10 autonomous rating-sites sharing products from the catalog (products are replicated with local URL per vendors and rating sites). The distribution law can be controled with parameters declared in experiments/bsbm/snakefile/config.yaml 
 * Workload= Instantiate the 12 template queries with 10 different random place-holders, such that each query return results.
 * Compute the optimal source assignment of each of the 120 queries of the Workload on Batch(0)
 * For i from 1 to 9
   * Batch(i)=Batch(i-1)+10 new vendors and 10 rating-sites
   * Compute the Reference Source Assignment (RSA) for each query of the Workload over Batch(i)
 
-We finished this process with a federation of 200 different federation members. This overall workflow can be changed thanks to parameters declared in experiments/bsbm/config.yaml 
+We finished this process with a federation of 200 different federation members. This overall workflow can be changed thanks to parameters declared in experiments/bsbm/snakefile/config.yaml 
 
 Please note:
 * The workflow is managed with the [Snakemake](https://snakemake.readthedocs.io/en/stable/) workflow management system. It allows the creation of reproducible and scalable data analyses. The snakemake files are located in experiments/bsbm/*.smk.
@@ -89,7 +89,7 @@ Please note:
 As the number of federation members can be high, having a SPARQL endpoint per federation member becomes hard. We ingested all shops and rating-sites over a single Virtuoso server as Virtual Endpoints,i.e.,  each shop and rating-site has its own Virtual SPARQL endpoint. The different configurations relative to Batch(i) are available to configure a given federated-query engine. It is possible at this stage to run all FedShop Benchmark with [Kobe](https://github.com/semagrow/kobe). However, we also provide a benchmark runner based on Snakemake that is convenient for managing failures during the execution of the benchmark.
 
 Federated-query engines must implement a [template](fedshop/engines/TemplateEngine.py) to be integrated in the evaluation workflow. Many templates are already written in [`fedshop/engines/`](fedshop/engines/). Once integrated, 
-the engine to be tested must be declared in `experiments/bsbm/config.yaml` to run.
+the engine to be tested must be declared in `experiments/bsbm/snakefile/config.yaml` to run.
 
 The following command allows to launch the evaluation:
 ```bash
@@ -99,7 +99,7 @@ OPTIONS:
 --clean [benchmark|metrics|instances][+db]: clean the benchmark|metrics|instances then (optional) destroy all database containers
 --touch : mark a phase as "terminated" so Snakemake would not rerun it.
 ```
-This launches the evaluation the FedShop workload over the different federations Batch(i) with the federated-query engines declared in experiments/bsbm/config.yaml. As for the generation, this process is long and complex and is managed by Snakemake. The evaluation rules are declared in experiments/bsbm/evaluate.smk. All the results are produced under experiments/bsbm/benchmark/evaluation.
+This launches the evaluation the FedShop workload over the different federations Batch(i) with the federated-query engines declared in experiments/bsbm/snakefile/config.yaml. As for the generation, this process is long and complex and is managed by Snakemake. The evaluation rules are declared in experiments/bsbm/evaluate.smk. All the results are produced under experiments/bsbm/benchmark/evaluation.
 
 Our [jupyter notebook](FedShop_Evaluation.ipynb) is already written to read results and computes the diverse metrics.
 
@@ -107,8 +107,8 @@ Our [jupyter notebook](FedShop_Evaluation.ipynb) is already written to read resu
 
 - [Load](https://github.com/mhoangvslev/RSFB/wiki/Quick-tutorial#saveload-model) our [basic model]() and mark both the generation and evaluation phases as "completed":
 ```bash
-python fedshop/benchmark.py generate data|queries experiments/bsbm/config.yaml --touch
-python fedshop/benchmark.py evaluate experiments/bsbm/config.yaml --touch
+python fedshop/benchmark.py generate data|queries experiments/bsbm/snakefile/config.yaml --touch
+python fedshop/benchmark.py evaluate experiments/bsbm/snakefile/config.yaml --touch
 ```
 
 - Register your engine's repo as a submodule:
@@ -141,7 +141,7 @@ cp TemplateEngine.py <your_engine>.py
 
 - Use [evaluate command](https://github.com/mhoangvslev/RSFB/wiki/Quick-tutorial#generationevaluation) to benchmark your engine:
 ```bash
-python fedshop/benchmark.py evaluate experiments/bsbm/config.yaml --clean metrics
+python fedshop/benchmark.py evaluate experiments/bsbm/snakefile/config.yaml --clean metrics
 
 ```
 
