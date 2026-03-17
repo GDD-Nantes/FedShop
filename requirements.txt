@@ -5,7 +5,7 @@ snakemake==7.18.1
 SPARQLWrapper==2.0.0
 rdflib==6.2.0
 fasttext-langdetect==1.0.3
-nltk==3.7
+nltk==3.9
 wget==3.2
 iso639-lang==2.1.0
 pandas==1.4.4
