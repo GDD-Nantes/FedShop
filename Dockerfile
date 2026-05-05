@@ -16,16 +16,19 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -
     && rm miniconda.sh
 
 RUN conda clean -afy && \
-    rm -rf /var/cache/apk/*
+    rm -rf /var/cache/apk/* && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
+    conda init bash && \
+    echo "conda activate fedshop" >> /root/.bashrc
 
 WORKDIR /FedShop
-# COPY . /FedShop/
-
-# Clone the repo
-RUN git clone --recurse-submodule https://github.com/mhoangvslev/FedShop.git /FedShop
-RUN pip install --no-cache Cython && pip install --no-cache git+https://github.com/oddconcepts/n2o.git
-RUN pip install --no-cache -r requirements.txt
-RUN python -m nltk.downloader stopwords punkt
+COPY . /FedShop/
+# RUN git clone --recurse-submodule https://github.com/mhoangvslev/FedShop.git /FedShop
+RUN conda env create -f environment.yml
+ENV PATH /root/miniconda/envs/fedshop/bin:$PATH
+#RUN pip install --no-cache Cython && pip install --no-cache git+https://github.com/oddconcepts/n2o.git
+RUN python -m nltk.downloader stopwords punkt wordnet
 
 # Install dependencies
 RUN curl -s https://bitbucket.org/mjensen/mvnvm/raw/master/mvn > /usr/bin/mvn && chmod a+x /usr/bin/mvn
