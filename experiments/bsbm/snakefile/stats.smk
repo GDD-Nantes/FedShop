@@ -10,7 +10,7 @@ import json
 
 import sys
 smk_directory = os.path.abspath(workflow.basedir)
-sys.path.append(os.path.join(Path(smk_directory).parent.parent, "fedshop"))
+sys.path.append(os.path.join(Path(smk_directory).parents[2], "fedshop"))
 
 from utils import load_config, get_docker_endpoint_by_container_name, check_container_status
 

@@ -12,7 +12,7 @@ import sys
 smk_directory = os.path.abspath(workflow.basedir)
 sys.path.append(os.path.join(Path(smk_directory).parent.parent, "fedshop"))
 
-from utils import load_config, get_docker_endpoint_by_container_name, check_container_status
+from utils import load_config
 
 #===============================
 # GENERATION PHASE:
@@ -43,7 +43,7 @@ TEMPLATE_DIR = f"{MODEL_DIR}/watdiv"
 #=================
 
 def start_generator(status_file):
-    exec_cmd = CONFIG_GEN["generator"]["exec"]
+    exec_cmd = CONFIG["generator"]["exec"]
     if os.system(f"command -v {exec_cmd}") == 0:
         with open(status_file, "w") as f:
             f.write(exec_cmd + "\n")
