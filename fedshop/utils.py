@@ -44,12 +44,47 @@ LOGGER = fedshop_logger(Path(__file__).name)
 
 def docker_check_container_running(container_name):
     try:
-        cmd = f"docker inspect -f '{{{{.State.Running}}}}' {container_name}"
         status = subprocess.check_output(f"docker inspect -f '{{{{.State.Running}}}}' {container_name}", shell=True)
         status = status.decode("utf-8").strip()
         return status == "true"
     except subprocess.CalledProcessError:
         return False
+
+def check_container_status(compose_file, service_name, container_name):
+    if docker_check_container_running(container_name):
+        return "running"
+    return "stopped"
+
+def get_docker_endpoint_by_container_name(container_name):
+    try:
+        # Try to get the host port mapped to 8890
+        cmd = f"docker inspect --format='{{{{(index (index .NetworkSettings.Ports \"8890/tcp\") 0).HostPort}}}}' {container_name}"
+        port = subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
+        return f"http://localhost:{port}/sparql"
+    except Exception:
+        # Fallback for host network or if port is not mapped
+        return "http://localhost:8890/sparql"
+
+def get_virtuoso_containers(compose_file, service_name):
+    try:
+        cmd = f"docker compose -f {compose_file} ps -a --format '{{{{.Name}}}}'"
+        output = subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
+        if not output: return []
+        return output.split("\n")
+    except Exception:
+        return []
+
+def get_docker_endpoints(compose_file, service_name):
+    containers = get_virtuoso_containers(compose_file, service_name)
+    return [get_docker_endpoint_by_container_name(c) for c in containers]
+
+# Register resolvers
+try:
+    OmegaConf.register_new_resolver("get_docker_endpoints", get_docker_endpoints)
+    OmegaConf.register_new_resolver("get_virtuoso_containers", get_virtuoso_containers)
+    OmegaConf.register_new_resolver("get_docker_endpoint", get_docker_endpoint_by_container_name)
+except Exception:
+    pass
 
 def str2n3(value):
     if str(value).startswith("http") or str(value).startswith("nodeID"): 
