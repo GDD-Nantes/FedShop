@@ -14,6 +14,23 @@ FedShop consists of three components:
 - The quickstart guide is available in the [Quickstart tutorial](https://github.com/GDD-Nantes/FedShop/wiki/1.-Quick-start)
 - How to configure FedShop and how to extend FedShop is available in the [wiki](https://github.com/GDD-Nantes/FedShop/wiki)
 
+## Setup
+
+### Using Docker
+FedShop is available as a Docker image. See the [Quickstart guide](https://github.com/GDD-Nantes/FedShop/wiki/1.-Quick-start) for instructions.
+
+### Using Conda
+You can create a Conda environment with all the necessary dependencies:
+
+```bash
+conda env create -f environment.yml
+conda activate fedshop
+# Install NLTK data
+python -m nltk.downloader stopwords punkt
+# Build WatDiv
+cd generators/watdiv && make rebuild && make install
+```
+
 FedShop has been published in ISWC2023 as a resource paper:
 - Dang, M. H., Aimonier-Davat, J., Molli, P., Hartig, O., Skaf-Molli, H., & Le Crom, Y. (2023, October). FedShop: A Benchmark for Testing the Scalability of SPARQL Federation Engines. In International Semantic Web Conference (pp. 285-301). Cham: Springer Nature Switzerland.
 - https://hal.science/hal-04180506/document 

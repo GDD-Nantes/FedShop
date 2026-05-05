@@ -1,0 +1,32 @@
+name: fedshop
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.8
+  - pip
+  - boost
+  - openjdk=11
+  - cython
+  - pip:
+      - click==8.1.3
+      - coloredlogs==15.0.1
+      - snakemake==7.18.1
+      - SPARQLWrapper==2.0.0
+      - rdflib==6.2.0
+      - fasttext-langdetect==1.0.3
+      - nltk==3.9
+      - wget==3.2
+      - iso639-lang==2.1.0
+      - pandas==1.4.4
+      - omegaconf==2.2.3
+      - coloredlogs==15.0.1
+      - seaborn==0.12.1
+      - scikit-learn==1.2.0
+      - statsmodels==0.13.5
+      - numpy==1.22.0
+      - colorlog==6.7.0
+      - python-textops3==3.2.1
+      - pulp==2.3.1
+      - git+https://github.com/oddconcepts/n2o.git
