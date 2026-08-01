@@ -43,3 +43,6 @@
 [submodule "generators/lubm-uba"]
 	path = generators/lubm-uba
 	url = https://github.com/rvesse/lubm-uba.git
+[submodule "wiki"]
+	path = wiki
+	url = https://github.com/GDD-Nantes/FedShop.wiki.git
