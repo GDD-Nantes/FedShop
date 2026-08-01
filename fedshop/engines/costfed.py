@@ -15,10 +15,9 @@ from sklearn.preprocessing import LabelEncoder
 import psutil
 
 import sys
-sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import load_config, fedshop_logger, str2n3, create_stats
-import fedx
+from ..utils import load_config, fedshop_logger, str2n3, create_stats
+from . import fedx
 
 logger = fedshop_logger(Path(__file__).name)
 

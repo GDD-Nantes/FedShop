@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from utils import LOGGER
+from .utils import LOGGER
 
 @click.group
 def cli():

@@ -5,7 +5,7 @@ from typing import Dict, Tuple
 import click
 import pandas as pd
 import numpy as np
-from utils import load_config, fedshop_logger
+from .utils import load_config, fedshop_logger
 from tqdm import tqdm
 
 logger = fedshop_logger(Path(__file__).name)

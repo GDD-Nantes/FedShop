@@ -5,7 +5,7 @@ import re
 import shutil
 import subprocess
 import click
-from utils import load_config, fedshop_logger
+from .utils import load_config, fedshop_logger
 import requests
 import time
 

@@ -12,10 +12,9 @@ import csv
 from itertools import zip_longest
 
 import sys
-sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 #sys.set_int_max_str_digits(0)
 
-from utils import kill_process, load_config, str2n3
+from ..utils import kill_process, load_config, str2n3
 # Example of use : 
 # python3 utils/generate-fedx-config-file.py experiments/bsbm/model/vendor test/out.ttl
 
