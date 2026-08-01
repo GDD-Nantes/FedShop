@@ -1,1 +1,22 @@
-{"http://www.vendor0.fr/": "http://localhost:8890/vendor0/sparql", "http://www.vendor1.fr/": "http://localhost:8890/vendor1/sparql", "http://www.vendor2.fr/": "http://localhost:8890/vendor2/sparql", "http://www.vendor3.fr/": "http://localhost:8890/vendor3/sparql", "http://www.vendor4.fr/": "http://localhost:8890/vendor4/sparql", "http://www.vendor5.fr/": "http://localhost:8890/vendor5/sparql", "http://www.vendor6.fr/": "http://localhost:8890/vendor6/sparql", "http://www.vendor7.fr/": "http://localhost:8890/vendor7/sparql", "http://www.vendor8.fr/": "http://localhost:8890/vendor8/sparql", "http://www.vendor9.fr/": "http://localhost:8890/vendor9/sparql", "http://www.ratingsite0.fr/": "http://localhost:8890/ratingsite0/sparql", "http://www.ratingsite1.fr/": "http://localhost:8890/ratingsite1/sparql", "http://www.ratingsite2.fr/": "http://localhost:8890/ratingsite2/sparql", "http://www.ratingsite3.fr/": "http://localhost:8890/ratingsite3/sparql", "http://www.ratingsite4.fr/": "http://localhost:8890/ratingsite4/sparql", "http://www.ratingsite5.fr/": "http://localhost:8890/ratingsite5/sparql", "http://www.ratingsite6.fr/": "http://localhost:8890/ratingsite6/sparql", "http://www.ratingsite7.fr/": "http://localhost:8890/ratingsite7/sparql", "http://www.ratingsite8.fr/": "http://localhost:8890/ratingsite8/sparql", "http://www.ratingsite9.fr/": "http://localhost:8890/ratingsite9/sparql"}
+{
+  "http://www.vendor0.fr/": "http://localhost:34200/vendor0/sparql",
+  "http://www.vendor1.fr/": "http://localhost:34201/vendor1/sparql",
+  "http://www.vendor2.fr/": "http://localhost:34202/vendor2/sparql",
+  "http://www.vendor3.fr/": "http://localhost:34203/vendor3/sparql",
+  "http://www.vendor4.fr/": "http://localhost:34204/vendor4/sparql",
+  "http://www.vendor5.fr/": "http://localhost:34205/vendor5/sparql",
+  "http://www.vendor6.fr/": "http://localhost:34206/vendor6/sparql",
+  "http://www.vendor7.fr/": "http://localhost:34207/vendor7/sparql",
+  "http://www.vendor8.fr/": "http://localhost:34208/vendor8/sparql",
+  "http://www.vendor9.fr/": "http://localhost:34209/vendor9/sparql",
+  "http://www.ratingsite0.fr/": "http://localhost:34210/ratingsite0/sparql",
+  "http://www.ratingsite1.fr/": "http://localhost:34211/ratingsite1/sparql",
+  "http://www.ratingsite2.fr/": "http://localhost:34212/ratingsite2/sparql",
+  "http://www.ratingsite3.fr/": "http://localhost:34213/ratingsite3/sparql",
+  "http://www.ratingsite4.fr/": "http://localhost:34214/ratingsite4/sparql",
+  "http://www.ratingsite5.fr/": "http://localhost:34215/ratingsite5/sparql",
+  "http://www.ratingsite6.fr/": "http://localhost:34216/ratingsite6/sparql",
+  "http://www.ratingsite7.fr/": "http://localhost:34217/ratingsite7/sparql",
+  "http://www.ratingsite8.fr/": "http://localhost:34218/ratingsite8/sparql",
+  "http://www.ratingsite9.fr/": "http://localhost:34219/ratingsite9/sparql"
+}
