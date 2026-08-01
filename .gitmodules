@@ -40,9 +40,6 @@
 	path = engines/fedup
 	url = https://github.com/mhoangvslev/fedup.git
 	branch = main
-[submodule "generators/lubm-uba"]
-	path = generators/lubm-uba
-	url = https://github.com/rvesse/lubm-uba.git
 [submodule "wiki"]
 	path = wiki
 	url = https://github.com/GDD-Nantes/FedShop.wiki.git
