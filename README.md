@@ -19,6 +19,30 @@ FedShop consists of three components:
 ### Using Docker
 FedShop is available as a Docker image. See the [Quickstart guide](https://github.com/GDD-Nantes/FedShop/wiki/1.-Quick-start) for instructions.
 
+### Using uv
+
+You can set up a local environment with [uv](https://docs.astral.sh/uv/), which will download the pinned Python 3.8 interpreter and install all dependencies declared in [`pyproject.toml`](pyproject.toml):
+
+```bash
+uv sync
+# Install NLTK data
+uv run python -m nltk.downloader stopwords punkt
+# Build WatDiv
+cd generators/watdiv && make rebuild && make install
+```
+
+`uv sync` only manages the Python dependencies; `boost` and `openjdk` (required to build WatDiv and to run Virtuoso/Java-based engines) still need to be installed on your system separately (or use the Conda environment below, which provides them).
+
+Once synced, the `fedshop` CLI is available as a shortcut:
+
+```bash
+uv run fedshop generate data|queries experiments/bsbm/snakefile/config.yaml [OPTIONS]
+uv run fedshop evaluate experiments/bsbm/snakefile/config.yaml [OPTIONS]
+uv run fedshop --help
+```
+
+Every other CLI in the codebase (`fedshop/query.py`, `fedshop/metrics.py`, `fedshop/virtuoso.py`, `fedshop/generate.py`, and each `fedshop/engines/*.py`) is registered the same way, e.g. `uv run fedshop-query --help` or `uv run fedshop-engine-fedx --help`; see [`pyproject.toml`](pyproject.toml) for the full list. Internally, Snakemake rules invoke these as modules, e.g. `python -m fedshop.query ...` or `python -m fedshop.engines.fedx ...`.
+
 ### Using Conda
 You can create a Conda environment with all the necessary dependencies:
 
@@ -76,7 +100,7 @@ Basic statistics about the default configuration of FedShop are available in the
 Once `config.yaml` properly set, you can launch the generation of the FedShop benchmark with the following command:
 
 ```bash
-python fedshop/benchmark.py generate data|queries experiments/bsbm/snakefile/config.yaml  [OPTIONS]
+uv run fedshop generate data|queries experiments/bsbm/snakefile/config.yaml  [OPTIONS]
 
 OPTIONS:
 --clean [benchmark|metrics|instances][+db]: clean the benchmark|metrics|instances then (optional) destroy all database containers
@@ -110,7 +134,7 @@ the engine to be tested must be declared in `experiments/bsbm/snakefile/config.y
 
 The following command allows to launch the evaluation:
 ```bash
-python fedshop/benchmark.py evaluate experiments/bsbm/snakemake/config.yaml --rerun-incomplete [OPTIONS]
+uv run fedshop evaluate experiments/bsbm/snakemake/config.yaml --rerun-incomplete [OPTIONS]
 
 OPTIONS:
 --clean [benchmark|metrics|instances][+db]: clean the benchmark|metrics|instances then (optional) destroy all database containers
@@ -124,8 +148,8 @@ Our [jupyter notebook](FedShop_Evaluation.ipynb) is already written to read resu
 
 - [Load](https://github.com/mhoangvslev/RSFB/wiki/Quick-tutorial#saveload-model) our [basic model]() and mark both the generation and evaluation phases as "completed":
 ```bash
-python fedshop/benchmark.py generate data|queries experiments/bsbm/snakefile/config.yaml --touch
-python fedshop/benchmark.py evaluate experiments/bsbm/snakefile/config.yaml --touch
+uv run fedshop generate data|queries experiments/bsbm/snakefile/config.yaml --touch
+uv run fedshop evaluate experiments/bsbm/snakefile/config.yaml --touch
 ```
 
 - Register your engine's repo as a submodule:
@@ -150,15 +174,20 @@ evaluation:
 
 - Make `<your_engine>.py`:
 ```bash
-cd rsfb/engines/
+cd fedshop/engines/
 cp TemplateEngine.py <your_engine>.py
+```
+
+- Register the new console-script shortcut in [`pyproject.toml`](pyproject.toml) under `[project.scripts]`:
+```toml
+fedshop-engine-<your_engine> = "fedshop.engines.<your_engine>:cli"
 ```
 
 - Implement every function within `<your_engine>.py`.
 
 - Use [evaluate command](https://github.com/mhoangvslev/RSFB/wiki/Quick-tutorial#generationevaluation) to benchmark your engine:
 ```bash
-python fedshop/benchmark.py evaluate experiments/bsbm/snakefile/config.yaml --clean metrics
+uv run fedshop evaluate experiments/bsbm/snakefile/config.yaml --clean metrics
 
 ```
 
@@ -172,16 +201,16 @@ python fedshop/benchmark.py evaluate experiments/bsbm/snakefile/config.yaml --cl
 rm -rf .snakemake
 
 # Continue the workflow if interrupted 
-python fedshop/benchmark.py generate|evaluate experiments/bsbm/snakemake/config.yaml --rerun-incomplete
+uv run fedshop generate|evaluate experiments/bsbm/snakemake/config.yaml --rerun-incomplete
 
 # Delete everything and restart
-python fedshop/benchmark.py generate|evaluate experiments/bsbm/snakemake/config.yaml --rerun-incomplete --clean all
+uv run fedshop generate|evaluate experiments/bsbm/snakemake/config.yaml --rerun-incomplete --clean all
 
 # Keep the data but remove the intermediary artefacts and db containers.
-python fedshop/benchmark.py generate data|queries experiments/bsbm/snakemake/config.yaml --rerun-incomplete --clean benchmark+db
+uv run fedshop generate data|queries experiments/bsbm/snakemake/config.yaml --rerun-incomplete --clean benchmark+db
 
 # Only remove the metrics files, applicable when you need to rerun some of the steps
-python fedshop/benchmark.py generate data|queries experiments/bsbm/snakemake/config.yaml --rerun-incomplete --clean metrics
+uv run fedshop generate data|queries experiments/bsbm/snakemake/config.yaml --rerun-incomplete --clean metrics
 
 ```
 
