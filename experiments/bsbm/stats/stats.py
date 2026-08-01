@@ -10,14 +10,8 @@ import pandas as pd
 import os
 from pathlib import Path
 
-import sys
-
-directory = os.path.abspath(__file__)
-print(Path(directory).parent.parent.parent.parent)
-sys.path.append(os.path.join(Path(directory).parent.parent.parent.parent, "fedshop")) 
-
-from query import exec_query
-from utils import load_config, activate_one_container, fedshop_logger
+from fedshop.query import exec_query
+from fedshop.utils import load_config, activate_one_container, fedshop_logger
 
 @click.group
 def cli():

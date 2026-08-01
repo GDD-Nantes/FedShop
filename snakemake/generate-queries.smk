@@ -136,8 +136,8 @@ rule execute_instances:
 
         composition_file = f"{Path(str(input)).parent}/composition.json"
         if not os.path.exists(composition_file):
-            shell("python fedshop/query.py decompose-query {input} {composition_file}")
-        shell("python fedshop/query.py execute-query {params.endpoint_batch0} --queryfile={input} --outfile={output}")
+            shell("python -m fedshop.query decompose-query {input} {composition_file}")
+        shell("python -m fedshop.query execute-query {params.endpoint_batch0} --queryfile={input} --outfile={output}")
 
 rule instanciate_workload:
     threads: 1
@@ -149,7 +149,7 @@ rule instanciate_workload:
     params:
         batch_id = 0
     run:
-        shell("python fedshop/query.py instanciate-workload {input.queryfile} {input.workload_value_selection} {output.injected_query} {wildcards.instance_id}")
+        shell("python -m fedshop.query instanciate-workload {input.queryfile} {input.workload_value_selection} {output.injected_query} {wildcards.instance_id}")
         
 rule create_workload_value_selection:
     threads: 5
@@ -169,7 +169,7 @@ rule create_workload_value_selection:
                 time.sleep(1)
 
         constfile = f"{QUERY_DIR}/{wildcards.query}.const.json"
-        shell(f"python fedshop/query.py create-workload-value-selection {CONFIGFILE} {constfile} {input.value_selection_infos} {output} {params.n_query_instances}")
+        shell(f"python -m fedshop.query create-workload-value-selection {CONFIGFILE} {constfile} {input.value_selection_infos} {output} {params.n_query_instances}")
 
 rule build_value_selection_query:
     threads: 5
@@ -177,4 +177,4 @@ rule build_value_selection_query:
         constfile = expand("{queryDir}/{{query}}.const.json", queryDir=QUERY_DIR),
         queryfile = expand("{queryDir}/{{query}}.sparql", queryDir=QUERY_DIR)
     output: "{benchDir}/{query}/value_selection.json"
-    shell: "python fedshop/query.py build-value-selection-query {input.queryfile} {input.constfile} {output}"
+    shell: "python -m fedshop.query build-value-selection-query {input.queryfile} {input.constfile} {output}"

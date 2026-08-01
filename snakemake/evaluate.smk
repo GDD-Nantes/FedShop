@@ -150,7 +150,7 @@ rule compute_metrics:
             attempt_id=ATTEMPT_ID
         ),
     output: "{benchDir}/eval_metrics_batch{batch_id}.csv"
-    shell: "python fedshop/metrics.py compute-metrics {CONFIGFILE} {output} {input.provenance}"
+    shell: "python -m fedshop.metrics compute-metrics {CONFIGFILE} {output} {input.provenance}"
 
 rule transform_provenance:
     input: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/source_selection.txt"
@@ -158,14 +158,14 @@ rule transform_provenance:
     params:
         composition=expand("{workDir}/benchmark/generation/{{query}}/instance_{{instance_id}}/composition.json", workDir=WORK_DIR)
     run: 
-        shell("python fedshop/engines/{wildcards.engine}.py transform-provenance {input} {output} {params.composition}")
+        shell("python -m fedshop.engines.{wildcards.engine} transform-provenance {input} {output} {params.composition}")
 
 rule transform_results:
     input: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.txt"
     output: "{benchDir}/{engine}/{query}/instance_{instance_id}/batch_{batch_id}/attempt_{attempt_id}/results.csv"
     run:
         # Transform results
-        shell("python fedshop/engines/{wildcards.engine}.py transform-results {input} {output}")
+        shell("python -m fedshop.engines.{wildcards.engine} transform-results {input} {output}")
         if os.stat(str(output)).st_size > 0:
             expected_results = pd.read_csv(f"{WORK_DIR}/benchmark/generation/{wildcards.query}/instance_{wildcards.instance_id}/batch_{wildcards.batch_id}/results.csv").dropna(how="all", axis=1)
             expected_results = expected_results.reindex(sorted(expected_results.columns), axis=1)
@@ -229,12 +229,12 @@ rule evaluate_engines:
         engine = str(wildcards.engine)
         batch_id = int(wildcards.batch_id)
         engine_dir = CONFIG_EVAL["engines"][engine]["dir"]
-        shell(f"python fedshop/engines/{engine}.py generate-config-file {CONFIGFILE} {batch_id}")
+        shell(f"python -m fedshop.engines.{engine} generate-config-file {CONFIGFILE} {batch_id}")
         
         if USE_DOCKER:
-            shell(f"python fedshop/virtuoso.py virtuoso-kill-all-transactions --container-name={SPARQL_CONTAINER_NAME}")
+            shell(f"python -m fedshop.virtuoso virtuoso-kill-all-transactions --container-name={SPARQL_CONTAINER_NAME}")
         else:
-            shell(f"python fedshop/virtuoso.py virtuoso-kill-all-transactions --isql={VIRTUOSO_PATH_TO_ISQL}")
+            shell(f"python -m fedshop.virtuoso virtuoso-kill-all-transactions --isql={VIRTUOSO_PATH_TO_ISQL}")
 
         # Early stop if earlier attempts got timed out
         skipBatch = batch_id - 1
@@ -264,22 +264,22 @@ rule evaluate_engines:
         previous_reason = str(skip_stats_file | cat() | find_first_pattern([r"(timeout)"]))
 
         if NO_EXEC:
-            shell("python fedshop/engines/{engine}.py run-benchmark {CONFIGFILE} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --query-plan {params.query_plan} --batch-id {batch_id} --noexec")
+            shell("python -m fedshop.engines.{engine} run-benchmark {CONFIGFILE} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --query-plan {params.query_plan} --batch-id {batch_id} --noexec")
 
         else:
             if canSkip and previous_reason != "":
                 LOGGER.info(skipReason)
-                shell("python fedshop/engines/{engine}.py run-benchmark {CONFIGFILE} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --query-plan {params.query_plan} --batch-id {batch_id} --noexec")
+                shell("python -m fedshop.engines.{engine} run-benchmark {CONFIGFILE} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --query-plan {params.query_plan} --batch-id {batch_id} --noexec")
                 create_stats(str(output.stats), previous_reason)
                 # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{previous_batch}/attempt_{wildcards.attempt_id}/stats.csv {output.stats}")
                 # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/query_plan.txt {params.query_plan}")
                 # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/source_selection.txt {output.source_selection}")
                 # shell(f"cp {BENCH_DIR}/{wildcards.engine}/{wildcards.query}/instance_{wildcards.instance_id}/batch_{skipBatch}/attempt_{skipAttempt}/results.txt {output.result_txt}")
             else:
-                shell("python fedshop/engines/{engine}.py run-benchmark {CONFIGFILE} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --query-plan {params.query_plan} --batch-id {batch_id}")
+                shell("python -m fedshop.engines.{engine} run-benchmark {CONFIGFILE} {input.query} --out-result {output.result_txt}  --out-source-selection {output.source_selection} --stats {output.stats} --query-plan {params.query_plan} --batch-id {batch_id}")
 
 
 rule engines_prerequisites:
     output: "{benchDir}/{engine}/{engine}-ok.txt"
-    shell: "python fedshop/engines/{wildcards.engine}.py prerequisites {CONFIGFILE} && echo 'OK' > {output}"
+    shell: "python -m fedshop.engines.{wildcards.engine} prerequisites {CONFIGFILE} && echo 'OK' > {output}"
 

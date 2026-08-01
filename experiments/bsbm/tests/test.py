@@ -27,16 +27,12 @@ from statsmodels.stats.proportion import proportions_chisquare, proportions_ztes
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
-import sys
-directory = os.path.abspath(__file__)
-sys.path.append(os.path.join(Path(directory).parent.parent.parent.parent, "fedshop"))
+from fedshop.utils import load_config
+from fedshop.query import exec_query
 
 @click.group
 def cli():
     pass
-
-from utils import load_config
-from query import exec_query
 
 BATCH_ID = int(os.environ["RSFB__BATCHID"])
 CONFIGFILE = os.environ["RSFB__CONFIGFILE"]
