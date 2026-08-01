@@ -1,0 +1,57 @@
+[project]
+name = "fedshop"
+version = "0.1.0"
+description = "FedShop: The Federated Shop Benchmark"
+readme = "README.md"
+license = "GPL-3.0-only"
+requires-python = "==3.8.*"
+dependencies = [
+    "click==8.1.3",
+    "coloredlogs==15.0.1",
+    "snakemake==7.18.1",
+    "sparqlwrapper==2.0.0",
+    "rdflib==6.2.0",
+    "fasttext-langdetect==1.0.3",
+    "nltk==3.9b1",
+    "wget==3.2",
+    "iso639-lang==2.1.0",
+    "pandas==1.4.4",
+    "omegaconf==2.2.3",
+    "seaborn==0.12.1",
+    "scikit-learn==1.2.0",
+    "statsmodels==0.13.5",
+    "numpy==1.22.0",
+    "colorlog==6.7.0",
+    "python-textops3==3.2.1",
+    "pulp==2.3.1",
+    "psutil",
+    "pyparsing",
+    "scipy",
+    "tqdm",
+    "matplotlib",
+]
+
+[project.scripts]
+fedshop = "fedshop.benchmark:cli"
+fedshop-query = "fedshop.query:cli"
+fedshop-generate = "fedshop.generate:cli"
+fedshop-metrics = "fedshop.metrics:cli"
+fedshop-virtuoso = "fedshop.virtuoso:cli"
+fedshop-engine-template = "fedshop.engines.TemplateEngine:cli"
+fedshop-engine-fedx = "fedshop.engines.fedx:cli"
+fedshop-engine-costfed = "fedshop.engines.costfed:cli"
+fedshop-engine-splendid = "fedshop.engines.splendid:cli"
+fedshop-engine-semagrow = "fedshop.engines.semagrow:cli"
+fedshop-engine-mulder = "fedshop.engines.mulder:cli"
+fedshop-engine-anapsid = "fedshop.engines.anapsid:cli"
+fedshop-engine-hibiscus = "fedshop.engines.hibiscus:cli"
+fedshop-engine-odyssey = "fedshop.engines.odyssey:cli"
+fedshop-engine-fedup = "fedshop.engines.fedup:cli"
+fedshop-engine-rsa = "fedshop.engines.rsa:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["fedshop"]

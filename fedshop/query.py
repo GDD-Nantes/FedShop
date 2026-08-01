@@ -16,8 +16,8 @@ from rdflib.plugins.sparql.parser import parseQuery
 from rdflib.plugins.sparql.algebra import _traverseAgg, traverse, translateQuery, pprintAlgebra
 from rdflib.plugins.sparql.parserutils import CompValue
 
-from algebra.rdflib_algebra import add_graph_to_triple_pattern, add_values_with_placeholders, collect_triple_variables, collect_variables, disable_offset, disable_orderby_limit, extract_where, inject_constant_into_placeholders, remove_filter_with_placeholders, replace_select_projection_with_graph, translateAlgebra
-from algebra.pandas_algebra import collect_constants, parse_expr, translate_query
+from .algebra.rdflib_algebra import add_graph_to_triple_pattern, add_values_with_placeholders, collect_triple_variables, collect_variables, disable_offset, disable_orderby_limit, extract_where, inject_constant_into_placeholders, remove_filter_with_placeholders, replace_select_projection_with_graph, translateAlgebra
+from .algebra.pandas_algebra import collect_constants, parse_expr, translate_query
 
 import re
 import numpy as np
@@ -26,7 +26,7 @@ from SPARQLWrapper import SPARQLWrapper, CSV
 from io import BytesIO, StringIO
 import click
 
-from utils import load_config, fedshop_logger
+from .utils import load_config, fedshop_logger
 logger = fedshop_logger(Path(__file__).name)
 
 import nltk

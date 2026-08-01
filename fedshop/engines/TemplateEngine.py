@@ -13,9 +13,8 @@ from pathlib import Path
 
 import sys
 import requests
-sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import create_stats, kill_process, load_config, fedshop_logger, str2n3
+from ..utils import create_stats, kill_process, load_config, fedshop_logger, str2n3
 logger = fedshop_logger(Path(__file__).name)
 
 

@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 import click
 import subprocess
-from utils import load_config, kill_process, fedshop_logger
+from .utils import load_config, kill_process, fedshop_logger
 import psutil
 
 logger = fedshop_logger(Path(__file__).name)

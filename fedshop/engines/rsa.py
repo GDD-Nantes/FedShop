@@ -16,16 +16,15 @@ import sys
 from rdflib import URIRef
 import requests
 from tqdm import tqdm
-sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from algebra.rdflib_algebra import add_service_to_triple_blocks, add_values_with_placeholders
-from utils import load_config, fedshop_logger, create_stats
-from query import export_query, exec_query_on_endpoint, parse_query_proc
+from ..algebra.rdflib_algebra import add_service_to_triple_blocks, add_values_with_placeholders
+from ..utils import load_config, fedshop_logger, create_stats
+from ..query import export_query, exec_query_on_endpoint, parse_query_proc
 from rdflib.plugins.sparql.algebra import traverse
 
 logger = fedshop_logger(Path(__file__).name)
 
-import fedup
+from . import fedup
 
 # How to use
 # 1. Duplicate this file and rename the new file with <engine>.py

@@ -67,7 +67,7 @@ rule generate_ratingsites:
         status=expand("{workDir}/generator-ok.txt", workDir=WORK_DIR),
         product=ancient(CONFIG["schema"]["product"]["export_output_dir"])
     output: "{modelDir}/dataset/ratingsite{ratingsite_id}.nq"
-    shell: "python fedshop/generate.py generate {CONFIGFILE} ratingsite {output} --id {wildcards.ratingsite_id}"
+    shell: "python -m fedshop.generate generate {CONFIGFILE} ratingsite {output} --id {wildcards.ratingsite_id}"
 
 rule generate_vendors:
     priority: 13
@@ -76,14 +76,14 @@ rule generate_vendors:
         status=expand("{workDir}/generator-ok.txt", workDir=WORK_DIR),
         product=ancient(CONFIG["schema"]["product"]["export_output_dir"])
     output: "{modelDir}/dataset/vendor{vendor_id}.nq"
-    shell: "python fedshop/generate.py generate {CONFIGFILE} vendor {output} --id {wildcards.vendor_id}"
+    shell: "python -m fedshop.generate generate {CONFIGFILE} vendor {output} --id {wildcards.vendor_id}"
 
 rule generate_products:
     priority: 14
     threads: 1
     input: expand("{workDir}/generator-ok.txt", workDir=WORK_DIR)
     output: directory(CONFIG["schema"]["product"]["export_output_dir"]), 
-    shell: 'python fedshop/generate.py generate {CONFIGFILE} product {output}'
+    shell: 'python -m fedshop.generate generate {CONFIGFILE} product {output}'
 
 rule start_generator_container:
     output: "{workDir}/generator-ok.txt"

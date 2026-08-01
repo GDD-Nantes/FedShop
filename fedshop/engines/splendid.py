@@ -16,10 +16,9 @@ import sys
 import requests
 
 from sklearn.calibration import LabelEncoder
-sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
 
-from utils import check_container_status, kill_process, load_config, fedshop_logger, create_stats
-import fedx
+from ..utils import check_container_status, kill_process, load_config, fedshop_logger, create_stats
+from . import fedx
 
 logger = fedshop_logger(Path(__file__).name)
 # Example of use : 

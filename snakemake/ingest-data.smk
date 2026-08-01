@@ -131,9 +131,9 @@ rule create_federation_endpoints:
             proxy_mapping[fed_member_iri] = proxy_target
             
             if USE_DOCKER:
-                shell(f"python fedshop/virtuoso.py create-sparql-endpoint --container-name={SPARQL_CONTAINER_NAME} --on-duplicate=REPLACE --host={host} --lpath={lpath} {fed_member_iri}")
+                shell(f"python -m fedshop.virtuoso create-sparql-endpoint --container-name={SPARQL_CONTAINER_NAME} --on-duplicate=REPLACE --host={host} --lpath={lpath} {fed_member_iri}")
             else:
-                shell(f'python fedshop/virtuoso.py create-sparql-endpoint --isql="{VIRTUOSO_PATH_TO_ISQL}" --on-duplicate=REPLACE --host={host} --lpath={lpath} {fed_member_iri}')
+                shell(f'python -m fedshop.virtuoso create-sparql-endpoint --isql="{VIRTUOSO_PATH_TO_ISQL}" --on-duplicate=REPLACE --host={host} --lpath={lpath} {fed_member_iri}')
 
             NET_PORT += 1
 
@@ -158,9 +158,9 @@ rule ingest_data:
 
             
             datafiles = [ f.replace(DATA_DIR + "/", "") for f in input.datafiles ]
-            shell(f'python fedshop/virtuoso.py ingest-data --container-name {SPARQL_CONTAINER_NAME} --datafiles "{",".join(datafiles)}"')
+            shell(f'python -m fedshop.virtuoso ingest-data --container-name {SPARQL_CONTAINER_NAME} --datafiles "{",".join(datafiles)}"')
         else:
-            shell(f'python fedshop/virtuoso.py ingest-data --isql "{VIRTUOSO_PATH_TO_ISQL}" --datapath {os.path.realpath(VIRTUOSO_PATH_TO_DATA)} --datafiles "{",".join(datafiles)}"')
+            shell(f'python -m fedshop.virtuoso ingest-data --isql "{VIRTUOSO_PATH_TO_ISQL}" --datapath {os.path.realpath(VIRTUOSO_PATH_TO_DATA)} --datafiles "{",".join(datafiles)}"')
         
         validate(str(output))
 

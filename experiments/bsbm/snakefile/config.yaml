@@ -105,7 +105,6 @@ evaluation:
     port: 5555
     endpoint: "http://${evaluation.proxy.host}:${evaluation.proxy.port}/"
     container_name: "docker-fedshop-proxy-1"
-    targets: "${get_proxy_target: }"
   engines:
     fedx:
       dir: "engines/FedX"
